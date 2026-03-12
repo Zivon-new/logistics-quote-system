@@ -1,0 +1,61 @@
+# 新架构文件清单
+
+## 📄 核心代码文件
+
+### 基础框架
+- scripts/modules/extractors/base_extractor.py       (基础提取器，310行，详细注释)
+- scripts/modules/extractors/__init__.py
+
+### 独立提取器  
+- scripts/modules/extractors/route_extractor_v2.py   (路线提取器，350行，详细注释)
+- scripts/modules/extractors/agent_extractor_v2.py   (代理提取器，380行，详细注释)
+
+### 数据组装
+- scripts/modules/assembler/data_assembler.py        (数据组装器，220行，详细注释)
+- scripts/modules/assembler/__init__.py
+
+## 📖 文档文件
+
+- README.md              (快速开始指南，200行)
+- CODE_GUIDE.md          (详细代码导览，800行，必读！)
+- example_usage.py       (完整使用示例，250行，详细注释)
+- FILE_LIST.txt          (本文件)
+
+## 📊 统计
+
+- 总代码行数: ~1,500行（包含注释）
+- 核心代码文件: 5个
+- 文档文件: 4个
+- 所有代码都有详细的中文注释
+- 所有文档都有完整的使用说明
+
+## 🎯 关键特性
+
+1. ✅ 完全保留现有规则（复用route_extractor.py等）
+2. ✅ 独立提取架构（agent失败不影响route）
+3. ✅ 明确验证标准（4个route标准，3个agent标准）
+4. ✅ LLM使用严格控制（3个条件判断）
+5. ✅ 详细的中文注释（每个方法都有说明）
+6. ✅ 完整的文档和示例
+
+## 📝 使用建议
+
+1. 先阅读 README.md（5分钟）
+2. 再阅读 CODE_GUIDE.md（20分钟，了解架构）
+3. 查看 example_usage.py（10分钟，了解使用）
+4. 查看各个代码文件的注释（按需）
+5. 开始使用！
+
+## 🚀 快速验证
+
+```bash
+# 1. 查看文件结构
+tree scripts/modules/
+
+# 2. 运行示例（需要修改文件路径）
+python example_usage.py
+
+# 3. 查看结果
+cat data/clean/routes.json
+```
+

@@ -1,0 +1,881 @@
+{
+  "file_name": "国际部成本汇总2025.10.20-2025.10.24.xlsx",
+  "completed_sheets": 23,
+  "timestamp": "20260312_121636",
+  "sheets_data": [
+    {
+      "sheet_name": "国内-西班牙海运专线",
+      "sheet_index": 0,
+      "route": "Route(起始地='国内', 目的地='西班牙', 途径地=None, 贸易备注=None, weight=1740.0, volume=3.0, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注=None, 时效='55天', 时效备注='约50-55天左右，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', 不含='国内提货费，保险费，二次包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式='海运', 贸易类型='专线', _column=2)",
+        "Agent(代理商='银顺达', 代理备注='仅合作过快递，未合作过专线', 时效='45天', 时效备注='约45天左右，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', 不含='国内提货费，保险费，二次包装费，存储费、送货时的卡车等待费、卸货上楼费、停车费等，如产生其他费用实报实销', 是否赔付='是', 赔付内容='电池专线赔偿标准：在运输过程中如货物丢失赔偿RMB40/kg，不退运费，尾程提取后丢失按照快递公司官方赔偿标准进行赔偿,最高不超过100美金/票', 运输方式='海运', 贸易类型='专线', _column=3)",
+        "Agent(代理商='欧洲专线集团', 代理备注='展会新加代理，未合作', 时效='55天', 时效备注='约50-55天左右，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', 不含='国内提货费，保险费，二次包装费，存储费、送货时的卡车等待费、卸货上楼费、停车费等，如产生其他费用实报实销', 是否赔付='否', 赔付内容=None, 运输方式='快递', 贸易类型='专线', _column=4)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='碱性电池', 实际重量=1740.0, 货值=None, 总体积=None, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='海运费', 单价=18.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='附加费', 单价=5.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='宽高<费', 原币金额=300.0, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=22.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=17.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-新加坡& 英国",
+      "sheet_index": 1,
+      "route": "Route(起始地='深圳', 目的地='新加坡', 途径地=None, 贸易备注=None, weight=910.0, volume=5.46, value=100000.0)",
+      "agents": [
+        "Agent(代理商='越海速达', 代理备注=None, 时效='15天', 时效备注='时效：运输时间：12-15个工作日左右', 不含='卸货拆箱等', 是否赔付=None, 赔付内容=None, 运输方式='海运', 贸易类型='双清', _column=2)",
+        "Agent(代理商='骐盛', 代理备注=None, 时效=None, 时效备注='运输时间：近期船期乱，时效不稳定不做保证', 不含='卸货拆箱等', 是否赔付=None, 赔付内容=None, 运输方式='海运', 贸易类型='双清', _column=3)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='2件展示柜', 实际重量=910.0, 货值=100000.0, 总体积=5.46, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='海运费', 单价=500.0, 单位='/cbm', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='海运费', 单价=380.0, 单位='/cbm', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "Sheet1",
+      "sheet_index": 2,
+      "route": "Route(起始地='深圳', 目的地='英国', 途径地=None, 贸易备注=None, weight=910.0, volume=5.46, value=100000.0)",
+      "agents": [
+        "Agent(代理商='拓宇', 代理备注=None, 时效='50天', 时效备注='开船后时效50天左右到', 不含=None, 是否赔付=None, 赔付内容=None, 运输方式='海运', 贸易类型='双清', _column=2)",
+        "Agent(代理商='融迅', 代理备注=None, 时效=None, 时效备注=None, 不含=None, 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型=None, _column=3)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='2件展示柜', 实际重量=910.0, 货值=100000.0, 总体积=5.46, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='海运费', 单价=14.5, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='海运双清含税', 单价=14.5, 单位='kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-澳门询价",
+      "sheet_index": 3,
+      "route": "Route(起始地='国内', 目的地='澳门', 途径地=None, 贸易备注=None, weight=930.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='一诺物流', 代理备注='新代理，未合作', 时效='3天', 时效备注='约2-3天，海关查验顺延', 不含='保险费，查验费，待时费，国内转运费（天津-珠海），包装费', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型=None, _column=2)",
+        "Agent(代理商='雄展货运', 代理备注='未合作，新代理', 时效='2天', 时效备注='约2天，海关查验顺延', 不含='保险费，查验费，待时费，国内转运费（天津-珠海），包装费', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型=None, _column=3)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='2件展示柜', 实际重量=910.0, 货值=None, 总体积=2.73, 备注=None)",
+          "GoodsTotal(货物名称='粮食标本', 实际重量=5.0, 货值=None, 总体积=49.836, 备注=None)",
+          "GoodsTotal(货物名称='电子屏', 实际重量=10.0, 货值=None, 总体积=0.002, 备注=None)",
+          "GoodsTotal(货物名称='酿酒陶坛', 实际重量=5.0, 货值=None, 总体积=0.002, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=8.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='卸货费', 单价=300.0, 单位='/人', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='拆箱费', 单价=300.0, 单位='/个', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='派送费', 原币金额=500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='扔垃圾费', 原币金额=600.0, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='集运费', 单价=3.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=800.0, 单位='/次', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='卸货上楼并拆清费用费', 原币金额=1200.0, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-澳洲",
+      "sheet_index": 4,
+      "route": "Route(起始地='深圳', 目的地='澳洲', 途径地=None, 贸易备注=None, weight=None, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='澳凯', 代理备注='海运专线-新代理未合作', 时效='30天', 时效备注='展会货物建议尽早出运，以免遇到晚开船/查验等导致延误；开船后25-30天左右签收，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', 不含='国内提货费，保险费，包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 是否赔付='是', 赔付内容='货物丢件 赔偿20/kg 不退运费', 运输方式='海运', 贸易类型='专线', _column=2)",
+        "Agent(代理商='蓝鹰', 代理备注='海运专线-新代理未合作', 时效='35天', 时效备注='展会货物建议尽早出运，以免遇到晚开船/查验等导致延误；开船后约25-35天左右到，海运受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', 不含='国内提货费，保险费，包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式='海运', 贸易类型='专线', _column=3)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=7.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=500.0, 单位='/票', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=11.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='运费', 单价=300.0, 单位='/件', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='运费', 单价=500.0, 单位='/票', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-香港",
+      "sheet_index": 5,
+      "route": "Route(起始地='深圳', 目的地='香港', 途径地=None, 贸易备注=None, weight=None, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='海阳中港', 代理备注=None, 时效='4天', 时效备注='展会货物建议尽早出运，以免遇到晚开船/查验等导致延误；约3-4个工作日过港（不含派送时间），如遇海关查验时间顺延，参考之前货物过港遇到查验退运，约2周左右重新发出', 不含='香港杂费实报实销，国内提货费，保险费，包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式='海运', 贸易类型=None, _column=2)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=1.5, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "达拉斯-新加坡",
+      "sheet_index": 6,
+      "route": "Route(起始地='达拉斯', 目的地='新加坡', 途径地=None, 贸易备注=None, weight=10.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注='快递+贸代方案', 时效='12天', 时效备注='提货+包装需要2-3天，快递4-6天， 清关+送货2-3天，全程：8-12天，海关查验顺延', 不含='仓储费和查验等费用，保险费，海关查验费，仓储费，待时费，快递杂费实报实销', 是否赔付=None, 赔付内容=None, 运输方式='快递', 贸易类型='快递', _column=2)"
+      ],
+      "goods": {
+        "type": "details",
+        "goods_details": [
+          "GoodsDetail(货物名称='CE88-D8CQ板卡', 是否新品=0, 货物种类='耗材', 数量=10.0, 单价=1200.0, 币种='RMB', 重量=0.5, 总重量=5.0, 总价=12000.0, 备注=None)"
+        ],
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='包装费', 单价=60.0, 单位='/个', 数量=None, 币种='USD', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='提货费', 原币金额=300.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='上楼费', 原币金额=180.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='UPS快递费', 原币金额=450.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='操作费', 原币金额=100.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='清关费', 原币金额=100.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='出入库费', 原币金额=45.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='派送费', 原币金额=180.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='上楼费', 原币金额=180.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='手续费', 原币金额=65.0, 币种='SGD', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.09, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "深圳-新加坡一般贸易",
+      "sheet_index": 7,
+      "route": "Route(起始地='深圳', 目的地='新加坡', 途径地=None, 贸易备注=None, weight=100.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注=None, 时效='7天', 时效备注='深圳-香港1-2天，香港-新加坡4-5天，全程：5-7天，海关查验顺延', 不含='保险费，海关查验费，国内转运费，二次包装费，新加坡仓储费，待时费，香港杂费实报实销', 是否赔付=None, 赔付内容=None, 运输方式='空运', 贸易类型='一般贸易', _column=2)"
+      ],
+      "goods": {
+        "type": "details",
+        "goods_details": [
+          "GoodsDetail(货物名称='Nokia 7750-SR-1（每台2块100G接口卡）', 是否新品=1, 货物种类='网络设备', 数量=2.0, 单价=132631.0, 币种='RMB', 重量=10.0, 总重量=20.0, 总价=265262.0, 备注=None)",
+          "GoodsDetail(货物名称='OTNS8600-DCI8', 是否新品=1, 货物种类='网络设备', 数量=4.0, 单价=2500.0, 币种='RMB', 重量=15.0, 总重量=60.0, 总价=10000.0, 备注=None)",
+          "GoodsDetail(货物名称='OTMT2光转换单元', 是否新品=1, 货物种类='网络设备', 数量=8.0, 单价=37000.0, 币种='RMB', 重量=1.5, 总重量=12.0, 总价=296000.0, 备注=None)"
+        ],
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='空运费', 单价=25.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='操作费', 单价=0.3, 单位='/kg', 数量=None, 币种='SGD', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='验电费', 原币金额=500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='操作费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='报关费', 原币金额=300.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='申报税费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='报关费', 原币金额=100.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='MIN费', 原币金额=35.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='卡车费', 原币金额=180.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='人工费', 原币金额=180.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='拆包装和回收垃圾费', 原币金额=200.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='代理税金操作费', 原币金额=65.0, 币种='SGD', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.09, 汇损率=0.04, 备注='备注：一般贸易过港需要发票，箱单，品牌授权')"
+      ]
+    },
+    {
+      "sheet_name": "深圳-新加坡专线成本",
+      "sheet_index": 8,
+      "route": "Route(起始地='深圳', 目的地='新加坡', 途径地=None, 贸易备注=None, weight=30.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='越海速达', 代理备注='双清', 时效='6天', 时效备注='起运后4-6天，海关查验顺延', 不含='保险费，海关查验费，国内转运费，二次包装费，超重和超尺费', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型=None, _column=2)"
+      ],
+      "goods": {
+        "type": "details",
+        "goods_details": [
+          "GoodsDetail(货物名称='100G单模模块\\xa0QSFP28-100G-LR4(1310nm,10km,LC)', 是否新品=1, 货物种类='耗材', 数量=21.0, 单价=950.0, 币种='RMB', 重量=0.1, 总重量=2.1, 总价=19950.0, 备注=None)",
+          "GoodsDetail(货物名称='100G多模模块\\xa0QSFP28-100G-SR4(850nm,0.1km,MPO)', 是否新品=1, 货物种类='耗材', 数量=38.0, 单价=168.0, 币种='RMB', 重量=0.1, 总重量=3.8, 总价=6384.0, 备注=None)",
+          "GoodsDetail(货物名称='MPO（100g多模） 10m', 是否新品=1, 货物种类='耗材', 数量=40.0, 单价=80.7, 币种='RMB', 重量=0.1, 总重量=4.0, 总价=3228.0, 备注=None)",
+          "GoodsDetail(货物名称='光纤跳线 单模（LC-LC）10m', 是否新品=1, 货物种类='耗材', 数量=42.0, 单价=10.15, 币种='RMB', 重量=0.1, 总重量=4.2, 总价=426.3, 备注=None)",
+          "GoodsDetail(货物名称='AOC（25g）5m', 是否新品=1, 货物种类='耗材', 数量=66.0, 单价=117.0, 币种='RMB', 重量=0.1, 总重量=6.6, 总价=7722.0, 备注=None)",
+          "GoodsDetail(货物名称='标签纸A4', 是否新品=1, 货物种类='耗材', 数量=2.0, 单价=20.0, 币种='RMB', 重量=0.1, 总重量=0.2, 总价=40.0, 备注=None)",
+          "GoodsDetail(货物名称='理线架', 是否新品=1, 货物种类='耗材', 数量=4.0, 单价=25.0, 币种='RMB', 重量=0.1, 总重量=0.4, 总价=100.0, 备注=None)",
+          "GoodsDetail(货物名称='魔术贴', 是否新品=1, 货物种类='耗材', 数量=1.0, 单价=40.0, 币种='RMB', 重量=0.1, 总重量=0.1, 总价=40.0, 备注=None)",
+          "GoodsDetail(货物名称='扎带', 是否新品=1, 货物种类='耗材', 数量=1.0, 单价=38.0, 币种='RMB', 重量=0.1, 总重量=0.1, 总价=38.0, 备注=None)"
+        ],
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=45.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='预约费', 原币金额=500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='卸货上楼费', 原币金额=500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='尺寸要求费', 原币金额=80.0, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-达拉斯贸代",
+      "sheet_index": 9,
+      "route": "Route(起始地='香港', 目的地='达拉斯', 途径地=None, 贸易备注=None, weight=45.0, volume=None, value=None)",
+      "agents": [],
+      "goods": {
+        "type": "details",
+        "goods_details": [
+          "GoodsDetail(货物名称='Nokia 7750-SR-1（每台2块100G接口卡）', 是否新品=1, 货物种类='网络设备', 数量=2.0, 单价=132631.0, 币种='RMB', 重量=10.0, 总重量=20.0, 总价=265262.0, 备注=None)",
+          "GoodsDetail(货物名称='MPO（100g多模） 15m', 是否新品=0, 货物种类='耗材', 数量=32.0, 单价=33.65, 币种='RMB', 重量=0.1, 总重量=3.2, 总价=1076.8, 备注=None)"
+        ],
+        "goods_total": null
+      },
+      "fees": [],
+      "summaries": []
+    },
+    {
+      "sheet_name": "国内-法兰克福专线",
+      "sheet_index": 10,
+      "route": "Route(起始地='国内', 目的地='法兰克福', 途径地=None, 贸易备注=None, weight=100.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注='双清含税报价', 时效='20天', 时效备注='时效10-15个工作日左右；全程15-20天，海关查验顺延', 不含='保险费，包装费，国内转运费，海关查验费，仓储费，待时费', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型=None, _column=2)"
+      ],
+      "goods": {
+        "type": "details",
+        "goods_details": [
+          "GoodsDetail(货物名称='P616 光转换单元', 是否新品=1, 货物种类='网络设备', 数量=6.0, 单价=50000.0, 币种='RMB', 重量=1.5, 总重量=9.0, 总价=300000.0, 备注=None)",
+          "GoodsDetail(货物名称='Nokia 7750-SR-1（每台2块100G接口卡）', 是否新品=1, 货物种类='网络设备', 数量=2.0, 单价=132631.0, 币种='RMB', 重量=10.0, 总重量=20.0, 总价=265262.0, 备注=None)",
+          "GoodsDetail(货物名称='100G单模模块\\xa0QSFP28-100G-LR4(1310nm,10km,LC)', 是否新品=1, 货物种类='耗材', 数量=82.0, 单价=950.0, 币种='RMB', 重量=0.1, 总重量=8.2, 总价=77900.0, 备注=None)",
+          "GoodsDetail(货物名称='MPO（100g多模） 10m', 是否新品=1, 货物种类='耗材', 数量=30.0, 单价=80.7, 币种='RMB', 重量=0.1, 总重量=3.0, 总价=2421.0, 备注=None)",
+          "GoodsDetail(货物名称='单模（LC-LC）10m', 是否新品=1, 货物种类='耗材', 数量=49.0, 单价=10.15, 币种='RMB', 重量=0.1, 总重量=4.9, 总价=497.35, 备注=None)",
+          "GoodsDetail(货物名称='AOC（25g）5m', 是否新品=1, 货物种类='耗材', 数量=66.0, 单价=117.0, 币种='RMB', 重量=0.1, 总重量=6.6, 总价=7722.0, 备注=None)",
+          "GoodsDetail(货物名称='标签纸A4', 是否新品=1, 货物种类='耗材', 数量=2.0, 单价=20.0, 币种='RMB', 重量=0.1, 总重量=0.2, 总价=40.0, 备注=None)",
+          "GoodsDetail(货物名称='理线架', 是否新品=1, 货物种类='耗材', 数量=10.0, 单价=25.0, 币种='RMB', 重量=0.1, 总重量=1.0, 总价=250.0, 备注=None)",
+          "GoodsDetail(货物名称='魔术贴', 是否新品=1, 货物种类='耗材', 数量=5.0, 单价=40.0, 币种='RMB', 重量=0.1, 总重量=0.5, 总价=200.0, 备注=None)",
+          "GoodsDetail(货物名称='扎带', 是否新品=1, 货物种类='耗材', 数量=5.0, 单价=38.0, 币种='RMB', 重量=0.1, 总重量=0.5, 总价=190.0, 备注=None)",
+          "GoodsDetail(货物名称='网线5m', 是否新品=1, 货物种类='耗材', 数量=15.0, 单价=19.0, 币种='RMB', 重量=0.1, 总重量=1.5, 总价=285.0, 备注=None)",
+          "GoodsDetail(货物名称='C13-C14电源线', 是否新品=0, 货物种类='耗材', 数量=24.0, 单价=25.0, 币种='RMB', 重量=0.1, 总重量=2.4, 总价=600.0, 备注=None)",
+          "GoodsDetail(货物名称='CE6865E', 是否新品=0, 货物种类='交换机', 数量=2.0, 单价=11248.0, 币种='RMB', 重量=8.0, 总重量=16.0, 总价=22496.0, 备注=None)"
+        ],
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=68.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='操作费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='卸货费', 原币金额=800.0, 币种='EUR', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.19, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "达拉斯-法兰克福",
+      "sheet_index": 11,
+      "route": "Route(起始地='达拉斯', 目的地='法兰克福', 途径地=None, 贸易备注=None, weight=8.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注='快递+贸代方案', 时效='12天', 时效备注='提货+包装需要2-3天，快递4-6天，拼车时效：2-3天（从荷兰发运-德国法兰克福），全程：8-12天，海关查验顺延', 不含='派送费：EUR280 预估的，拼车，不含卸货上楼，如果需要卸货上楼，需要准备地址： EUR 200 预估                                             不含仓储费和查验等费用，保险费，海关查验费，仓储费，待时费，快递杂费实报实销', 是否赔付=None, 赔付内容=None, 运输方式='快递', 贸易类型='贸易代理', _column=2)",
+        "Agent(代理商='UPS', 代理备注='提货费：USD300\\n上楼费：USD180\\n纸箱包装费：USD60/个\\n快递费：USD350 预估的\\n\\n调单费：EUR95\\n清关费：EUR115\\n操作费：EUR125\\n贸易代理费：EUR380\\n派送费：EUR280 预估的，拼车，不含卸货上楼\\n如果需要卸货上楼，需要准备地址： EUR 200 预估                                             不含仓储费和查验等费用\\nDuty和VAT实报实销\\n有其他杂费收取 实报实销', 时效='12天', 时效备注='提货+包装需要2-3天，快递4-6天，拼车时效：2-3天（从荷兰发运-德国法兰克福），全程：8-12天，海关查验顺延', 不含='保险费，海关查验费，仓储费，待时费，快递杂费实报实销', 是否赔付=None, 赔付内容=None, 运输方式='快递', 贸易类型='快递', _column=2)"
+      ],
+      "goods": {
+        "type": "details",
+        "goods_details": [
+          "GoodsDetail(货物名称='5120-48Y', 是否新品=0, 货物种类='交换机', 数量=1.0, 单价=11906.0, 币种='RMB', 重量=8.0, 总重量=8.0, 总价=11906.0, 备注=None)"
+        ],
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='包装费', 单价=60.0, 单位='/个', 数量=None, 币种='USD', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='提货费', 原币金额=300.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='上楼费', 原币金额=180.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='UPS快递费', 原币金额=350.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='调单费', 原币金额=95.0, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称='清关费', 原币金额=115.0, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称='操作费', 原币金额=125.0, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称='贸易代理费', 原币金额=380.0, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称='派送费', 原币金额=280.0, 币种='EUR', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='EUR', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='EUR', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.19, 汇损率=0.04, 备注=None)",
+        "Summary(税率=0.19, 汇损率=0.04, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "香港-新加坡",
+      "sheet_index": 12,
+      "route": "Route(起始地='香港', 目的地='新加坡', 途径地=None, 贸易备注=None, weight=100.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注='预估', 时效='7天', 时效备注='起运后5-7 个工作日，海关查验顺延', 不含='仓储费，查验费，待时费等其他额外费用，保险费，海关查验费，仓储费，待时费，验电费，香港杂费实报实销', 是否赔付=None, 赔付内容=None, 运输方式='空运', 贸易类型=None, _column=2)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='空运费', 单价=27.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='操作费', 单价=0.3, 单位='/kg', 数量=None, 币种='SGD', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='操作费', 原币金额=150.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='报关费', 原币金额=300.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='报关费', 原币金额=100.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='MIN费', 原币金额=35.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='卡车费', 原币金额=200.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='人工费', 原币金额=200.0, 币种='SGD', 备注=None)",
+            "FeeTotal(费用名称='拆包装和回收垃圾费', 原币金额=250.0, 币种='SGD', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.09, 汇损率=None, 备注='有效期：本周有效')"
+      ]
+    },
+    {
+      "sheet_name": "香港-马来-正清",
+      "sheet_index": 13,
+      "route": "Route(起始地='香港', 目的地='马来', 途径地=None, 贸易备注=None, weight=30.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注=None, 时效='6天', 时效备注='起运后4-6天，海关查验顺延', 不含='保险费，海关查验费，仓储费，香港杂费实报实销，', 是否赔付=None, 赔付内容=None, 运输方式='空运', 贸易类型='贸易代理', _column=2)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='空运费', 单价=26.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='运费', 单价=0.3, 单位='/kg', 数量=None, 币种='USD', 备注=None)",
+            "FeeItem(费用类型='SIRIM费', 单价=180.0, 单位='/个', 数量=None, 币种='USD', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='TO费', 原币金额=45.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='操作费', 原币金额=150.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='报关费', 原币金额=300.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='申报税费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='报关费', 原币金额=35.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='文件费', 原币金额=35.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='min费', 原币金额=45.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='送货费', 原币金额=150.0, 币种='USD', 备注=None)",
+            "FeeTotal(费用名称='卸货上楼费', 原币金额=150.0, 币种='USD', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.05, 汇损率=0.06, 备注='文件： 需要办理SIRIM， 英文说明书，发票，箱单，客户的账户密码，办理需要3-5个工作日')"
+      ]
+    },
+    {
+      "sheet_name": "香港-马来-专线",
+      "sheet_index": 14,
+      "route": "Route(起始地='香港', 目的地='马来', 途径地=None, 贸易备注=None, weight=20.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注=None, 时效='7天', 时效备注='时效2-4个工作日，再转当地派送1-3个工作日；起运后：4-7个工作日左右，海关查验顺延', 不含='派送费MYR 450，不含回收垃圾，保险、香港本地杂费等，保险费，海关查验费，二次包装费，香港杂费实报实销，拆托+回收垃圾，不含香港提货，入仓登记费等', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型='专线', _column=2)",
+        "Agent(代理商='启文', 代理备注=None, 时效='7天', 时效备注='起运后：5-7个工作日左右，海关查验顺延', 不含='保险费，海关查验费，二次包装费，香港杂费实报实销，拆托+回收垃圾，不含香港提货，入仓登记费等', 是否赔付=None, 赔付内容=None, 运输方式='快递', 贸易类型='专线', _column=3)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=44.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='Av费', 原币金额=5.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='操作费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='派送费', 原币金额=450.0, 币种='MYR', 备注=None)",
+            "FeeTotal(费用名称='起运后费', 原币金额=4.0, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=30.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='起运后费', 原币金额=5.0, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "香港-菲律宾",
+      "sheet_index": 15,
+      "route": "Route(起始地='香港', 目的地='菲律宾马尼拉', 途径地=None, 贸易备注=None, weight=150.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='融迅', 代理备注=None, 时效='8天', 时效备注='约6-8工作日，如遇海关查验时间顺延', 不含='香港本地杂费，香港杂费实报实销，尾端是当地物流派送，做不了额外操作，无指定签收单，不含预约备案，卸货上楼回收垃圾等费用，如果需要的话，先按卸货上楼：USD250，回收垃圾：USD200预估，需要有具体地址后再确认，二次包装费，保险费，存储费、送货时的卡车等待费、停车费等，无签收单，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型='专线', _column=2)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='4台Dell\\xa0PowerEdge R7625', 实际重量=150.0, 货值=None, 总体积=None, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=48.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='操作费', 原币金额=2500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='如入朗华仓加收费', 原币金额=1500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='操作费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='关税费', 原币金额=50.9, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "日本",
+      "sheet_index": 16,
+      "route": "Route(起始地='深圳', 目的地='日本', 途径地='香港', 贸易备注=None, weight=3000.0, volume=15.0, value=None)",
+      "agents": [
+        "Agent(代理商='嘉里', 代理备注=None, 时效='8天', 时效备注='深圳-香港预计2天时间，香港-日本预计4-6天，预计全程6-8天，海关查验顺延', 不含='保险费，国内中转费，香港杂费实报实销，不含日本拆托+回收垃圾，待时费,海关查验费', 是否赔付=None, 赔付内容=None, 运输方式=None, 贸易类型='一般贸易', _column=2)",
+        "Agent(代理商='融迅', 代理备注=None, 时效='8天', 时效备注='深圳-香港预计2天时间，香港-日本预计4-6天，预计全程6-8天，海关查验顺延', 不含='保险费，国内中转费，香港杂费实报实销，不含日本拆托+回收垃圾，待时费,海关查验费，机场保税仓费用,仓储费', 是否赔付=None, 赔付内容=None, 运输方式='空运', 贸易类型='一般贸易', _column=3)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=12.97, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=5.7, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='卸货费', 单价=70.0, 单位='/台', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='仓储费', 单价=1.5, 单位='/天', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='深圳香港费', 原币金额=5500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='出口清关杂费', 原币金额=1775.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='杂费', 原币金额=1775.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='目的港清关杂费', 原币金额=2400.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='RMB费', 原币金额=3360.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='派送费', 原币金额=2400.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='杂费', 原币金额=2400.0, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='舱单费', 单价=100.0, 单位='/票', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='卸货费', 单价=0.55, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='通关费', 单价=12800.0, 单位='/entry', 数量=None, 币种='JPY', 备注=None)",
+            "FeeItem(费用类型='通关手续费', 单价=11000.0, 单位='/entry', 数量=None, 币种='JPY', 备注=None)",
+            "FeeItem(费用类型='通关手续费', 单价=48.0, 单位='/kg', 数量=None, 币种='JPY', 备注=None)",
+            "FeeItem(费用类型='操作费', 单价=15000.0, 单位='/hawb', 数量=None, 币种='JPY', 备注=None)",
+            "FeeItem(费用类型='handlift费', 单价=6000.0, 单位='/台', 数量=None, 币种='JPY', 备注=None)",
+            "FeeItem(费用类型='上楼费', 单价=35000.0, 单位='/人', 数量=None, 币种='JPY', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='报关费', 原币金额=300.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='清关费', 原币金额=300.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='申报税费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='TO费', 原币金额=2600.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='验电费', 原币金额=500.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='提派费', 原币金额=399800.0, 币种='JPY', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=0.1, 汇损率=None, 备注='文件： 发票，箱单，POA， 不需要其他认证')",
+        "Summary(税率=0.1, 汇损率=None, 备注='文件： 发票，箱单，POA， 不需要其他认证')"
+      ]
+    },
+    {
+      "sheet_name": "新加坡-柔佛",
+      "sheet_index": 17,
+      "route": "Route(起始地='新加坡', 目的地='马来西亚', 途径地=None, 贸易备注=None, weight=None, volume=None, value=None)",
+      "agents": [],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='光纤10%', 实际重量=None, 货值=None, 总体积=None, 备注=None)"
+        ]
+      },
+      "fees": [],
+      "summaries": []
+    },
+    {
+      "sheet_name": "北京-沙特",
+      "sheet_index": 18,
+      "route": "Route(起始地='北京', 目的地='沙特', 途径地=None, 贸易备注=None, weight=120.0, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='银顺达', 代理备注='专线方案', 时效='15天', 时效备注='双清包税专线：12-15天左右；展会物资需要提前，不保证时效，如遇海关查验时间顺延', 不含='北京-深圳的运输费用，保险费，二次包装费，存储费，送货时的卡车等待费、停车费、回收垃圾的费用，及海关查验产生的相关费用等，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式='空派', 贸易类型='专线', _column=2)",
+        "Agent(代理商='银顺达', 代理备注='快递方案', 时效='6天', 时效备注='DHL：  6天左右；展会物资需要提前，不保证时效，如遇海关查验时间顺延', 不含='北京-深圳的运输费用，保险费，二次包装费，存储费，送货时的卡车等待费、停车费、回收垃圾的费用，及海关查验产生的相关费用等，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式='快递', 贸易类型='专线', _column=3)",
+        "Agent(代理商='DHL', 代理备注='快递方案：\\n货交深圳， 64/KG，需要收件人清关缴税\\n只能送展会门口，不可以指定日期送货', 时效='6天', 时效备注='DHL：  6天左右；展会物资需要提前，不保证时效，如遇海关查验时间顺延', 不含='北京-深圳的运输费用，保险费，二次包装费，存储费，送货时的卡车等待费、停车费、回收垃圾的费用，及海关查验产生的相关费用等，如产生其他费用实报实销', 是否赔付=None, 赔付内容=None, 运输方式='快递', 贸易类型='专线', _column=3)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='宣传册&伴手礼', 实际重量=120.0, 货值=None, 总体积=None, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=55.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='派送费', 原币金额=800.0, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='快递费', 单价=64.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='元', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运输费', 单价=55, 单位='kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='赔偿标准', 单价=40, 单位='kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-荷兰",
+      "sheet_index": 19,
+      "route": "Route(起始地='国内', 目的地='荷兰', 途径地=None, 贸易备注=None, weight=20.2, volume=None, value=None)",
+      "agents": [
+        "Agent(代理商='多信达', 代理备注=None, 时效='12天', 时效备注='空运时效：7-12个工作日', 不含=None, 是否赔付=None, 赔付内容=None, 运输方式='空运', 贸易类型=None, _column=None)",
+        "Agent(代理商='银顺达', 代理备注=None, 时效='12天', 时效备注='980 空派双清包税到门 12天左右', 不含=None, 是否赔付=None, 赔付内容=None, 运输方式='空运', 贸易类型='双清', _column=None)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='2台*10.1=20.2公斤', 实际重量=None, 货值=None, 总体积=None, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='荷兰双清包税派送上门运费', 单价=76, 单位='kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='香港运费', 单价=20, 单位='kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='荷兰双清包税派送上门运费', 单价=76, 单位='kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='香港运费', 单价=20, 单位='kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称=None, 原币金额=None, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "国内-荷兰2",
+      "sheet_index": 20,
+      "route": "Route(起始地='国内', 目的地='荷兰', 途径地=None, 贸易备注=None, weight=45.0, volume=None, value=None)",
+      "agents": [],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [],
+      "summaries": []
+    },
+    {
+      "sheet_name": "国内-越南",
+      "sheet_index": 21,
+      "route": "Route(起始地='上海', 目的地='越南', 途径地=None, 贸易备注=None, weight=1001.0, volume=None, value=3.0)",
+      "agents": [
+        "Agent(代理商='华平', 代理备注='专线   协议过期，未合作过', 时效='12天', 时效备注='专线10-12工作日左右， 不提供税单等文件；一般贸易出口放行后10-12工作日左右；如海关查验时间顺延', 不含='保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 是否赔付='是', 赔付内容='陆运灰清的，未购买保险，丢失按运费3-5倍赔偿，如果需要，保险可以按货值3%购买，如果丢失，全赔。', 运输方式='陆运', 贸易类型='双清', _column=2)",
+        "Agent(代理商='越海专线', 代理备注=None, 时效=None, 时效备注=None, 不含=None, 是否赔付='否', 赔付内容=None, 运输方式=None, 贸易类型=None, _column=3)",
+        "Agent(代理商='华平', 代理备注='正清', 时效=None, 时效备注=None, 不含='收货人缴纳， 如上报价不含税金，保险费，需要提供货值，国外税金，保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 是否赔付='否', 赔付内容=None, 运输方式=None, 贸易类型='正清', _column=4)"
+      ],
+      "goods": {
+        "type": "total",
+        "goods_details": null,
+        "goods_total": [
+          "GoodsTotal(货物名称='长雨伞和短雨伞', 实际重量=None, 货值=None, 总体积=None, 备注=None)"
+        ]
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=2.5, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=150.0, 单位='/票', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=1.3, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=1500.0, 单位='/票', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='运费', 单价=4.5, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='提货费', 单价=1.3, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='提货费', 单价=1.3, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='国内报关费', 原币金额=400.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='送货费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='国外清关费', 原币金额=200.0, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    },
+    {
+      "sheet_name": "Sheet2",
+      "sheet_index": 22,
+      "route": "Route(起始地='深圳', 目的地='越南', 途径地=None, 贸易备注=None, weight=27000.0, volume=None, value=3.0)",
+      "agents": [
+        "Agent(代理商='华平', 代理备注='专线   协议过期，未合作过', 时效='12天', 时效备注='专线10-12工作日左右， 不提供税单等文件， 以实际为准；一般贸易出口放行后10-12工作日左右，以实际为准；如海关查验时间顺延', 不含='保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 是否赔付='是', 赔付内容='陆运灰清的，未购买保险，丢失按运费3-5倍赔偿，如果需要，保险可以按货值3%购买，如果丢失，全赔。', 运输方式='陆运', 贸易类型='包税', _column=2)",
+        "Agent(代理商='越海专线', 代理备注=None, 时效=None, 时效备注=None, 不含=None, 是否赔付='否', 赔付内容=None, 运输方式=None, 贸易类型=None, _column=3)",
+        "Agent(代理商='华平', 代理备注='正清', 时效=None, 时效备注=None, 不含='税金实报实销， 请收货人缴纳， 如上报价不含税金（客户没提供货值），国外税金，保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 是否赔付='否', 赔付内容=None, 运输方式='陆运', 贸易类型='正清', _column=4)"
+      ],
+      "goods": {
+        "type": null,
+        "goods_details": null,
+        "goods_total": null
+      },
+      "fees": [
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=3.0, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=150.0, 单位='/票', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='运费', 单价=4.5, 单位='/kg', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='运费', 单价=1.3, 单位='/kg', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": []
+        },
+        {
+          "fee_items": [
+            "FeeItem(费用类型='重货费', 单价=3, 单位='KG', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='派送费', 单价=150, 单位='票', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='专车费', 单价=2000, 单位='车', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='运费', 单价=1.3, 单位='KGS', 数量=None, 币种='RMB', 备注=None)",
+            "FeeItem(费用类型='资料费', 单价=1500, 单位='票', 数量=None, 币种='RMB', 备注=None)"
+          ],
+          "fee_totals": [
+            "FeeTotal(费用名称='国内报关费', 原币金额=400.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='送货费', 原币金额=200.0, 币种='RMB', 备注=None)",
+            "FeeTotal(费用名称='国外清关费', 原币金额=200.0, 币种='RMB', 备注=None)"
+          ]
+        }
+      ],
+      "summaries": [
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)",
+        "Summary(税率=None, 汇损率=None, 备注=None)"
+      ]
+    }
+  ]
+}

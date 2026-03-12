@@ -1,0 +1,97 @@
+/* frontend/src/assets/styles/main.css */
+
+/* 全局颜色变量（仿公司系统） */
+:root {
+  --primary-color: #1890ff;
+  --sidebar-bg: #001529;
+  --sidebar-text: #ffffff;
+  --sidebar-hover: #1890ff;
+  --header-bg: #ffffff;
+  --content-bg: #f0f2f5;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+
+/* 登录页背景 */
+.login-container {
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #001529 0%, #003a70 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 网格背景动画 */
+.grid-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.1;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* 卡片阴影 */
+.card-shadow {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* 页面容器 */
+.page-container {
+  padding: 20px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 60px);
+}
+
+/* 表格样式优化 */
+.el-table {
+  font-size: 14px;
+}
+
+.el-table th {
+  background: #fafafa !important;
+  color: #000000d9;
+  font-weight: 600;
+}
+
+/* 按钮间距 */
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+/* 搜索表单 */
+.search-form {
+  background: #ffffff;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+}
+
+/* 结果容器 */
+.result-container {
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 4px;
+}
