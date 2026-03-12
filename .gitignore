@@ -58,3 +58,13 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend build
+frontend/dist/
