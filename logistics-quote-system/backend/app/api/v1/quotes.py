@@ -15,6 +15,7 @@ from ...models.user import User
 from ...services.recommend_service import (
     _get_lpi_map, _match_country, _normalize_inverse, _lpi_to_score
 )
+from .warnings import get_warnings_for_destinations
 from sqlalchemy import and_, or_
 
 
@@ -303,10 +304,15 @@ async def search_quotes(
             if aid in score_map:
                 agent.update(score_map[aid])
 
+    # 补充航线预警
+    destinations = list({r["目的地"] for r in quote_results if r.get("目的地")})
+    dest_warnings = get_warnings_for_destinations(db, destinations)
+
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
         "results": quote_results,
         "dest_lpi_info": dest_lpi_info,
+        "dest_warnings": dest_warnings,
     }

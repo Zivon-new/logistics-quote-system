@@ -116,6 +116,44 @@
           <el-tag v-if="route.货物名称" type="success" size="small" class="goods-tag">
             {{ route.货物名称.length > 20 ? route.货物名称.slice(0, 20) + '…' : route.货物名称 }}
           </el-tag>
+
+          <!-- 航线预警 badge -->
+          <el-popover
+            v-if="destWarnings[route.目的地]?.length"
+            placement="bottom-start"
+            :width="380"
+            trigger="hover"
+          >
+            <template #reference>
+              <el-tag
+                :type="destWarnings[route.目的地][0].风险等级 >= 3 ? 'danger' : 'warning'"
+                size="small"
+                class="warning-tag"
+              >
+                <el-icon style="vertical-align:-2px"><Warning /></el-icon>
+                {{ destWarnings[route.目的地][0].风险等级 >= 3 ? '高风险预警' : '风险提示' }}
+                （{{ destWarnings[route.目的地].length }}条）
+              </el-tag>
+            </template>
+            <div class="warning-popover">
+              <div
+                v-for="w in destWarnings[route.目的地]"
+                :key="w.预警ID"
+                class="warning-item"
+                :class="w.风险等级 >= 3 ? 'warning-high' : 'warning-mid'"
+              >
+                <div class="warning-item-title">
+                  <el-tag :type="w.风险等级 >= 3 ? 'danger' : 'warning'" size="small" style="margin-right:6px">
+                    {{ w.风险等级文字 }}
+                  </el-tag>
+                  <strong>{{ w.预警标题 }}</strong>
+                </div>
+                <div class="warning-item-type">{{ w.风险类型 }} · 生效 {{ w.生效日期 }}</div>
+                <div class="warning-item-detail">{{ w.预警详情 }}</div>
+              </div>
+            </div>
+          </el-popover>
+
           <span class="route-date">{{ route.交易开始日期 }} 至 {{ route.交易结束日期 }}</span>
           <span class="route-weight">
             实重 {{ route.实际重量 }} kg
@@ -470,7 +508,7 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, Download, Histogram, Tickets } from '@element-plus/icons-vue'
+import { Search, Refresh, Download, Histogram, Tickets, Warning } from '@element-plus/icons-vue'
 import { searchQuotes } from '@/api/quote'
 
 const loading = ref(false)
@@ -478,6 +516,7 @@ const dateRange = ref([])
 const quoteResults = ref([])
 const total = ref(0)
 const destLpiInfo = ref({})
+const destWarnings = ref({})   // { 目的地: [预警列表] }
 const sortBy = ref('score')
 const detailVisible = ref(false)
 const currentAgent = ref(null)
@@ -675,6 +714,7 @@ const handleSearch = async () => {
     quoteResults.value = res.results
     total.value = res.total
     destLpiInfo.value = res.dest_lpi_info || {}
+    destWarnings.value = res.dest_warnings || {}
     if (res.total === 0) ElMessage.warning('未找到匹配结果')
     else ElMessage.success(`找到 ${res.total} 条结果`)
   } catch (e) {
@@ -694,6 +734,7 @@ const handleReset = () => {
   quoteResults.value = []
   total.value = 0
   destLpiInfo.value = {}
+  destWarnings.value = {}
 }
 
 const viewDetail = (agent, route) => {
@@ -828,4 +869,15 @@ const viewDetail = (agent, route) => {
 
 .cell-best { background: #f6ffed; color: #389e0d; font-weight: 700; }
 .cell-worst { background: #fff2f0; color: #cf1322; }
+
+/* 预警 */
+.warning-tag { cursor: pointer; }
+.warning-popover { max-height: 400px; overflow-y: auto; }
+.warning-item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.warning-item:last-child { border-bottom: none; }
+.warning-item-title { display: flex; align-items: center; margin-bottom: 4px; font-size: 13px; }
+.warning-item-type { font-size: 11px; color: #8c8c8c; margin-bottom: 4px; }
+.warning-item-detail { font-size: 12px; color: #595959; line-height: 1.7; }
+.warning-high .warning-item-title { color: #cf1322; }
+.warning-mid .warning-item-title { color: #d46b08; }
 </style>
