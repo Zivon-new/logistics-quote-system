@@ -2,7 +2,7 @@
 """
 价格分析看板 API
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from ...database import get_db
@@ -34,54 +34,111 @@ async def get_overview(db: Session = Depends(get_db), current_user: User = Depen
     }
 
 
-@router.get("/by-destination")
-async def get_by_destination(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """各目的地报价统计：报价次数、平均总价、最低总价、最高总价"""
+@router.get("/route-usage")
+async def get_route_usage(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """热门路线排行：按代理报价数排序，展示各路线的使用频次和代理选择情况"""
     rows = db.execute(text("""
         SELECT
+            r.起始地,
             r.目的地,
-            COUNT(DISTINCT ra.代理路线ID) AS 报价次数,
-            ROUND(AVG(s.总计), 2)        AS 平均总价,
-            ROUND(MIN(s.总计), 2)        AS 最低总价,
-            ROUND(MAX(s.总计), 2)        AS 最高总价
+            COALESCE(ra.运输方式, '未知') AS 运输方式,
+            COUNT(DISTINCT ra.代理路线ID) AS 代理报价数,
+            COUNT(DISTINCT ra.代理商)    AS 代理商数,
+            ROUND(AVG(s.总计), 2)        AS 平均报价
         FROM routes r
         JOIN route_agents ra ON r.路线ID = ra.路线ID
-        JOIN summary s ON ra.代理路线ID = s.代理路线ID
-        WHERE s.总计 > 0 AND r.目的地 IS NOT NULL
-        GROUP BY r.目的地
-        ORDER BY 报价次数 DESC
+        LEFT JOIN summary s ON ra.代理路线ID = s.代理路线ID
+        WHERE s.总计 > 0
+        GROUP BY r.起始地, r.目的地, ra.运输方式
+        ORDER BY 代理报价数 DESC
+        LIMIT 15
     """)).fetchall()
     return [
         {
-            "目的地": r[0],
-            "报价次数": r[1],
-            "平均总价": float(r[2]) if r[2] else 0,
-            "最低总价": float(r[3]) if r[3] else 0,
-            "最高总价": float(r[4]) if r[4] else 0,
+            "起始地": r[0], "目的地": r[1], "运输方式": r[2],
+            "代理报价数": r[3], "代理商数": r[4],
+            "平均报价": float(r[5]) if r[5] else 0,
         }
         for r in rows
     ]
 
 
-@router.get("/by-transport")
-async def get_by_transport(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """各运输方式统计：报价次数、平均总价"""
-    rows = db.execute(text("""
+@router.get("/route-agent-dist")
+async def get_route_agent_dist(
+    origin: str = Query(default=""),
+    dest: str = Query(default=""),
+    transport: str = Query(default=""),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """指定路线的代理商选择分布（不传参数时返回全部路线汇总）"""
+    conditions = ["ra.代理商 IS NOT NULL"]
+    params = {}
+    if origin:
+        conditions.append("r.起始地 = :origin")
+        params["origin"] = origin
+    if dest:
+        conditions.append("r.目的地 = :dest")
+        params["dest"] = dest
+    if transport and transport != "未知":
+        conditions.append("ra.运输方式 = :transport")
+        params["transport"] = transport
+
+    where = "WHERE " + " AND ".join(conditions)
+
+    rows = db.execute(text(f"""
         SELECT
-            COALESCE(ra.运输方式, '未填写') AS 运输方式,
-            COUNT(DISTINCT ra.代理路线ID)   AS 报价次数,
-            ROUND(AVG(s.总计), 2)           AS 平均总价
-        FROM route_agents ra
-        JOIN summary s ON ra.代理路线ID = s.代理路线ID
-        WHERE s.总计 > 0
-        GROUP BY ra.运输方式
+            ra.代理商,
+            COUNT(ra.代理路线ID)  AS 报价次数,
+            ROUND(AVG(s.总计), 2) AS 平均报价
+        FROM routes r
+        JOIN route_agents ra ON r.路线ID = ra.路线ID
+        LEFT JOIN summary s ON ra.代理路线ID = s.代理路线ID
+        {where}
+        GROUP BY ra.代理商
         ORDER BY 报价次数 DESC
+        LIMIT 20
+    """), params).fetchall()
+    return [
+        {"代理商": r[0], "报价次数": r[1], "平均报价": float(r[2]) if r[2] else 0}
+        for r in rows
+    ]
+
+
+@router.get("/trend")
+async def get_trend(
+    granularity: str = Query(default="month"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """报价趋势：支持按周/月/季度/年聚合"""
+    if granularity == "week":
+        date_expr = "DATE_FORMAT(r.交易开始日期, '%Y-%u周')"
+    elif granularity == "quarter":
+        date_expr = "CONCAT(YEAR(r.交易开始日期), '-Q', QUARTER(r.交易开始日期))"
+    elif granularity == "year":
+        date_expr = "DATE_FORMAT(r.交易开始日期, '%Y年')"
+    else:
+        date_expr = "DATE_FORMAT(r.交易开始日期, '%Y-%m')"
+
+    rows = db.execute(text(f"""
+        SELECT
+            {date_expr}              AS 时间,
+            COUNT(DISTINCT r.路线ID) AS 路线数,
+            ROUND(AVG(s.总计), 2)   AS 平均报价,
+            ROUND(SUM(s.总计), 2)   AS 总报价额
+        FROM routes r
+        JOIN route_agents ra ON r.路线ID = ra.路线ID
+        JOIN summary s ON ra.代理路线ID = s.代理路线ID
+        WHERE r.交易开始日期 IS NOT NULL AND s.总计 > 0
+        GROUP BY 时间
+        ORDER BY MIN(r.交易开始日期)
     """)).fetchall()
     return [
         {
-            "运输方式": r[0],
-            "报价次数": r[1],
-            "平均总价": float(r[2]) if r[2] else 0,
+            "时间": r[0], "路线数": r[1],
+            "平均报价": float(r[2]) if r[2] else 0,
+            "总报价额": float(r[3]) if r[3] else 0,
         }
         for r in rows
     ]
@@ -89,7 +146,7 @@ async def get_by_transport(db: Session = Depends(get_db), current_user: User = D
 
 @router.get("/by-agent")
 async def get_by_agent(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """各代理商报价统计：报价次数、平均总价、路线数"""
+    """各代理商活跃度：报价次数、路线覆盖数、平均报价"""
     rows = db.execute(text("""
         SELECT
             ra.代理商,
@@ -113,33 +170,6 @@ async def get_by_agent(db: Session = Depends(get_db), current_user: User = Depen
             "平均总价": float(r[3]) if r[3] else 0,
             "最低报价": float(r[4]) if r[4] else 0,
             "最高报价": float(r[5]) if r[5] else 0,
-        }
-        for r in rows
-    ]
-
-
-@router.get("/trend")
-async def get_trend(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """月度报价趋势：按月统计路线数和平均报价"""
-    rows = db.execute(text("""
-        SELECT
-            DATE_FORMAT(r.交易开始日期, '%Y-%m') AS 月份,
-            COUNT(DISTINCT r.路线ID)              AS 路线数,
-            ROUND(AVG(s.总计), 2)                 AS 平均总价,
-            ROUND(SUM(s.总计), 2)                 AS 总报价额
-        FROM routes r
-        JOIN route_agents ra ON r.路线ID = ra.路线ID
-        JOIN summary s ON ra.代理路线ID = s.代理路线ID
-        WHERE r.交易开始日期 IS NOT NULL AND s.总计 > 0
-        GROUP BY 月份
-        ORDER BY 月份
-    """)).fetchall()
-    return [
-        {
-            "月份": r[0],
-            "路线数": r[1],
-            "平均总价": float(r[2]) if r[2] else 0,
-            "总报价额": float(r[3]) if r[3] else 0,
         }
         for r in rows
     ]

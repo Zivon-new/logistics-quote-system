@@ -5,20 +5,20 @@ export function getOverview() {
   return request({ url: '/v1/analytics/overview', method: 'get' })
 }
 
-export function getByDestination() {
-  return request({ url: '/v1/analytics/by-destination', method: 'get' })
+export function getRouteUsage() {
+  return request({ url: '/v1/analytics/route-usage', method: 'get' })
 }
 
-export function getByTransport() {
-  return request({ url: '/v1/analytics/by-transport', method: 'get' })
+export function getRouteAgentDist(params = {}) {
+  return request({ url: '/v1/analytics/route-agent-dist', method: 'get', params })
+}
+
+export function getTrend(granularity = 'month') {
+  return request({ url: '/v1/analytics/trend', method: 'get', params: { granularity } })
 }
 
 export function getByAgent() {
   return request({ url: '/v1/analytics/by-agent', method: 'get' })
-}
-
-export function getTrend() {
-  return request({ url: '/v1/analytics/trend', method: 'get' })
 }
 
 export function getPriceDistribution() {
