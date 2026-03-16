@@ -1,11 +1,11 @@
 // frontend/src/api/agentCheck.js
 import request from '@/utils/request'
 
-export function checkAgent(keyword, forceRefresh = false) {
+export function checkAgent(keyword, rawText, forceRefresh = false) {
   return request({
     url: '/v1/agent-check/check',
     method: 'post',
-    data: { keyword, force_refresh: forceRefresh }
+    data: { keyword, raw_text: rawText, force_refresh: forceRefresh }
   })
 }
 

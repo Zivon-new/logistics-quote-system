@@ -2,44 +2,54 @@
   <div class="check-page">
     <div class="page-header">
       <h2>AI 企业背调助手</h2>
-      <p class="subtitle">输入货运代理公司名称，由 GLM-4 自动生成背景调查报告，结果缓存7天</p>
+      <p class="subtitle">从天眼查/企查查复制企业信息，由 GLM-4 进行结构化解析与风险评估</p>
     </div>
 
     <el-row :gutter="16">
-      <!-- 左侧：查询 + 历史记录 -->
-      <el-col :span="8">
+      <!-- 左侧：输入区 + 历史记录 -->
+      <el-col :span="9">
 
-        <!-- 查询框 -->
+        <!-- 输入区 -->
         <el-card class="query-card" shadow="never">
           <template #header>
-            <div class="card-title"><el-icon><Search /></el-icon> 发起背调</div>
+            <div class="card-title"><el-icon><EditPen /></el-icon> 发起背调</div>
           </template>
+
+          <!-- 第一步：公司名称 -->
+          <div class="step-label">① 输入公司名称</div>
           <el-input
             v-model="keyword"
-            placeholder="输入公司名称，如：中远海运"
+            placeholder="如：北京嘉恒利供应链有限公司"
             clearable
-            size="large"
             style="margin-bottom:12px"
-            @keyup.enter="doCheck(false)"
           />
-          <div style="display:flex;gap:8px">
-            <el-button
-              type="primary"
-              :loading="loading"
-              :icon="MagicStick"
-              style="flex:1"
-              @click="doCheck(false)"
-            >
-              {{ loading ? 'AI分析中…' : '生成背调报告' }}
-            </el-button>
-            <el-tooltip content="忽略缓存，重新调用AI生成" placement="top">
-              <el-button :disabled="loading" :icon="Refresh" @click="doCheck(true)" />
-            </el-tooltip>
+
+          <!-- 第二步：粘贴原始信息 -->
+          <div class="step-label">
+            ② 粘贴企业信息
+            <span class="step-tip">（从天眼查 / 企查查 / 爱企查等平台复制）</span>
           </div>
-          <div v-if="result?.from_cache" class="cache-hint">
-            <el-icon><Clock /></el-icon> 来自缓存（{{ result.created_at?.slice(0, 16) }}）
-          </div>
-          <div v-else-if="result && !result.from_cache" class="api-hint">
+          <el-input
+            v-model="rawText"
+            type="textarea"
+            :rows="12"
+            placeholder="将天眼查或企查查上的公司工商信息、股东结构、风险记录等内容粘贴到此处..."
+            style="margin-bottom:12px"
+          />
+
+          <div class="char-count">已输入 {{ rawText.length }} 字符</div>
+
+          <el-button
+            type="primary"
+            :loading="loading"
+            :icon="MagicStick"
+            style="width:100%;margin-top:8px"
+            @click="doCheck"
+          >
+            {{ loading ? 'AI 分析中…' : 'AI 分析并生成报告' }}
+          </el-button>
+
+          <div v-if="result && !result.from_cache" class="api-hint">
             <el-icon><Lightning /></el-icon>
             GLM-4-Flash · {{ result.tokens }} tokens · {{ result.elapsed }}s
           </div>
@@ -78,13 +88,35 @@
       </el-col>
 
       <!-- 右侧：报告展示 -->
-      <el-col :span="16">
+      <el-col :span="15">
         <el-card v-if="!result" shadow="never" class="empty-card">
-          <el-empty description="输入公司名称，点击【生成背调报告】" :image-size="80">
+          <el-empty description="在左侧粘贴企业信息，点击【AI 分析并生成报告】" :image-size="80">
             <template #image>
               <el-icon style="font-size:60px;color:#d9d9d9"><Notebook /></el-icon>
             </template>
           </el-empty>
+          <!-- 使用说明 -->
+          <div class="usage-guide">
+            <div class="usage-title">使用方法</div>
+            <div class="usage-steps">
+              <div class="usage-step">
+                <span class="usage-num">1</span>
+                <span>打开 <strong>tianyancha.com</strong> 或 <strong>qichacha.com</strong>，搜索目标公司</span>
+              </div>
+              <div class="usage-step">
+                <span class="usage-num">2</span>
+                <span>复制工商基本信息、股东结构、风险记录等内容</span>
+              </div>
+              <div class="usage-step">
+                <span class="usage-num">3</span>
+                <span>粘贴到左侧文本框，点击"AI 分析"按钮</span>
+              </div>
+              <div class="usage-step">
+                <span class="usage-num">4</span>
+                <span>AI 自动解析数据，输出结构化风险评估报告</span>
+              </div>
+            </div>
+          </div>
         </el-card>
 
         <template v-else>
@@ -106,7 +138,7 @@
             <p class="risk-summary">{{ result.summary }}</p>
           </el-card>
 
-          <!-- 六大维度报告 -->
+          <!-- 详细报告 -->
           <el-card class="report-card" shadow="never">
             <template #header>
               <div class="card-title"><el-icon><Files /></el-icon> 详细背调报告</div>
@@ -120,24 +152,21 @@
               style="margin-bottom:12px"
             />
 
-            <!-- 结构化报告 -->
             <template v-if="!parseError">
-              <div
-                v-for="field in reportFields"
-                :key="field.key"
-                class="report-section"
-              >
+              <div v-for="field in reportFields" :key="field.key" class="report-section">
                 <div class="report-section-title">
                   <el-icon><component :is="field.icon" /></el-icon>
                   {{ field.label }}
                 </div>
-                <div class="report-section-body" :class="{ 'risk-text': field.key === '风险提示' }">
+                <div
+                  class="report-section-body"
+                  :class="{ 'risk-text': field.key === '风险提示' }"
+                >
                   {{ result.report[field.key] || '—' }}
                 </div>
               </div>
             </template>
 
-            <!-- 原始输出降级 -->
             <pre v-else class="raw-output">{{ result.report?.原始输出 }}</pre>
           </el-card>
         </template>
@@ -150,12 +179,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Search, Refresh, Document, RefreshRight, MagicStick,
-  Clock, Lightning, Notebook, OfficeBuilding, Files
+  EditPen, Document, RefreshRight, MagicStick,
+  Lightning, Notebook, OfficeBuilding, Files
 } from '@element-plus/icons-vue'
 import { checkAgent, getHistory, getHistoryDetail } from '@/api/agentCheck'
 
 const keyword = ref('')
+const rawText = ref('')
 const loading = ref(false)
 const loadingHistory = ref(false)
 const result = ref(null)
@@ -189,23 +219,20 @@ const riskBg = (level) => {
   return map[level] || '#fafafa'
 }
 
-const doCheck = async (forceRefresh) => {
-  const kw = keyword.value.trim()
-  if (!kw) { ElMessage.warning('请输入公司名称'); return }
+const doCheck = async () => {
+  if (!keyword.value.trim()) { ElMessage.warning('请输入公司名称'); return }
+  if (!rawText.value.trim()) { ElMessage.warning('请粘贴企业信息后再分析'); return }
+
   loading.value = true
   result.value = null
   activeHistoryId.value = null
   try {
-    const res = await checkAgent(kw, forceRefresh)
+    const res = await checkAgent(keyword.value.trim(), rawText.value.trim())
     result.value = res
-    if (res.from_cache) {
-      ElMessage.info('命中缓存，直接返回历史报告')
-    } else {
-      ElMessage.success('报告生成完成')
-      loadHistory()   // 刷新历史列表
-    }
+    ElMessage.success('分析完成')
+    loadHistory()
   } catch (e) {
-    ElMessage.error('背调失败：' + (e.message || '未知错误'))
+    ElMessage.error('分析失败：' + (e.message || '未知错误'))
   } finally {
     loading.value = false
   }
@@ -217,6 +244,7 @@ const viewHistory = async (id) => {
     const res = await getHistoryDetail(id)
     result.value = { ...res, from_cache: true }
     keyword.value = res.keyword
+    rawText.value = ''
   } catch (e) {
     ElMessage.error('加载失败')
   }
@@ -246,21 +274,21 @@ onMounted(loadHistory)
   display: flex; align-items: center; gap: 6px;
   font-size: 14px; font-weight: 600; color: #262626;
 }
-.card-title-row {
-  display: flex; align-items: center; justify-content: space-between;
-}
+.card-title-row { display: flex; align-items: center; justify-content: space-between; }
 
-/* 左侧 */
+/* 输入区 */
 .query-card { margin-bottom: 12px; border-radius: 8px; }
-.cache-hint, .api-hint {
+.step-label { font-size: 13px; font-weight: 600; color: #262626; margin-bottom: 6px; }
+.step-tip { font-size: 12px; color: #8c8c8c; font-weight: 400; }
+.char-count { font-size: 12px; color: #bfbfbf; text-align: right; margin-top: -8px; }
+.api-hint {
   display: flex; align-items: center; gap: 4px;
-  font-size: 12px; margin-top: 8px;
+  font-size: 12px; color: #52c41a; margin-top: 8px;
 }
-.cache-hint { color: #8c8c8c; }
-.api-hint { color: #52c41a; }
 
+/* 历史 */
 .history-card { border-radius: 8px; }
-.history-list { display: flex; flex-direction: column; gap: 4px; max-height: 520px; overflow-y: auto; }
+.history-list { display: flex; flex-direction: column; gap: 4px; max-height: 400px; overflow-y: auto; }
 .history-item {
   padding: 8px 10px; border-radius: 6px; cursor: pointer;
   transition: background .15s; border: 1px solid transparent;
@@ -273,8 +301,21 @@ onMounted(loadHistory)
 .history-time, .history-user { font-size: 11px; color: #bfbfbf; }
 
 /* 右侧 */
-.empty-card { border-radius: 8px; padding: 40px 0; }
+.empty-card { border-radius: 8px; }
+.empty-card :deep(.el-card__body) { padding: 40px 24px 24px; }
 
+/* 使用说明 */
+.usage-guide { margin-top: 24px; padding: 16px; background: #f0f9ff; border-radius: 8px; }
+.usage-title { font-size: 13px; font-weight: 600; color: #096dd9; margin-bottom: 12px; }
+.usage-steps { display: flex; flex-direction: column; gap: 10px; }
+.usage-step { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #595959; }
+.usage-num {
+  width: 20px; height: 20px; border-radius: 50%; background: #1890ff;
+  color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+}
+
+/* 报告 */
 .risk-header-card { margin-bottom: 12px; border-radius: 8px; }
 .risk-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .risk-company { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: #262626; }
@@ -289,8 +330,7 @@ onMounted(loadHistory)
 .report-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
 .report-section-title {
   display: flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 600; color: #1890ff;
-  margin-bottom: 6px;
+  font-size: 13px; font-weight: 600; color: #1890ff; margin-bottom: 6px;
 }
 .report-section-body { font-size: 13px; color: #595959; line-height: 1.8; }
 .risk-text { color: #cf1322; background: #fff2f0; padding: 8px 12px; border-radius: 4px; }
