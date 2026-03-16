@@ -36,6 +36,12 @@
           <el-icon><Box /></el-icon>
           <template #title>路线管理</template>
         </el-menu-item>
+
+        <el-menu-item index="/recommend">
+          <el-icon><Promotion /></el-icon>
+          <template #title>智能推荐</template>
+        </el-menu-item>
+
       </el-menu>
     </el-aside>
 
@@ -93,6 +99,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { House, Search, Box, SwitchButton, Expand, Fold, Promotion } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { logout } from '@/api/auth'
 

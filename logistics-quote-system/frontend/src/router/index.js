@@ -32,7 +32,13 @@ const routes = [
         name: 'RouteManage',
         component: () => import('@/views/RouteManage.vue'),
         meta: { title: '路线管理' }
-      }
+      },
+      {
+        path: 'recommend',
+        name: 'Recommend',
+        component: () => import('@/views/Recommend.vue'),
+        meta: { title: '智能推荐' }
+      },
     ]
   },
   {

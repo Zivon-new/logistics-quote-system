@@ -1,17 +1,107 @@
 # backend/app/api/v1/quotes.py
 """
-报价查询相关API
+报价查询相关API（含智能评分）
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import Optional
+from sqlalchemy import text
+from typing import Optional, List, Dict
 from datetime import date
 from ...core.deps import get_db, get_current_user
 from ...models.route import Route, RouteAgent
 from ...models.goods import GoodsDetail
-from ...models.fee import Summary  # ✅ 新增导入 Summary
+from ...models.fee import Summary
 from ...models.user import User
+from ...services.recommend_service import (
+    _get_lpi_map, _match_country, _normalize_inverse, _lpi_to_score
+)
 from sqlalchemy import and_, or_
+
+
+def _add_scores(db: Session, results: List[Dict]) -> Dict[str, dict]:
+    """
+    为 quote_results 中的每个 agent 补充智能评分。
+    按目的地分组归一化，返回 {代理路线ID: {综合评分, 各项得分, 时效天数}} 映射。
+    同时返回每个目的地的 LPI 信息。
+    """
+    if not results:
+        return {}, {}
+
+    # 收集所有 代理路线ID
+    all_agent_ids = []
+    for route in results:
+        for agent in route.get("agents", []):
+            all_agent_ids.append(agent["代理路线ID"])
+
+    if not all_agent_ids:
+        return {}, {}
+
+    # 一次性查出 时效天数 和 信用评分
+    id_list = ",".join(str(i) for i in all_agent_ids)
+    rows = db.execute(text(f"""
+        SELECT ra.代理路线ID, ra.时效天数, a.信用评分
+        FROM route_agents ra
+        LEFT JOIN agents a ON ra.代理商ID = a.代理商ID
+        WHERE ra.代理路线ID IN ({id_list})
+    """)).fetchall()
+    supp = {r[0]: {"时效天数": r[1], "信用评分": r[2]} for r in rows}
+
+    # 获取 LPI 映射
+    lpi_map = _get_lpi_map(db)
+
+    # 按目的地分组，分别归一化计算
+    score_map: Dict[int, dict] = {}
+    dest_lpi_info: Dict[str, dict] = {}
+
+    # 按目的地聚合 agents
+    dest_groups: Dict[str, List] = {}
+    for route in results:
+        dest = route["目的地"]
+        for agent in route.get("agents", []):
+            dest_groups.setdefault(dest, []).append(agent)
+
+    for dest, agents in dest_groups.items():
+        country_code = _match_country(dest)
+        lpi_info = lpi_map.get(country_code) if country_code else None
+        dest_lpi = lpi_info["lpi"] if lpi_info else None
+        lpi_score = _lpi_to_score(dest_lpi)
+
+        dest_lpi_info[dest] = {
+            "LPI": dest_lpi,
+            "风险等级": lpi_info["风险等级"] if lpi_info else "未知",
+            "国家中文名": lpi_info["国家中文名"] if lpi_info else None,
+        }
+
+        # 在当前目的地组内归一化
+        times = [supp.get(a["代理路线ID"], {}).get("时效天数") for a in agents]
+        times = [t for t in times if t is not None]
+        prices = [a["总费用"] for a in agents if a["总费用"] > 0]
+
+        min_t, max_t = (min(times), max(times)) if times else (None, None)
+        min_p, max_p = (min(prices), max(prices)) if prices else (None, None)
+
+        for agent in agents:
+            aid = agent["代理路线ID"]
+            s = supp.get(aid, {})
+            time_s = _normalize_inverse(s.get("时效天数"), min_t, max_t)
+            price_s = _normalize_inverse(
+                agent["总费用"] if agent["总费用"] > 0 else None, min_p, max_p
+            )
+            credit_s = float(s["信用评分"]) if s.get("信用评分") else 60.0
+            total = round(time_s * 0.3 + price_s * 0.3 + lpi_score * 0.2 + credit_s * 0.2, 1)
+
+            score_map[aid] = {
+                "综合评分": total,
+                "时效天数": s.get("时效天数"),
+                "各项得分": {
+                    "时效得分": time_s,
+                    "价格得分": price_s,
+                    "LPI得分": lpi_score,
+                    "信用得分": credit_s,
+                },
+            }
+
+    return score_map, dest_lpi_info
 
 router = APIRouter(prefix="/quotes", tags=["报价查询"])
 
@@ -204,10 +294,19 @@ async def search_quotes(
             route_dict["goods_total"].append(goods_total_dict)
         
         quote_results.append(route_dict)
-    
+
+    # 补充智能评分
+    score_map, dest_lpi_info = _add_scores(db, quote_results)
+    for route in quote_results:
+        for agent in route["agents"]:
+            aid = agent["代理路线ID"]
+            if aid in score_map:
+                agent.update(score_map[aid])
+
     return {
         "total": total,
         "page": page,
         "page_size": page_size,
-        "results": quote_results
+        "results": quote_results,
+        "dest_lpi_info": dest_lpi_info,
     }

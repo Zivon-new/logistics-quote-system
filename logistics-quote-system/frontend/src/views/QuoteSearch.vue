@@ -4,35 +4,31 @@
 
     <!-- 搜索表单 -->
     <el-card class="search-form">
-      <el-form :model="searchForm" label-width="100px">
-        <el-row :gutter="20">
-          <el-col :span="8">
+      <el-form :model="searchForm" label-width="80px">
+        <el-row :gutter="16">
+          <el-col :span="6">
             <el-form-item label="起始地" required>
-              <el-input v-model="searchForm.起始地" placeholder="支持模糊搜索，如：深圳" clearable />
+              <el-input v-model="searchForm.起始地" placeholder="如：深圳" clearable />
             </el-form-item>
           </el-col>
-
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="目的地" required>
-              <el-input v-model="searchForm.目的地" placeholder="支持模糊搜索，如：西班牙" clearable />
+              <el-input v-model="searchForm.目的地" placeholder="如：新加坡" clearable />
             </el-form-item>
           </el-col>
-
-          <el-col :span="8">
+          <el-col :span="6">
             <el-form-item label="货物名称">
-              <el-input v-model="searchForm.货物名称" placeholder="关键词搜索，如：服务器" clearable />
+              <el-input v-model="searchForm.货物名称" placeholder="关键词，如：服务器" clearable />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="代理商">
+              <el-input v-model="searchForm.代理商" placeholder="代理商名称" clearable />
             </el-form-item>
           </el-col>
         </el-row>
-
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="代理商">
-              <el-input v-model="searchForm.代理商" placeholder="支持模糊搜索" clearable />
-            </el-form-item>
-          </el-col>
-
-          <el-col :span="12">
+        <el-row :gutter="16">
+          <el-col :span="10">
             <el-form-item label="日期范围">
               <el-date-picker
                 v-model="dateRange"
@@ -41,12 +37,11 @@
                 start-placeholder="开始日期"
                 end-placeholder="结束日期"
                 value-format="YYYY-MM-DD"
-                style="width: 100%;"
+                style="width: 100%"
               />
             </el-form-item>
           </el-col>
-
-          <el-col :span="4" style="text-align: right;">
+          <el-col :span="14" style="display:flex; align-items:flex-end; gap:8px; padding-bottom:18px">
             <el-button type="primary" :icon="Search" :loading="loading" @click="handleSearch">
               查询报价
             </el-button>
@@ -56,64 +51,141 @@
       </el-form>
     </el-card>
 
-    <!-- 查询结果 -->
-    <el-card v-if="quoteResults.length > 0" class="result-container">
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>查询结果（共 {{ total }} 条）</span>
-          <el-button type="success" :icon="Download" size="small">导出Excel</el-button>
+    <!-- 结果区 -->
+    <template v-if="quoteResults.length > 0">
+
+      <!-- 目的国 LPI 信息条 -->
+      <div v-if="Object.keys(destLpiInfo).length" class="lpi-bar">
+        <span class="lpi-bar-label">目的国物流指数（LPI）：</span>
+        <span
+          v-for="(info, dest) in destLpiInfo"
+          :key="dest"
+          class="lpi-bar-item"
+        >
+          <strong>{{ dest }}</strong>
+          <template v-if="info.LPI">
+            （{{ info.国家中文名 }}）&nbsp;
+            <span class="lpi-score">{{ info.LPI }} / 5.0</span>&nbsp;
+            <el-tag :type="riskTagType(info.风险等级)" size="small">{{ info.风险等级 }}风险</el-tag>
+          </template>
+          <template v-else>
+            <el-tag type="info" size="small">暂无LPI数据</el-tag>
+          </template>
+        </span>
+        <span class="lpi-bar-tip">· LPI越高物流越成熟，综合评分已将其纳入计算</span>
+      </div>
+
+      <!-- 排序 + 结果统计 -->
+      <div class="result-toolbar">
+        <span class="result-count">共 <strong>{{ total }}</strong> 条结果</span>
+        <div class="sort-controls">
+          <span class="sort-label">排序：</span>
+          <el-radio-group v-model="sortBy" size="small">
+            <el-radio-button value="score">综合评分</el-radio-button>
+            <el-radio-button value="time">时效优先</el-radio-button>
+            <el-radio-button value="price">价格优先</el-radio-button>
+            <el-radio-button value="date">最新日期</el-radio-button>
+          </el-radio-group>
         </div>
-      </template>
+        <el-button type="success" :icon="Download" size="small">导出Excel</el-button>
+      </div>
 
       <!-- 路线列表 -->
-      <div v-for="route in quoteResults" :key="route.路线ID" class="route-item">
+      <el-card
+        v-for="route in sortedRoutes"
+        :key="route.路线ID"
+        class="route-card"
+        shadow="never"
+      >
+        <!-- 路线头部 -->
         <div class="route-header">
-          <h3>{{ route.起始地 }} → {{ route.目的地 }}</h3>
-          <el-tag v-if="route.途径地" type="info" size="small">途径: {{ route.途径地 }}</el-tag>
-          <span class="route-date">
-            {{ route.交易开始日期 }} 至 {{ route.交易结束日期 }}
+          <span class="route-title">{{ route.起始地 }} → {{ route.目的地 }}</span>
+          <el-tag v-if="route.途径地" type="info" size="small">途径 {{ route.途径地 }}</el-tag>
+          <el-tag v-if="route.货物名称" type="success" size="small" class="goods-tag">
+            {{ route.货物名称.length > 20 ? route.货物名称.slice(0, 20) + '…' : route.货物名称 }}
+          </el-tag>
+          <span class="route-date">{{ route.交易开始日期 }} 至 {{ route.交易结束日期 }}</span>
+          <span class="route-weight">
+            实重 {{ route.实际重量 }} kg
+            <template v-if="route.计费重量">· 计费重 {{ route.计费重量 }} kg</template>
           </span>
         </div>
 
-        <div class="route-info">
-          <el-descriptions :column="3" size="small" border>
-            <el-descriptions-item label="实际重量">{{ route.实际重量 }} kg</el-descriptions-item>
-            <el-descriptions-item label="总体积">{{ route.总体积 || '-' }} cbm</el-descriptions-item>
-            <el-descriptions-item label="货值">¥{{ route.货值 }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
+        <!-- 代理商表格 -->
+        <el-table :data="sortedAgents(route.agents)" border stripe size="small">
+          <!-- 评分列 -->
+          <el-table-column label="推荐评分" width="90" align="center" sortable>
+            <template #default="{ row }">
+              <el-tooltip
+                v-if="row.综合评分 != null"
+                placement="right"
+                :content="`时效:${row.各项得分?.时效得分} · 价格:${row.各项得分?.价格得分} · LPI:${row.各项得分?.LPI得分} · 信用:${row.各项得分?.信用得分}`"
+              >
+                <el-tag
+                  :type="scoreTagType(row.综合评分)"
+                  size="small"
+                  style="font-weight:600; cursor:help"
+                >
+                  {{ row.综合评分 }}
+                </el-tag>
+              </el-tooltip>
+              <span v-else class="dim">—</span>
+            </template>
+          </el-table-column>
 
-        <!-- 货物信息 -->
-        <div v-if="route.goods_details && route.goods_details.length > 0" class="goods-info">
-          <h4>货物信息</h4>
-          <el-tag v-for="goods in route.goods_details" :key="goods.货物ID" type="success" style="margin-right: 8px;">
-            {{ goods.货物名称 }}
-          </el-tag>
-        </div>
+          <el-table-column prop="代理商" label="代理商" min-width="130" />
+          <el-table-column prop="运输方式" label="运输方式" width="90" />
 
-        <!-- 代理商列表 -->
-        <div class="agents-container">
-          <el-table :data="route.agents" border stripe>
-            <el-table-column prop="代理商" label="代理商" width="150" />
-            <el-table-column prop="运输方式" label="运输方式" width="100" />
-            <el-table-column prop="时效" label="时效" width="120" />
-            <el-table-column prop="总费用" label="总费用(CNY)" width="120" align="right">
-              <template #default="scope">
-                <span style="color: #f5222d; font-weight: 600;">
-                  ¥{{ scope.row.总费用?.toFixed(2) || '0.00' }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150" align="center">
-              <template #default="scope">
-                <el-button type="primary" link size="small" @click="viewDetail(scope.row, route)">
-                  查看详情
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </div>
+          <!-- 时效 -->
+          <el-table-column label="时效" width="100">
+            <template #default="{ row }">
+              <span :class="{ 'fast-time': row.时效天数 && row.时效天数 <= 10 }">
+                {{ row.时效天数 ? row.时效天数 + ' 天' : (row.时效 || '—') }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <!-- 小计（费用合计，不含税汇损） -->
+          <el-table-column label="小计 (CNY)" width="120" align="right">
+            <template #default="{ row }">
+              <span class="price-text">
+                {{ row.总费用 > 0 ? '¥ ' + row.总费用.toFixed(2) : '—' }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <!-- 总计（含税+汇损的最终金额） -->
+          <el-table-column label="总计 (CNY)" width="120" align="right">
+            <template #default="{ row }">
+              <span class="total-price" v-if="row.summary?.总计 > 0">
+                ¥ {{ row.summary.总计.toFixed(2) }}
+              </span>
+              <span v-else class="dim">—</span>
+            </template>
+          </el-table-column>
+
+          <!-- 赔付 -->
+          <el-table-column label="赔付" width="66" align="center">
+            <template #default="{ row }">
+              <el-tag
+                :type="isCompensation(row.是否赔付) ? 'success' : 'info'"
+                size="small"
+              >
+                {{ isCompensation(row.是否赔付) ? '有' : '无' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+
+          <!-- 操作 -->
+          <el-table-column label="操作" width="90" align="center">
+            <template #default="{ row }">
+              <el-button type="primary" link size="small" @click="viewDetail(row, route)">
+                费用详情
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
 
       <!-- 分页 -->
       <div class="pagination-container">
@@ -121,118 +193,116 @@
           v-model:current-page="searchForm.page"
           v-model:page-size="searchForm.page_size"
           :total="total"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSearch"
           @current-change="handleSearch"
         />
       </div>
-    </el-card>
+    </template>
 
-    <!-- 空状态 -->
-    <el-empty v-else-if="!loading" description="请输入查询条件进行搜索" />
+    <el-empty v-else-if="!loading" description="请输入起始地和目的地查询" />
 
-    <!-- 全屏详情弹窗 -->
-    <el-dialog 
-      v-model="detailVisible" 
-      title="报价详情" 
+    <!-- 费用详情弹窗 -->
+    <el-dialog
+      v-model="detailVisible"
+      title="费用详情"
       fullscreen
       :close-on-click-modal="false"
       class="detail-dialog"
     >
       <div v-if="currentAgent && currentRoute" class="detail-container">
         <el-row :gutter="20">
-          <!-- 左侧：路线和货物信息 -->
+          <!-- 左：路线 + 货物 + 智能评分 -->
           <el-col :span="12">
-            <!-- 基本信息 -->
             <div class="detail-section">
               <h3>基本信息</h3>
               <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="路线ID">{{ currentRoute.路线ID }}</el-descriptions-item>
-                <el-descriptions-item label="起始地">{{ currentRoute.起始地 }}</el-descriptions-item>
-                <el-descriptions-item label="目的地">{{ currentRoute.目的地 }}</el-descriptions-item>
-                <el-descriptions-item label="途径地">{{ currentRoute.途径地 || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="交易开始日期">{{ currentRoute.交易开始日期 }}</el-descriptions-item>
-                <el-descriptions-item label="交易结束日期">{{ currentRoute.交易结束日期 }}</el-descriptions-item>
+                <el-descriptions-item label="路线">{{ currentRoute.起始地 }} → {{ currentRoute.目的地 }}</el-descriptions-item>
+                <el-descriptions-item label="途径地">{{ currentRoute.途径地 || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="交易日期">{{ currentRoute.交易开始日期 }} 至 {{ currentRoute.交易结束日期 }}</el-descriptions-item>
+                <el-descriptions-item label="货物名称">{{ currentRoute.货物名称 || '—' }}</el-descriptions-item>
                 <el-descriptions-item label="实际重量">{{ currentRoute.实际重量 }} kg</el-descriptions-item>
-                <el-descriptions-item label="计费重量">{{ currentRoute.计费重量 || '-' }} kg</el-descriptions-item>
-                <el-descriptions-item label="总体积">{{ currentRoute.总体积 || '-' }} cbm</el-descriptions-item>
+                <el-descriptions-item label="计费重量">{{ currentRoute.计费重量 || '—' }} kg</el-descriptions-item>
+                <el-descriptions-item label="总体积">{{ currentRoute.总体积 || '—' }} cbm</el-descriptions-item>
                 <el-descriptions-item label="货值">¥{{ currentRoute.货值 }}</el-descriptions-item>
               </el-descriptions>
             </div>
 
-            <!-- 货物信息 -->
-            <div class="detail-section">
+            <div class="detail-section" v-if="currentRoute.goods_details?.length || currentRoute.goods_total?.length">
               <h3>货物信息</h3>
-              
-              <!-- 货物明细表格 -->
-              <div v-if="currentRoute.goods_details?.length > 0" style="margin-bottom: 16px;">
-                <p style="font-size: 14px; font-weight: 600; color: #595959; margin-bottom: 8px;">货物明细</p>
-                <el-table :data="currentRoute.goods_details" border stripe max-height="300" size="small">
-                  <el-table-column prop="货物名称" label="货物名称" min-width="140" />
-                  <el-table-column prop="货物种类" label="货物种类" width="90" />
-                  <el-table-column label="是否新品" width="70" align="center">
-                    <template #default="scope">
-                      <el-tag :type="isNewProduct(scope.row.是否新品) ? 'success' : 'info'" size="small">
-                        {{ isNewProduct(scope.row.是否新品) ? '是' : '否' }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="数量" label="数量" width="60" align="right" />
-                  <el-table-column label="重量" width="80" align="right">
-                    <template #default="scope">
-                      {{ scope.row['重量(/kg)'] || 0 }} kg
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="总重量" width="80" align="right">
-                    <template #default="scope">
-                      {{ scope.row['总重量(/kg)'] || 0 }} kg
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="单价" width="80" align="right">
-                    <template #default="scope">
-                      {{ scope.row.单价 || 0 }} {{ scope.row.币种 || '' }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="总价" width="90" align="right">
-                    <template #default="scope">
-                      ¥{{ (scope.row.总货值 || scope.row.总价 || 0)?.toFixed(2) }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="备注" label="备注" min-width="100" show-overflow-tooltip />
-                </el-table>
+              <el-table v-if="currentRoute.goods_details?.length" :data="currentRoute.goods_details" border stripe size="small" style="margin-bottom:12px">
+                <el-table-column prop="货物名称" label="货物名称" min-width="140" />
+                <el-table-column prop="货物种类" label="种类" width="90" />
+                <el-table-column label="新品" width="60" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="isNewProduct(row.是否新品) ? 'success' : 'info'" size="small">
+                      {{ isNewProduct(row.是否新品) ? '是' : '否' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="数量" label="数量" width="60" align="right" />
+                <el-table-column label="总重(kg)" width="80" align="right">
+                  <template #default="{ row }">{{ row['总重量(/kg)'] || 0 }}</template>
+                </el-table-column>
+                <el-table-column label="总价" width="90" align="right">
+                  <template #default="{ row }">¥{{ (row.总货值 || row.总价 || 0).toFixed?.(2) }}</template>
+                </el-table-column>
+                <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
+              </el-table>
+              <div v-if="currentRoute.goods_total?.length" class="goods-total-list">
+                <div v-for="g in currentRoute.goods_total" :key="g.整单货物ID" class="goods-total-item">
+                  <span>{{ g.货物名称 || '整单' }}</span>
+                  <span>实重 {{ g['实际重量(/kg)'] }} kg · 货值 ¥{{ g.货值?.toFixed(2) }} · 体积 {{ g['总体积(/cbm)'] }} cbm</span>
+                  <span v-if="g.备注" class="dim">备注：{{ g.备注 }}</span>
+                </div>
               </div>
+            </div>
 
-              <!-- 整单货物汇总 -->
-              <div v-if="currentRoute.goods_total?.length > 0">
-                <p style="font-size: 14px; font-weight: 600; color: #595959; margin-bottom: 8px;">整单汇总</p>
-                <div class="goods-summary">
-                  <div v-for="goods in currentRoute.goods_total" :key="goods.整单货物ID" class="summary-item">
-                    <span class="summary-label">{{ goods.货物名称 || '货物信息' }}:</span>
-                    <span class="summary-value">
-                      实际重量 {{ goods['实际重量(/kg)'] }} kg | 
-                      货值 ¥{{ goods.货值?.toFixed(2) }} | 
-                      体积 {{ goods['总体积(/cbm)'] }} cbm
-                    </span>
-                    <div v-if="goods.备注" style="margin-top: 4px;">
-                      <span style="color: #909399; font-size: 12px;">备注：{{ goods.备注 }}</span>
-                    </div>
+            <!-- 智能评分放在左侧底部 -->
+            <div class="detail-section score-section" v-if="currentAgent.综合评分 != null">
+              <h3>智能评分</h3>
+              <div class="score-overview">
+                <div class="score-circle-wrap">
+                  <el-progress
+                    type="circle"
+                    :percentage="currentAgent.综合评分"
+                    :color="scoreColor(currentAgent.综合评分)"
+                    :width="80"
+                    :stroke-width="7"
+                  >
+                    <template #default>
+                      <span class="score-big">{{ currentAgent.综合评分 }}</span>
+                    </template>
+                  </el-progress>
+                  <div class="dim" style="font-size:12px;margin-top:4px">综合评分</div>
+                </div>
+                <div class="score-dims">
+                  <div v-for="dim in [
+                    {label:'时效', val: currentAgent.各项得分?.时效得分, tip:'时效天数越短越高'},
+                    {label:'价格', val: currentAgent.各项得分?.价格得分, tip:'报价越低越高'},
+                    {label:'LPI',  val: currentAgent.各项得分?.LPI得分,  tip:'目的国物流绩效指数'},
+                    {label:'信用', val: currentAgent.各项得分?.信用得分, tip:'代理商信用评分'},
+                  ]" :key="dim.label" class="dim-row">
+                    <el-tooltip :content="`${dim.label}得分（${dim.tip}）`" placement="top">
+                      <span class="dim-label">{{ dim.label }}</span>
+                    </el-tooltip>
+                    <el-progress
+                      :percentage="dim.val ?? 0"
+                      :color="scoreColor(dim.val ?? 0)"
+                      :show-text="false"
+                      :stroke-width="6"
+                      style="flex:1"
+                    />
+                    <span class="dim-val">{{ dim.val ?? '—' }}</span>
                   </div>
                 </div>
               </div>
-
-              <el-empty 
-                v-if="(!currentRoute.goods_details || currentRoute.goods_details.length === 0) && 
-                      (!currentRoute.goods_total || currentRoute.goods_total.length === 0)" 
-                description="暂无货物信息" 
-                :image-size="60" 
-              />
             </div>
           </el-col>
 
-          <!-- 右侧：代理商和费用信息 -->
+          <!-- 右：代理商 + 费用明细 + 汇总 -->
           <el-col :span="12">
-            <!-- 代理商信息 -->
             <div class="detail-section">
               <h3>代理商信息</h3>
               <el-descriptions :column="2" border size="small">
@@ -240,80 +310,60 @@
                 <el-descriptions-item label="运输方式">{{ currentAgent.运输方式 }}</el-descriptions-item>
                 <el-descriptions-item label="贸易类型">{{ currentAgent.贸易类型 }}</el-descriptions-item>
                 <el-descriptions-item label="时效">{{ currentAgent.时效 }}</el-descriptions-item>
-                <el-descriptions-item label="时效备注" :span="2">{{ currentAgent.时效备注 || '-' }}</el-descriptions-item>
-                <el-descriptions-item label="不含" :span="2">{{ currentAgent.不含 || '-' }}</el-descriptions-item>
+                <el-descriptions-item label="时效备注" :span="2">{{ currentAgent.时效备注 || '—' }}</el-descriptions-item>
+                <el-descriptions-item label="不含" :span="2">{{ currentAgent.不含 || '—' }}</el-descriptions-item>
                 <el-descriptions-item label="是否赔付">
                   <el-tag :type="isCompensation(currentAgent.是否赔付) ? 'success' : 'info'" size="small">
-                    {{ isCompensation(currentAgent.是否赔付) ? '是' : '否' }}
+                    {{ isCompensation(currentAgent.是否赔付) ? '有赔付' : '无赔付' }}
                   </el-tag>
                 </el-descriptions-item>
-                <el-descriptions-item label="赔付内容">{{ currentAgent.赔付内容 || '-' }}</el-descriptions-item>
-                <el-descriptions-item v-if="currentAgent.代理备注" label="代理备注" :span="2">
+                <el-descriptions-item label="赔付内容">{{ currentAgent.赔付内容 || '—' }}</el-descriptions-item>
+                <el-descriptions-item v-if="currentAgent.代理备注" label="备注" :span="2">
                   {{ currentAgent.代理备注 }}
                 </el-descriptions-item>
               </el-descriptions>
             </div>
 
-            <!-- 费用明细（表格展示全部字段） -->
             <div class="detail-section">
               <h3>费用明细</h3>
-              
-              <!-- 费用明细表 -->
-              <div v-if="currentAgent.fee_items?.length > 0" style="margin-bottom: 16px;">
-                <p style="font-size: 13px; font-weight: 600; color: #595959; margin-bottom: 8px;">费用明细（{{ currentAgent.fee_items.length }}条）</p>
-                <el-table :data="currentAgent.fee_items" border stripe size="small">
-                  <el-table-column prop="费用类型" label="费用类型" min-width="120" />
-                  <el-table-column label="单价" width="100" align="right">
-                    <template #default="scope">
-                      {{ scope.row.单价 }}{{ scope.row.币种 }}{{ scope.row.单位 ? '/' + scope.row.单位.replace('/','') : '' }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="数量" label="数量" width="70" align="right">
-                    <template #default="scope">
-                      {{ Number(scope.row.数量).toFixed(0) }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="原币金额" width="100" align="right">
-                    <template #default="scope">
-                      {{ scope.row.原币金额?.toFixed(2) }} {{ scope.row.币种 }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="人民币金额" width="100" align="right">
-                    <template #default="scope">
-                      <span style="color: #52c41a; font-weight: 500;">¥{{ scope.row.人民币金额?.toFixed(2) }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="备注" label="备注" min-width="100" show-overflow-tooltip />
-                </el-table>
-              </div>
-              
-              <!-- 整单费用表 -->
-              <div v-if="currentAgent.fee_total?.length > 0" style="margin-bottom: 16px;">
-                <p style="font-size: 13px; font-weight: 600; color: #595959; margin-bottom: 8px;">整单费用（{{ currentAgent.fee_total.length }}条）</p>
-                <el-table :data="currentAgent.fee_total" border stripe size="small">
-                  <el-table-column prop="费用名称" label="费用名称" min-width="140" />
-                  <el-table-column label="原币金额" width="120" align="right">
-                    <template #default="scope">
-                      {{ scope.row.原币金额?.toFixed(2) }} {{ scope.row.币种 }}
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="人民币金额" width="120" align="right">
-                    <template #default="scope">
-                      <span style="color: #52c41a; font-weight: 500;">¥{{ scope.row.人民币金额?.toFixed(2) }}</span>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="备注" label="备注" min-width="100" show-overflow-tooltip />
-                </el-table>
-              </div>
-              
-              <el-empty 
-                v-if="(!currentAgent.fee_items || currentAgent.fee_items.length === 0) && (!currentAgent.fee_total || currentAgent.fee_total.length === 0)" 
-                description="暂无费用明细" 
-                :image-size="60" 
-              />
+              <el-table v-if="currentAgent.fee_items?.length" :data="currentAgent.fee_items" border stripe size="small" style="margin-bottom:12px">
+                <el-table-column prop="费用类型" label="费用类型" min-width="110" />
+                <el-table-column label="单价" width="120" align="right">
+                  <template #default="{ row }">
+                    {{ row.单价 }}{{ row.币种 }}{{ row.单位 ? '/' + row.单位.replace('/','') : '' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="数量" width="60" align="right">
+                  <template #default="{ row }">{{ Number(row.数量).toFixed(0) }}</template>
+                </el-table-column>
+                <el-table-column label="原币金额" width="100" align="right">
+                  <template #default="{ row }">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</template>
+                </el-table-column>
+                <el-table-column label="人民币" width="90" align="right">
+                  <template #default="{ row }">
+                    <span class="rmb-amount">¥{{ row.人民币金额?.toFixed(2) }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
+              </el-table>
+
+              <el-table v-if="currentAgent.fee_total?.length" :data="currentAgent.fee_total" border stripe size="small">
+                <el-table-column prop="费用名称" label="整单费用" min-width="130" />
+                <el-table-column label="原币金额" width="120" align="right">
+                  <template #default="{ row }">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</template>
+                </el-table-column>
+                <el-table-column label="人民币" width="90" align="right">
+                  <template #default="{ row }">
+                    <span class="rmb-amount">¥{{ row.人民币金额?.toFixed(2) }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
+              </el-table>
+
+              <el-empty v-if="!currentAgent.fee_items?.length && !currentAgent.fee_total?.length"
+                description="暂无费用明细" :image-size="60" />
             </div>
 
-            <!-- 费用汇总 -->
             <div v-if="currentAgent.summary" class="detail-section">
               <h3>费用汇总</h3>
               <el-descriptions :column="2" border size="small">
@@ -324,9 +374,6 @@
                 <el-descriptions-item label="汇损">¥{{ currentAgent.summary.汇损?.toFixed(2) }}</el-descriptions-item>
                 <el-descriptions-item label="总计" :span="2">
                   <span class="total-amount">¥{{ currentAgent.summary.总计?.toFixed(2) }}</span>
-                </el-descriptions-item>
-                <el-descriptions-item v-if="currentAgent.summary.备注" label="备注" :span="2">
-                  {{ currentAgent.summary.备注 }}
                 </el-descriptions-item>
               </el-descriptions>
             </div>
@@ -347,116 +394,99 @@ const loading = ref(false)
 const dateRange = ref([])
 const quoteResults = ref([])
 const total = ref(0)
+const destLpiInfo = ref({})
+const sortBy = ref('score')
 const detailVisible = ref(false)
 const currentAgent = ref(null)
 const currentRoute = ref(null)
 
 const searchForm = reactive({
-  起始地: '',
-  目的地: '',
-  货物名称: '',
-  代理商: '',
-  page: 1,
-  page_size: 10
+  起始地: '', 目的地: '', 货物名称: '', 代理商: '',
+  page: 1, page_size: 10
 })
 
-// 判断是否为新品（兼容多种数据类型）
-const isNewProduct = (value) => {
-  // 兼容：数字1、字符串"1"、布尔值true
-  return value === 1 || value === '1' || value === true
+const isNewProduct = (v) => v === 1 || v === '1' || v === true
+const isCompensation = (v) => v === 1 || v === '1' || v === true
+
+const scoreTagType = (score) => {
+  if (score >= 80) return 'success'
+  if (score >= 60) return 'primary'
+  if (score >= 40) return 'warning'
+  return 'danger'
 }
 
-// 判断是否赔付（兼容多种数据类型）
-const isCompensation = (value) => {
-  // 兼容：数字1、字符串"1"、布尔值true
-  return value === 1 || value === '1' || value === true
+const scoreColor = (score) => {
+  if (score >= 80) return '#52c41a'
+  if (score >= 60) return '#1890ff'
+  if (score >= 40) return '#faad14'
+  return '#ff4d4f'
 }
 
-// 合并费用明细和整单费用
-const allFees = computed(() => {
-  if (!currentAgent.value) return []
-  
-  const fees = []
-  
-  // 添加费用明细
-  if (currentAgent.value.fee_items) {
-    currentAgent.value.fee_items.forEach(fee => {
-      fees.push({
-        name: fee.费用类型,
-        price: fee.单价,
-        unit: fee.单位,
-        currency: fee.币种,
-        remark: fee.备注 || ''  // ✅ 新增：备注
-      })
-    })
+const riskTagType = (level) => {
+  const map = { '低': 'success', '中低': 'success', '中': 'warning', '中高': 'warning', '高': 'danger' }
+  return map[level] || 'info'
+}
+
+// 每张路线卡的"代表值"（用于卡片间排序）
+const routeSortKey = (route) => {
+  const agents = route.agents || []
+  if (sortBy.value === 'score') {
+    const scores = agents.map(a => a.综合评分 ?? -1)
+    return -Math.max(...scores, -1)           // 降序：最高分排前
+  } else if (sortBy.value === 'time') {
+    const times = agents.map(a => a.时效天数).filter(t => t != null)
+    return times.length ? Math.min(...times) : 9999   // 升序：最快排前
+  } else if (sortBy.value === 'price') {
+    const prices = agents.map(a => a.总费用).filter(p => p > 0)
+    return prices.length ? Math.min(...prices) : 9999999  // 升序：最低价排前
+  } else {  // date
+    return route.交易开始日期 ? -new Date(route.交易开始日期).getTime() : 0  // 降序：最新排前
   }
-  
-  // 添加整单费用
-  if (currentAgent.value.fee_total) {
-    currentAgent.value.fee_total.forEach(fee => {
-      fees.push({
-        name: fee.费用名称,
-        price: fee.原币金额,
-        unit: '',
-        currency: fee.币种,
-        remark: fee.备注 || ''  // ✅ 新增：备注
-      })
-    })
-  }
-  
-  return fees
+}
+
+// 路线卡排序（返回排序后的路线列表）
+const sortedRoutes = computed(() => {
+  return [...quoteResults.value].sort((a, b) => routeSortKey(a) - routeSortKey(b))
 })
 
-// 费用明细左栏
-const leftColumnFees = computed(() => {
-  const mid = Math.ceil(allFees.value.length / 2)
-  return allFees.value.slice(0, mid)
-})
+// 路线内代理商始终按综合评分降序（方便对比同一路线）
+const sortedAgents = (agents) => {
+  if (!agents) return []
+  return [...agents].sort((a, b) => (b.综合评分 ?? -1) - (a.综合评分 ?? -1))
+}
 
-// 费用明细右栏
-const rightColumnFees = computed(() => {
-  const mid = Math.ceil(allFees.value.length / 2)
-  return allFees.value.slice(mid)
-})
-
-// 查询报价
 const handleSearch = async () => {
   if (!searchForm.起始地 || !searchForm.目的地) {
     ElMessage.warning('请输入起始地和目的地')
     return
   }
-
   loading.value = true
-
   try {
     const params = {
       起始地: searchForm.起始地,
       目的地: searchForm.目的地,
       page: searchForm.page,
-      page_size: searchForm.page_size
+      page_size: searchForm.page_size,
     }
-
-    // 可选参数
     if (searchForm.货物名称) params.货物名称 = searchForm.货物名称
     if (searchForm.代理商) params.代理商 = searchForm.代理商
     if (dateRange.value?.length === 2) {
       params.交易开始日期 = dateRange.value[0]
       params.交易结束日期 = dateRange.value[1]
     }
-
     const res = await searchQuotes(params)
     quoteResults.value = res.results
     total.value = res.total
-
-    ElMessage.success(`查询成功，找到 ${res.total} 条结果`)
-  } catch (error) {
-    console.error('查询失败:', error)
+    destLpiInfo.value = res.dest_lpi_info || {}
+    if (res.total === 0) ElMessage.warning('未找到匹配结果')
+    else ElMessage.success(`找到 ${res.total} 条结果`)
+  } catch (e) {
+    ElMessage.error('查询失败：' + (e.message || '未知错误'))
   } finally {
     loading.value = false
   }
 }
 
-// 重置表单
 const handleReset = () => {
   searchForm.起始地 = ''
   searchForm.目的地 = ''
@@ -466,9 +496,9 @@ const handleReset = () => {
   dateRange.value = []
   quoteResults.value = []
   total.value = 0
+  destLpiInfo.value = {}
 }
 
-// 查看详情
 const viewDetail = (agent, route) => {
   currentAgent.value = agent
   currentRoute.value = route
@@ -477,187 +507,87 @@ const viewDetail = (agent, route) => {
 </script>
 
 <style scoped>
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #262626;
-  margin-bottom: 20px;
-}
+.page-title { font-size: 22px; font-weight: 600; color: #262626; margin-bottom: 16px; }
 
-.route-item {
-  margin-bottom: 30px;
-  padding: 20px;
-  background: #fafafa;
-  border-radius: 8px;
-}
+.search-form { margin-bottom: 12px; border-radius: 8px; }
+.search-form :deep(.el-form-item) { margin-bottom: 12px; }
 
-.route-item:last-child {
-  margin-bottom: 0;
+/* LPI 信息条 */
+.lpi-bar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  background: #f0f9ff; border: 1px solid #bae7ff;
+  border-radius: 8px; padding: 10px 16px;
+  font-size: 13px; margin-bottom: 10px;
 }
+.lpi-bar-label { color: #096dd9; font-weight: 600; }
+.lpi-bar-item { display: flex; align-items: center; gap: 6px; }
+.lpi-score { color: #1890ff; font-weight: 600; }
+.lpi-bar-tip { color: #8c8c8c; font-size: 12px; margin-left: auto; }
+
+/* 工具栏 */
+.result-toolbar {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.result-count { font-size: 14px; color: #595959; }
+.result-count strong { color: #1890ff; }
+.sort-controls { display: flex; align-items: center; gap: 8px; }
+.sort-label { font-size: 13px; color: #8c8c8c; }
+
+/* 路线卡片 */
+.route-card { margin-bottom: 12px; border-radius: 8px; }
 
 .route-header {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 10px; margin-bottom: 12px;
 }
+.route-title { font-size: 16px; font-weight: 600; color: #262626; }
+.goods-tag { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.route-date { font-size: 12px; color: #8c8c8c; margin-left: auto; }
+.route-weight { font-size: 12px; color: #8c8c8c; }
 
-.route-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: #262626;
-  margin: 0;
+/* 表格内样式 */
+.price-text { color: #595959; font-weight: 500; }
+.total-price { color: #d4380d; font-weight: 700; }
+.fast-time { color: #52c41a; font-weight: 600; }
+.days-badge {
+  display: inline-block; background: #e6f7ff; color: #1890ff;
+  font-size: 11px; border-radius: 3px; padding: 0 4px; margin-left: 4px;
 }
+.dim { color: #bfbfbf; }
 
-.route-date {
-  font-size: 14px;
-  color: #8c8c8c;
-  margin-left: auto;
-}
+.pagination-container { margin-top: 16px; display: flex; justify-content: center; }
 
-.route-info {
-  margin-bottom: 15px;
-}
-
-.goods-info {
-  margin-bottom: 15px;
-  padding: 10px;
-  background: #f0f9ff;
-  border-radius: 4px;
-}
-
-.goods-info h4 {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  color: #595959;
-}
-
-.agents-container {
-  background: #ffffff;
-  padding: 15px;
-  border-radius: 4px;
-}
-
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-}
-
-/* 全屏详情弹窗 */
+/* 详情弹窗 */
 .detail-dialog :deep(.el-dialog__body) {
-  padding: 20px;
-  height: calc(100vh - 120px);
-  overflow-y: auto;
+  padding: 20px; height: calc(100vh - 120px); overflow-y: auto;
 }
-
-.detail-container {
-  height: 100%;
-}
-
 .detail-section {
-  margin-bottom: 24px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 4px;
+  margin-bottom: 20px; padding: 16px;
+  background: #fafafa; border-radius: 6px;
 }
-
 .detail-section h3 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #262626;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #1890ff;
+  margin: 0 0 12px; font-size: 15px; font-weight: 600; color: #262626;
+  padding-bottom: 8px; border-bottom: 2px solid #1890ff;
 }
 
-/* 整单货物汇总样式 */
-.goods-summary {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  padding: 12px;
+/* 评分区 */
+.score-section { background: #f0f9ff; border: 1px solid #bae7ff; }
+.score-overview { display: flex; gap: 24px; align-items: center; }
+.score-circle-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.score-big { font-size: 18px; font-weight: 700; }
+.score-dims { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.dim-row { display: flex; align-items: center; gap: 8px; }
+.dim-label { font-size: 12px; color: #595959; width: 26px; flex-shrink: 0; cursor: help; }
+.dim-val { font-size: 12px; color: #595959; width: 30px; text-align: right; flex-shrink: 0; }
+
+.goods-total-list { display: flex; flex-direction: column; gap: 8px; }
+.goods-total-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 12px; background: #fff;
+  border: 1px solid #f0f0f0; border-radius: 4px; font-size: 13px;
 }
 
-.summary-item {
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.summary-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.summary-label {
-  font-size: 14px;
-  color: #595959;
-  font-weight: 600;
-  display: inline-block;
-  min-width: 120px;
-}
-
-.summary-value {
-  font-size: 14px;
-  color: #262626;
-}
-
-/* 费用明细两栏布局 */
-.fee-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  background: #ffffff;
-}
-
-.fee-column {
-  padding: 0;
-}
-
-.fee-column:first-child {
-  border-right: 1px solid #e5e7eb;
-}
-
-.fee-item {
-  padding: 12px 16px;
-}
-
-.fee-item-border {
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.fee-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.fee-label {
-  font-size: 14px;
-  color: #262626;
-}
-
-.fee-value {
-  font-size: 14px;
-  color: #595959;
-  font-weight: 500;
-}
-
-/* 总计样式 */
-.total-summary {
-  padding: 16px;
-  background: #ffffff;
-  border-radius: 4px;
-  text-align: right;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.total-amount {
-  color: #f5222d;
-  font-size: 20px;
-  margin-left: 8px;
-}
+.rmb-amount { color: #52c41a; font-weight: 500; }
+.total-amount { color: #f5222d; font-size: 18px; font-weight: 700; }
 </style>
