@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         return f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
     
+    # 智谱 GLM API
+    ZHIPU_API_KEY: str = ""
+
     # JWT配置
     SECRET_KEY: str = "your-secret-key-change-in-production-jhl181116"
     ALGORITHM: str = "HS256"

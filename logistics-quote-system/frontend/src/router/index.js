@@ -34,10 +34,28 @@ const routes = [
         meta: { title: '路线管理' }
       },
       {
-        path: 'recommend',
-        name: 'Recommend',
-        component: () => import('@/views/Recommend.vue'),
-        meta: { title: '智能推荐' }
+        path: 'analytics',
+        name: 'Analytics',
+        component: () => import('@/views/Analytics.vue'),
+        meta: { title: '价格看板' }
+      },
+      {
+        path: 'port-map',
+        name: 'PortMap',
+        component: () => import('@/views/PortMap.vue'),
+        meta: { title: '港口地图' }
+      },
+      {
+        path: 'risk-profile',
+        name: 'RiskProfile',
+        component: () => import('@/views/RiskProfile.vue'),
+        meta: { title: '航线风险' }
+      },
+      {
+        path: 'agent-check',
+        name: 'AgentCheck',
+        component: () => import('@/views/AgentCheck.vue'),
+        meta: { title: 'AI企业背调' }
       },
     ]
   },

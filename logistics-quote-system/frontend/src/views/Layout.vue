@@ -37,9 +37,24 @@
           <template #title>路线管理</template>
         </el-menu-item>
 
-        <el-menu-item index="/recommend">
-          <el-icon><Promotion /></el-icon>
-          <template #title>智能推荐</template>
+        <el-menu-item index="/analytics">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>价格看板</template>
+        </el-menu-item>
+
+        <el-menu-item index="/port-map">
+          <el-icon><MapLocation /></el-icon>
+          <template #title>港口地图</template>
+        </el-menu-item>
+
+        <el-menu-item index="/risk-profile">
+          <el-icon><Warning /></el-icon>
+          <template #title>航线风险</template>
+        </el-menu-item>
+
+        <el-menu-item index="/agent-check">
+          <el-icon><Aim /></el-icon>
+          <template #title>企业背调</template>
         </el-menu-item>
 
       </el-menu>
@@ -99,7 +114,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { House, Search, Box, SwitchButton, Expand, Fold, Promotion } from '@element-plus/icons-vue'
+import { House, Search, Box, SwitchButton, Expand, Fold, DataAnalysis, MapLocation, Warning, Aim } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { logout } from '@/api/auth'
 

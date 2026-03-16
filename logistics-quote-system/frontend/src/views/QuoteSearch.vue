@@ -88,6 +88,18 @@
           </el-radio-group>
         </div>
         <el-button type="success" :icon="Download" size="small">导出Excel</el-button>
+        <el-badge :value="selectedAgents.length" :hidden="selectedAgents.length < 2" type="primary">
+          <el-button
+            type="warning"
+            :icon="Histogram"
+            size="small"
+            :disabled="selectedAgents.length < 2"
+            @click="compareVisible = true"
+          >
+            对比报价{{ selectedAgents.length >= 2 ? `（${selectedAgents.length}家）` : '' }}
+          </el-button>
+        </el-badge>
+        <el-button v-if="selectedAgents.length > 0" size="small" @click="selectedAgents = []">清空选择</el-button>
       </div>
 
       <!-- 路线列表 -->
@@ -113,6 +125,19 @@
 
         <!-- 代理商表格 -->
         <el-table :data="sortedAgents(route.agents)" border stripe size="small">
+          <!-- 选择列 -->
+          <el-table-column width="46" align="center">
+            <template #header>
+              <el-icon style="color:#8c8c8c;font-size:13px" title="勾选后可横向对比"><Tickets /></el-icon>
+            </template>
+            <template #default="{ row }">
+              <el-checkbox
+                :model-value="isSelected(row, route)"
+                @change="toggleSelect(row, route)"
+                :disabled="!isSelected(row, route) && selectedAgents.length >= 6"
+              />
+            </template>
+          </el-table-column>
           <!-- 评分列 -->
           <el-table-column label="推荐评分" width="90" align="center" sortable>
             <template #default="{ row }">
@@ -381,13 +406,71 @@
         </el-row>
       </div>
     </el-dialog>
+
+    <!-- 报价对比弹窗 -->
+    <el-dialog
+      v-model="compareVisible"
+      title="报价横向对比"
+      width="90%"
+      :close-on-click-modal="false"
+      class="compare-dialog"
+    >
+      <div v-if="compareVisible" class="compare-container">
+        <el-alert type="info" :closable="false" style="margin-bottom:12px">
+          <template #title>
+            共对比 <strong>{{ selectedAgents.length }}</strong> 家代理商方案；
+            <span style="color:#52c41a">绿色</span>为最优值，<span style="color:#f5222d">红色</span>为最差值（同类可比项）
+          </template>
+        </el-alert>
+
+        <div class="compare-scroll">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th class="metric-col">指标</th>
+                <th v-for="(item, idx) in selectedAgents" :key="idx" class="agent-col">
+                  <div class="agent-col-header">
+                    <div class="agent-name">{{ item.agent.代理商 }}</div>
+                    <div class="agent-route">{{ item.route.起始地 }} → {{ item.route.目的地 }}</div>
+                    <el-tag v-if="item.agent.综合评分 != null" :type="scoreTagType(item.agent.综合评分)" size="small" style="margin-top:4px">
+                      综合 {{ item.agent.综合评分 }}
+                    </el-tag>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in compareRows" :key="row.key" :class="{ 'section-header': row.isSection }">
+                <td v-if="row.isSection" :colspan="selectedAgents.length + 1" class="section-title">{{ row.label }}</td>
+                <template v-else>
+                  <td class="metric-label">{{ row.label }}</td>
+                  <td
+                    v-for="(item, idx) in selectedAgents"
+                    :key="idx"
+                    class="metric-value"
+                    :class="getCellClass(row, item)"
+                  >
+                    <span v-html="row.render(item)"></span>
+                  </td>
+                </template>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="compareVisible = false">关闭</el-button>
+        <el-button type="danger" plain @click="selectedAgents = []; compareVisible = false">清空选择并关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Refresh, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, Download, Histogram, Tickets } from '@element-plus/icons-vue'
 import { searchQuotes } from '@/api/quote'
 
 const loading = ref(false)
@@ -399,6 +482,120 @@ const sortBy = ref('score')
 const detailVisible = ref(false)
 const currentAgent = ref(null)
 const currentRoute = ref(null)
+
+// 报价对比
+const selectedAgents = ref([])  // [{agent, route}]
+const compareVisible = ref(false)
+
+const agentKey = (agent, route) => `${route.路线ID}-${agent.代理商}-${agent.运输方式}`
+
+const isSelected = (agent, route) =>
+  selectedAgents.value.some(x => agentKey(x.agent, x.route) === agentKey(agent, route))
+
+const toggleSelect = (agent, route) => {
+  const key = agentKey(agent, route)
+  const idx = selectedAgents.value.findIndex(x => agentKey(x.agent, x.route) === key)
+  if (idx >= 0) {
+    selectedAgents.value.splice(idx, 1)
+  } else {
+    if (selectedAgents.value.length >= 6) {
+      ElMessage.warning('最多同时对比6家代理商')
+      return
+    }
+    selectedAgents.value.push({ agent, route })
+  }
+}
+
+// 对比表行定义
+const compareRows = computed(() => [
+  { key: 's1', isSection: true, label: '基本信息' },
+  { key: '运输方式', label: '运输方式', render: ({ agent }) => agent.运输方式 || '—' },
+  { key: '贸易类型', label: '贸易类型', render: ({ agent }) => agent.贸易类型 || '—' },
+  {
+    key: '时效天数', label: '时效', numeric: true, lowerBetter: true,
+    getValue: ({ agent }) => agent.时效天数,
+    render: ({ agent }) => agent.时效天数 ? `${agent.时效天数} 天` : (agent.时效 || '—'),
+  },
+  { key: '是否赔付', label: '赔付保障', render: ({ agent }) => isCompensation(agent.是否赔付) ? '<span style="color:#52c41a;font-weight:600">✔ 有赔付</span>' : '<span style="color:#bfbfbf">✘ 无赔付</span>' },
+  { key: '赔付内容', label: '赔付说明', render: ({ agent }) => agent.赔付内容 || '—' },
+  { key: '不含', label: '不含项目', render: ({ agent }) => agent.不含 || '—' },
+
+  { key: 's2', isSection: true, label: '综合评分' },
+  {
+    key: '综合评分', label: '综合评分', numeric: true, lowerBetter: false,
+    getValue: ({ agent }) => agent.综合评分,
+    render: ({ agent }) => agent.综合评分 != null ? `<strong>${agent.综合评分}</strong> / 100` : '—',
+  },
+  {
+    key: '时效得分', label: '时效得分', numeric: true, lowerBetter: false,
+    getValue: ({ agent }) => agent.各项得分?.时效得分,
+    render: ({ agent }) => agent.各项得分?.时效得分 ?? '—',
+  },
+  {
+    key: '价格得分', label: '价格得分', numeric: true, lowerBetter: false,
+    getValue: ({ agent }) => agent.各项得分?.价格得分,
+    render: ({ agent }) => agent.各项得分?.价格得分 ?? '—',
+  },
+  {
+    key: 'LPI得分', label: 'LPI得分', numeric: true, lowerBetter: false,
+    getValue: ({ agent }) => agent.各项得分?.LPI得分,
+    render: ({ agent }) => agent.各项得分?.LPI得分 ?? '—',
+  },
+  {
+    key: '信用得分', label: '信用得分', numeric: true, lowerBetter: false,
+    getValue: ({ agent }) => agent.各项得分?.信用得分,
+    render: ({ agent }) => agent.各项得分?.信用得分 ?? '—',
+  },
+
+  { key: 's3', isSection: true, label: '费用（CNY）' },
+  {
+    key: '总费用', label: '小计（不含税汇损）', numeric: true, lowerBetter: true,
+    getValue: ({ agent }) => agent.总费用 > 0 ? agent.总费用 : null,
+    render: ({ agent }) => agent.总费用 > 0 ? `¥ ${agent.总费用.toFixed(2)}` : '—',
+  },
+  {
+    key: '总计', label: '总计（含税汇损）', numeric: true, lowerBetter: true,
+    getValue: ({ agent }) => agent.summary?.总计 > 0 ? agent.summary.总计 : null,
+    render: ({ agent }) => agent.summary?.总计 > 0 ? `¥ ${agent.summary.总计.toFixed(2)}` : '—',
+  },
+  { key: '税率', label: '税率', render: ({ agent }) => agent.summary?.税率 != null ? (agent.summary.税率 * 100).toFixed(2) + '%' : '—' },
+  { key: '汇损率', label: '汇损率', render: ({ agent }) => agent.summary?.汇损率 != null ? (agent.summary.汇损率 * 100).toFixed(4) + '%' : '—' },
+
+  { key: 's4', isSection: true, label: '路线信息' },
+  { key: '路线', label: '路线', render: ({ route }) => `${route.起始地} → ${route.目的地}` },
+  { key: '途径地', label: '途径地', render: ({ route }) => route.途径地 || '—' },
+  { key: '货物名称', label: '货物名称', render: ({ route }) => route.货物名称 || '—' },
+  { key: '交易日期', label: '报价日期', render: ({ route }) => `${route.交易开始日期 || '—'} 至 ${route.交易结束日期 || '—'}` },
+  { key: '实际重量', label: '实际重量', render: ({ route }) => route.实际重量 ? `${route.实际重量} kg` : '—' },
+])
+
+// 获取某行的最优/最差值集合（用于高亮）
+const getRowExtremes = (row) => {
+  if (!row.numeric) return {}
+  const vals = selectedAgents.value
+    .map(item => row.getValue(item))
+    .filter(v => v != null && !isNaN(v))
+  if (vals.length < 2) return {}
+  const min = Math.min(...vals)
+  const max = Math.max(...vals)
+  return { min, max }
+}
+
+const getCellClass = (row, item) => {
+  if (!row.numeric) return ''
+  const val = row.getValue(item)
+  if (val == null || isNaN(val)) return ''
+  const { min, max } = getRowExtremes(row)
+  if (min === max) return ''
+  if (row.lowerBetter) {
+    if (val === min) return 'cell-best'
+    if (val === max) return 'cell-worst'
+  } else {
+    if (val === max) return 'cell-best'
+    if (val === min) return 'cell-worst'
+  }
+  return ''
+}
 
 const searchForm = reactive({
   起始地: '', 目的地: '', 货物名称: '', 代理商: '',
@@ -590,4 +787,45 @@ const viewDetail = (agent, route) => {
 
 .rmb-amount { color: #52c41a; font-weight: 500; }
 .total-amount { color: #f5222d; font-size: 18px; font-weight: 700; }
+
+/* 对比弹窗 */
+.compare-container { min-height: 300px; }
+
+.compare-scroll { overflow-x: auto; }
+
+.compare-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; table-layout: auto;
+}
+.compare-table th, .compare-table td {
+  border: 1px solid #e8e8e8;
+  padding: 8px 12px;
+  text-align: center;
+  vertical-align: middle;
+}
+.compare-table thead th {
+  background: #fafafa;
+  font-weight: 600;
+}
+.metric-col { width: 120px; min-width: 120px; background: #fafafa; }
+.agent-col { min-width: 160px; }
+.agent-col-header { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.agent-name { font-weight: 700; font-size: 14px; color: #262626; }
+.agent-route { font-size: 12px; color: #8c8c8c; }
+
+.metric-label {
+  text-align: left; color: #595959; background: #fafafa;
+  font-weight: 500; white-space: nowrap;
+}
+.metric-value { color: #262626; }
+
+.section-title {
+  background: #f0f5ff; color: #2f54eb;
+  font-weight: 700; font-size: 13px;
+  text-align: left; padding: 6px 12px;
+  border-top: 2px solid #adc6ff;
+}
+
+.cell-best { background: #f6ffed; color: #389e0d; font-weight: 700; }
+.cell-worst { background: #fff2f0; color: #cf1322; }
 </style>
