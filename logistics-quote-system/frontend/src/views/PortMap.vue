@@ -99,6 +99,42 @@
       <div ref="mapContainer" class="map-container"></div>
     </el-card>
 
+    <!-- 预警详情对话框 -->
+    <el-dialog
+      v-model="warningDialogVisible"
+      :title="`${warningDialogPort} — 地区风险预警详情`"
+      width="560px"
+      destroy-on-close
+    >
+      <div v-if="warningDialogList.length === 0" style="color:#8c8c8c;text-align:center;padding:24px">
+        暂无预警信息
+      </div>
+      <div v-else class="warning-dialog-list">
+        <div
+          v-for="w in warningDialogList"
+          :key="w['预警ID']"
+          class="warning-dialog-item"
+          :class="`risk-${w['风险等级']}`"
+        >
+          <div class="wd-header">
+            <el-tag
+              :type="w['风险等级'] === 3 ? 'danger' : w['风险等级'] === 2 ? 'warning' : 'success'"
+              size="small"
+              style="margin-right:8px"
+            >{{ w['风险等级文字'] }}</el-tag>
+            <span class="wd-type">{{ w['风险类型'] }}</span>
+            <span class="wd-date">生效：{{ w['生效日期'] }}</span>
+          </div>
+          <div class="wd-title">{{ w['预警标题'] }}</div>
+          <div class="wd-detail">{{ w['预警详情'] }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="warningDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="goSearchFromDialog">查询该目的地路线 →</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 图例 -->
     <el-card class="legend-card" shadow="never">
       <div class="legend-title">图例说明</div>
@@ -167,6 +203,17 @@ const stats = ref({})
 // 预警数据：{ 国家代码: [预警列表] }
 const warningsByCountry = ref({})
 
+// 预警详情对话框
+const warningDialogVisible = ref(false)
+const warningDialogPort = ref('')
+const warningDialogList = ref([])
+const warningDialogCountry = ref('')  // 用于对话框内"查询路线"按钮
+
+const goSearchFromDialog = () => {
+  warningDialogVisible.value = false
+  router.push({ name: 'QuoteSearch', query: { dest: warningDialogCountry.value } })
+}
+
 const filters = reactive({
   types: ['海港', '空港', '内陆港', '铁路港', '多式联运'],
   risks: ['低', '中', '高'],
@@ -232,9 +279,11 @@ const buildPopup = (port) => {
 
   // 路线查询按钮（用 window 函数桥接 Vue router）
   const btnStyle = 'display:inline-block;margin-top:8px;padding:4px 10px;background:#1890ff;color:#fff;border-radius:4px;font-size:12px;cursor:pointer;border:none;'
-  const riskBtnStyle = warnings.length > 0
-    ? 'display:inline-block;margin-top:8px;margin-left:6px;padding:4px 10px;background:#fff1f0;color:#f5222d;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid #ffa39e;'
-    : ''
+  const riskBtnStyle = 'display:inline-block;margin-top:8px;margin-left:6px;padding:4px 10px;background:#fff1f0;color:#f5222d;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid #ffa39e;'
+
+  // 转义单引号，避免 onclick 字符串中断
+  const safeName = port.name.replace(/'/g, "\\'")
+  const safeCountry = port.country.replace(/'/g, "\\'")
 
   return `
     <div style="min-width:220px;max-width:300px;font-size:13px;line-height:1.8">
@@ -257,10 +306,10 @@ const buildPopup = (port) => {
       </table>
       ${warningBlock}
       <div style="margin-top:6px">
-        <button style="${btnStyle}" onclick="window.__portMapGoSearch('${port.country}')">
+        <button style="${btnStyle}" onclick="window.__portMapGoSearch('${safeCountry}')">
           查询该目的地路线 →
         </button>
-        ${warnings.length > 0 ? `<button style="${riskBtnStyle}" onclick="window.__portMapGoRisk('${port.country_code}')">查看预警详情</button>` : ''}
+        ${warnings.length > 0 ? `<button style="${riskBtnStyle}" onclick="window.__portMapShowWarnings('${port.country_code}','${safeName}','${safeCountry}')">查看预警详情（${warnings.length}条）</button>` : ''}
       </div>
     </div>`
 }
@@ -307,8 +356,11 @@ const setupGlobalBridge = () => {
   window.__portMapGoSearch = (country) => {
     router.push({ name: 'QuoteSearch', query: { dest: country } })
   }
-  window.__portMapGoRisk = (countryCode) => {
-    router.push({ name: 'RiskProfile', query: { code: countryCode } })
+  window.__portMapShowWarnings = (countryCode, portName, country) => {
+    warningDialogPort.value = portName
+    warningDialogCountry.value = country
+    warningDialogList.value = warningsByCountry.value[countryCode] || []
+    warningDialogVisible.value = true
   }
 }
 
@@ -455,4 +507,19 @@ onBeforeUnmount(() => {
   width: 12px; height: 12px; border-radius: 50%;
   border: 2.5px solid; display: inline-block; flex-shrink: 0;
 }
+
+/* 预警对话框 */
+.warning-dialog-list { display: flex; flex-direction: column; gap: 12px; max-height: 440px; overflow-y: auto; }
+.warning-dialog-item {
+  border-radius: 6px; padding: 12px 14px;
+  border-left: 4px solid #faad14; background: #fffbe6;
+}
+.warning-dialog-item.risk-3 { border-left-color: #f5222d; background: #fff1f0; }
+.warning-dialog-item.risk-2 { border-left-color: #faad14; background: #fffbe6; }
+.warning-dialog-item.risk-1 { border-left-color: #52c41a; background: #f6ffed; }
+.wd-header { display: flex; align-items: center; margin-bottom: 6px; gap: 6px; }
+.wd-type { font-size: 12px; color: #595959; background: #f5f5f5; padding: 1px 6px; border-radius: 3px; }
+.wd-date { font-size: 11px; color: #8c8c8c; margin-left: auto; }
+.wd-title { font-size: 14px; font-weight: 600; color: #262626; margin-bottom: 4px; }
+.wd-detail { font-size: 13px; color: #595959; line-height: 1.6; }
 </style>
