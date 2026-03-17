@@ -104,90 +104,170 @@ class FeeItemExtractor(BaseExtractor):
         
         return fee_items
     
+    # 所有支持的单位
+    _UNITS = r'(?:kg|KG|Kg|cbm|CBM|Cbm|吨|人|个|次|票|柜|天|小时|工作日|木箱|台|hawb|HAWB|entry|ENTRY|件)'
+
+    # 所有支持的币种
+    _CURRENCIES = r'(?:RMB|CNY|USD|EUR|GBP|MYR|SGD|HKD|JPY|AUD|CAD|￥|¥|元)'
+
+    # 行内任意位置的"数字/单位"搜索模式（用于金额不在行首的情况）
+    _PRICE_UNIT_SEARCH = None  # 延迟初始化
+
+    def _get_price_unit_pattern(self):
+        if self._PRICE_UNIT_SEARCH is None:
+            type(self)._PRICE_UNIT_SEARCH = re.compile(
+                r'(' + self._CURRENCIES + r')?\s*'
+                r'(\d+(?:\.\d+)?)\s*(?:元)?\s*/\s*'
+                r'(' + self._UNITS + r')',
+                re.IGNORECASE
+            )
+        return self._PRICE_UNIT_SEARCH
+
     def _extract_from_text(self, text: str) -> List[FeeItem]:
         """
-        从文本中提取所有单价费用
-        
-        ✅ 支持的格式：
-        1. "44/kg" → 海运费，44元/kg
-        2. "RMB 8/kg" → 海运费，8元/kg
-        3. "500元/cbm" → 海运费，500元/cbm
-        4. "海运运费18/kg" → 海运运费，18元/kg
-        5. "产品附加费5/kg" → 产品附加费，5元/kg
-        
-        ✅ 修复问题3和4：排除赔付内容
+        从文本中提取所有单价费用（按行处理，支持跨行费用名）。
+
+        支持格式：
+          A. "人工费: USD180/人"        — 冒号分隔（含双冒号）
+          B. "操作费 2.9/kg"            — 空格分隔
+          C. "空运费：\n  DFW/USD2.9/kg" — 费用名在上一行，金额在下一行
+          D. "USD25/kg" / "2.9/kg"      — 无名称，默认"运费"
         """
-        # ✅ 修复问题5：检查是否是赔付相关内容，如果是则跳过
-        exclude_keywords = [
-            '赔付', '赔偿', '理赔', 
-            '赔付标准', '赔偿标准', '理赔标准',
-            '不退运费', '不退', '退费'  # ✅ 修复问题5：添加"不退"关键词
-        ]
-        for keyword in exclude_keywords:
-            if keyword in text:
-                if self.logger:
-                    self.logger.debug(f"      跳过赔付相关内容: {text[:50]}...")
-                return []  # 返回空列表，不提取任何费用
-        
+        exclude_keywords = ['赔付', '赔偿', '理赔', '不退运费', '不退', '退费']
+        for kw in exclude_keywords:
+            if kw in text:
+                return []
+
         fee_items = []
-        matched_positions = set()  # ✅ 修复问题1和3：记录已匹配的位置，避免重复
-        
-        # ✅ 正则表达式模式1：币种在数字前面
-        # 格式：[费用类型] [币种] 数字 [元] / 单位
-        # 例如：RMB 380/CBM, 海运费 USD 25/kg
-        pattern1 = re.compile(
-            r'([^\d\s]*?)'  # 可选的费用类型（非数字、非空格）
-            r'([A-Z]{3,4}|RMB|CNY|USD|EUR|GBP|MYR|SGD|HKD|JPY|AUD|CAD|￥|¥|元)?\s*'  # 可选的币种
-            r'(\d+(?:\.\d+)?)\s*'  # 数字（单价）
-            r'(?:元)?\s*'  # 可选的"元"
-            r'/\s*'  # 斜杠
-            r'(kg|KG|Kg|cbm|CBM|Cbm|吨|人|个|次|票|柜|天|小时|工作日|木箱|台|hawb|HAWB|entry|ENTRY|件)',  # ✅ 修复问题2、4：添加更多单位
-            re.IGNORECASE
-        )
-        
-        # ✅ 修复问题1：正则表达式模式2：币种在数字后面
-        # 格式：[费用类型] 数字 币种 / 单位
-        # 例如：380RMB/CBM, 25USD/kg
-        pattern2 = re.compile(
-            r'([^\d\s]*?)'  # 可选的费用类型（非数字、非空格）
-            r'(\d+(?:\.\d+)?)\s*'  # 数字（单价）
-            r'([A-Z]{3,4}|RMB|CNY|USD|EUR|GBP|MYR|SGD|HKD|JPY|AUD|CAD|￥|¥|元)\s*'  # 币种（必需）
-            r'/\s*'  # 斜杠
-            r'(kg|KG|Kg|cbm|CBM|Cbm|吨|人|个|次|票|柜|天|小时|工作日|木箱|台|hawb|HAWB|entry|ENTRY|件)',  # ✅ 修复问题2、4：添加更多单位
-            re.IGNORECASE
-        )
-        
-        # 使用模式1匹配
-        for match in pattern1.finditer(text):
-            # ✅ 修复问题1和3：检查是否已匹配，避免重复
-            match_key = (match.group(3), match.group(4))  # (价格, 单位)作为唯一标识
-            if match_key in matched_positions:
+        seen = set()
+        pending_name = None  # 上一行留下的纯费用名（如"空运费："）
+
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line:
+                pending_name = None
                 continue
-            matched_positions.add(match_key)
-            
-            fee_type_prefix = match.group(1).strip()
-            currency_str = match.group(2) or 'RMB'
-            price = float(match.group(3))
-            unit_raw = match.group(4)  # 原始单位
-            
-            self._process_fee_match(fee_type_prefix, currency_str, price, unit_raw, text, match.start(), fee_items)
-        
-        # 使用模式2匹配
-        for match in pattern2.finditer(text):
-            # ✅ 修复问题1和3：检查是否已匹配，避免重复
-            match_key = (match.group(2), match.group(4))  # (价格, 单位)作为唯一标识
-            if match_key in matched_positions:
-                continue
-            matched_positions.add(match_key)
-            
-            fee_type_prefix = match.group(1).strip()
-            price = float(match.group(2))
-            currency_str = match.group(3)  # 币种在数字后面
-            unit_raw = match.group(4)  # 原始单位
-            
-            self._process_fee_match(fee_type_prefix, currency_str, price, unit_raw, text, match.start(), fee_items)
-        
+
+            item, new_pending = self._extract_from_line(line, seen, pending_name)
+            if item:
+                fee_items.append(item)
+                pending_name = None
+            else:
+                pending_name = new_pending  # 可能是新的纯名称行，或 None
+
         return fee_items
+
+    def _extract_from_line(self, line: str, seen: set, pending_name: str = None):
+        """
+        尝试从单行提取费用。
+
+        返回 (FeeItem | None, pending_name | None)：
+          - 成功提取：(FeeItem, None)
+          - 本行只有费用名无金额：(None, 费用名)
+          - 无法提取：(None, None)
+        """
+        units = self._UNITS
+        currencies = self._CURRENCIES
+
+        # ── 模式A：费用名 + 一个或多个冒号 + [币种] + 数字 + /单位
+        # 例："人工费: USD180/人"  "安检费：: USD0.2/kg"
+        pat_a = re.compile(
+            r'^([^\d:：/\n]+?)'
+            r'\s*[:：]+\s*'             # 一个或多个冒号（处理双冒号）
+            r'(' + currencies + r')?\s*'
+            r'(\d+(?:\.\d+)?)\s*(?:元)?\s*/\s*'
+            r'(' + units + r')',
+            re.IGNORECASE
+        )
+
+        # ── 模式B：费用名 + 空格 + [币种] + 数字 + /单位（无冒号）
+        # 例："操作费 2.9/kg"
+        pat_b = re.compile(
+            r'^([^\d:：/\n]+?)\s+'
+            r'(' + currencies + r')?\s*'
+            r'(\d+(?:\.\d+)?)\s*(?:元)?\s*/\s*'
+            r'(' + units + r')',
+            re.IGNORECASE
+        )
+
+        # 尝试模式A和B（费用名在行首）
+        for pat in (pat_a, pat_b):
+            m = pat.match(line)
+            if m:
+                fee_name = self._clean_fee_name_simple(m.group(1)) or '运费'
+                currency_str = m.group(2) or 'RMB'
+                price = float(m.group(3))
+                unit_raw = m.group(4)
+                key = (price, unit_raw.lower())
+                if key in seen:
+                    return None, None
+                seen.add(key)
+                return FeeItem(
+                    费用类型=fee_name,
+                    单价=price,
+                    币种=self._parse_currency(currency_str),
+                    单位=self._fmt_unit(unit_raw),
+                ), None
+
+        # ── 模式C：行内任意位置搜索"[币种]数字/单位"
+        # 例："DFW-CDG-SIN / AF / +100KG / USD2.9/kg"（金额在中间）
+        pu = self._get_price_unit_pattern()
+        m = pu.search(line)
+        if m:
+            currency_str = m.group(1) or 'RMB'
+            price = float(m.group(2))
+            unit_raw = m.group(3)
+            key = (price, unit_raw.lower())
+            if key in seen:
+                return None, None
+            seen.add(key)
+            # 费用名优先用上一行传来的 pending_name
+            if pending_name:
+                fee_name = pending_name
+            else:
+                fee_name = self._infer_fee_name(line, m.start(2))
+            return FeeItem(
+                费用类型=fee_name,
+                单价=price,
+                币种=self._parse_currency(currency_str),
+                单位=self._fmt_unit(unit_raw),
+            ), None
+
+        # ── 本行只有费用名，没有金额（如"空运费："）
+        # 判断：以费用关键词或汉字结尾，末尾带冒号
+        if re.search(r'[\u4e00-\u9fa5A-Za-z]+[:：]+\s*$', line):
+            name = re.sub(r'[:：\s]+$', '', line).strip()
+            name = self._clean_fee_name_simple(name)
+            if name:
+                return None, name
+
+        return None, None
+
+    def _clean_fee_name_simple(self, name: str) -> str:
+        """清理费用名称：去掉多余标点和空白"""
+        name = re.sub(r'[+&\-]', '', name)
+        name = name.strip('.。,，;；: ')
+        name = ' '.join(name.split())
+        return name
+
+    def _fmt_unit(self, unit_raw: str) -> str:
+        """格式化单位：英文转小写，加斜杠前缀"""
+        if unit_raw.upper() in ('KG', 'CBM'):
+            return f'/{unit_raw.lower()}'
+        return f'/{unit_raw}'
+
+    def _infer_fee_name(self, line: str, num_start: int) -> str:
+        """当行首没有明确名称时，在数字前的文字里推断费用类型"""
+        prefix = line[:num_start].strip()
+        prefix = re.sub(r'[A-Z]{3,4}', '', prefix, flags=re.IGNORECASE).strip()
+        if not prefix:
+            return '运费'
+        for kw in self.fee_type_keywords:
+            if kw in prefix:
+                return kw if kw.endswith('费') else kw + '费'
+        if any(ak in prefix.upper() for ak in ['BY', 'HK', 'CX', 'CA', 'MU', 'CZ']):
+            return '空运费'
+        return '运费'
     
     def _process_fee_match(self, fee_type_prefix: str, currency_str: str, price: float, 
                           unit_raw: str, text: str, match_start: int, fee_items: List[FeeItem]):
@@ -225,13 +305,16 @@ class FeeItemExtractor(BaseExtractor):
     def _extract_fee_type(self, prefix: str, full_text: str, match_start: int) -> str:
         """
         识别费用类型
-        
-        ✅ 修复问题4：调整策略顺序
+
         1. 先检查prefix中的明确费用名称（最高优先级）
-        2. 向前查找context中的明确费用名称
+        2. 向前查找context中的明确费用名称（仅限当前行）
         3. 检查航空公司缩写 → "空运费"（最后才用，优先级最低）
         4. 默认"运费"
         """
+        # 找到当前行的起始位置，避免跨行污染（如"提货费"出现在上一行导致后续费用都被标为"提货费"）
+        line_start = full_text.rfind('\n', 0, match_start)
+        line_start = 0 if line_start == -1 else line_start + 1
+
         # ✅ 策略1：prefix有费用关键词（包括"操作费"等明确的费用）
         # 优先级最高，即使前面有航空公司缩写，也优先识别明确的费用名称
         if prefix:
@@ -275,9 +358,9 @@ class FeeItemExtractor(BaseExtractor):
                         return keyword + '费'
                     return keyword
         
-        # ✅ 策略2：向前查找（多层次查找）
+        # ✅ 策略2：向前查找（仅在当前行内查找，避免跨行污染）
         # 第一层：15个字符（避免匹配到前面的其他费用）
-        start_near = max(0, match_start - 15)
+        start_near = max(line_start, match_start - 15)
         context_near = full_text[start_near:match_start]
         
         # ✅ 修复问题1、3、4：先在近距离查找新费用类型
@@ -314,9 +397,8 @@ class FeeItemExtractor(BaseExtractor):
                     return keyword + '费'
                 return keyword
         
-        # 第二层：如果近距离没找到，扩大到50个字符
-        # （特别是"操作费"经常离数字较远）
-        start_far = max(0, match_start - 50)
+        # 第二层：扩大到行首（当前行全部文本）
+        start_far = line_start
         context_far = full_text[start_far:match_start]
         
         # ✅ 修复问题1、3、4：检查所有费用类型（包括新增的）
@@ -362,7 +444,7 @@ class FeeItemExtractor(BaseExtractor):
         # ✅ 策略3（修复问题4）：检查航空公司缩写（优先级降低，放到最后）
         # 只有在prefix和context中都没有明确费用名称时，才根据航空公司推断为"空运费"
         airline_keywords = ['BY', 'HK', 'CX', 'SIN', 'CA', 'MU', 'HU', 'CZ', 'FM', 'ZH']
-        context_before = full_text[max(0, match_start - 50):match_start]
+        context_before = full_text[line_start:match_start]
         
         for airline in airline_keywords:
             if airline in context_before.upper():

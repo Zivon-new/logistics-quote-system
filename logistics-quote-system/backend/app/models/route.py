@@ -27,7 +27,8 @@ class Route(Base):
     计费重量 = Column("计费重量(/kg)", DECIMAL(18, 2), nullable=True)
     总体积 = Column("总体积(/cbm)", DECIMAL(18, 3), nullable=True)
     货值 = Column("货值", DECIMAL(18, 2), default=0.00)
-    
+    货值币种 = Column("货值币种", String(20), default='RMB')
+
     # ✅ 新增：货物名称
     货物名称 = Column("货物名称", Text, nullable=True)
     

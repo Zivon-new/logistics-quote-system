@@ -208,21 +208,21 @@
 
             <el-table-column label="数量" width="100">
               <template #default="scope">
-                <el-tooltip 
+                <el-tooltip
                   v-if="isAutoQuantity(scope.row.单位)"
-                  content="根据路线重量/体积自动计算"
+                  content="已按计费重量/体积自动填入，可手动修改"
                   placement="top"
                 >
-                  <el-input-number :controls="false" 
+                  <el-input-number :controls="false"
                     v-model="scope.row.数量"
                     :precision="2"
                     :min="0"
-                    disabled
                     size="small"
                     controls-position="right"
+                    @change="updateFeeAmount(scope.row)"
                   />
                 </el-tooltip>
-                <el-input-number :controls="false" 
+                <el-input-number :controls="false"
                   v-else
                   v-model="scope.row.数量"
                   :precision="2"
@@ -407,14 +407,14 @@
             <el-row :gutter="16">
               <el-col :span="12">
                 <el-form-item label="小计">
-                  <el-input-number :controls="false" 
-                    :value="calculateSubtotal(agent)"
-                    disabled
-                    :precision="2"
-                    controls-position="right"
-                    style="width: 100%;"
-                  />
-                  <span class="unit-label">¥</span>
+                  <div class="amount-display">
+                    <template v-for="(amount, currency) in calculateSubtotalByCurrency(agent)" :key="currency">
+                      <span v-if="currency !== 'RMB'" class="original-amount">
+                        {{ currency }} {{ amount.toFixed(2) }} →
+                      </span>
+                    </template>
+                    <span class="rmb-amount">¥{{ calculateSubtotal(agent).toFixed(2) }}</span>
+                  </div>
                 </el-form-item>
               </el-col>
 
@@ -437,14 +437,12 @@
             <el-row :gutter="16">
               <el-col :span="12">
                 <el-form-item label="税金">
-                  <el-input-number :controls="false" 
-                    :value="calculateTax(agent)"
-                    disabled
-                    :precision="2"
-                    controls-position="right"
-                    style="width: 100%;"
-                  />
-                  <span class="unit-label">¥</span>
+                  <div class="amount-display">
+                    <span v-if="routeValueCurrency !== 'RMB'" class="original-amount">
+                      {{ routeValueCurrency }} {{ calculateTaxOriginal(agent).toFixed(2) }} →
+                    </span>
+                    <span class="rmb-amount">¥{{ calculateTax(agent).toFixed(2) }}</span>
+                  </div>
                 </el-form-item>
               </el-col>
 
@@ -467,28 +465,20 @@
             <el-row :gutter="16">
               <el-col :span="12">
                 <el-form-item label="汇损">
-                  <el-input-number :controls="false" 
-                    :value="calculateLoss(agent)"
-                    disabled
-                    :precision="2"
-                    controls-position="right"
-                    style="width: 100%;"
-                  />
-                  <span class="unit-label">¥</span>
+                  <div class="amount-display">
+                    <span v-if="routeValueCurrency !== 'RMB'" class="original-amount">
+                      {{ routeValueCurrency }} {{ calculateLossOriginal(agent).toFixed(2) }} →
+                    </span>
+                    <span class="rmb-amount">¥{{ calculateLoss(agent).toFixed(2) }}</span>
+                  </div>
                 </el-form-item>
               </el-col>
 
               <el-col :span="12">
                 <el-form-item label="总计">
-                  <el-input-number :controls="false" 
-                    :value="calculateTotal(agent)"
-                    disabled
-                    :precision="2"
-                    controls-position="right"
-                    style="width: 100%;"
-                    class="total-input"
-                  />
-                  <span class="unit-label total-label">¥</span>
+                  <div class="amount-display">
+                    <span class="total-amount">¥{{ calculateTotal(agent).toFixed(2) }}</span>
+                  </div>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -546,6 +536,10 @@ const props = defineProps({
   routeValue: {
     type: Number,
     default: 0
+  },
+  routeValueCurrency: {
+    type: String,
+    default: 'RMB'
   }
 })
 
@@ -692,57 +686,58 @@ const calculateRMB = (feeItem) => {
   return originalAmount * rate
 }
 
-// 计算小计
+// 按币种统计原币小计（用于展示）
+const calculateSubtotalByCurrency = (agent) => {
+  const byCurrency = {}
+  const add = (currency, amount) => {
+    currency = currency || 'RMB'
+    byCurrency[currency] = (byCurrency[currency] || 0) + amount
+  }
+  if (agent.fee_items) {
+    agent.fee_items.forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
+  }
+  if (agent.fee_total) {
+    agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
+  }
+  return byCurrency
+}
+
+// 计算小计（人民币合计）
 const calculateSubtotal = (agent) => {
   let total = 0
-  
-  // 费用明细
   if (agent.fee_items) {
-    total += agent.fee_items.reduce((sum, item) => {
-      return sum + calculateRMB(item)
-    }, 0)
+    total += agent.fee_items.reduce((sum, item) => sum + calculateRMB(item), 0)
   }
-  
-  // 整单费用
   if (agent.fee_total) {
-    total += agent.fee_total.reduce((sum, item) => {
-      return sum + calculateRMB(item)
-    }, 0)
+    total += agent.fee_total.reduce((sum, item) => sum + calculateRMB(item), 0)
   }
-  
   return total
 }
 
-// 计算税金
-const calculateTax = (agent) => {
-  const routeValue = parseFloat(props.routeValue) || 0
-  const taxRate = parseFloat(agent.summary.税率) || 0
-  const result = routeValue * taxRate
-  
-  // 🔍 调试输出
-  console.log('=== 税金计算 ===')
-  console.log('货值 routeValue:', routeValue, '类型:', typeof routeValue)
-  console.log('税率 taxRate:', taxRate, '类型:', typeof taxRate)
-  console.log('税金 result:', result)
-  console.log('===============')
-  
-  return result
+// 货值换算为人民币
+const routeValueRMB = () => {
+  const value = parseFloat(props.routeValue) || 0
+  const rate = exchangeRates[props.routeValueCurrency] || 1
+  return value * rate
 }
 
-// 计算汇损
+// 税金/汇损原币金额（换汇前，用于展示原币部分）
+const calculateTaxOriginal = (agent) => {
+  return (parseFloat(props.routeValue) || 0) * (parseFloat(agent.summary.税率) || 0)
+}
+const calculateLossOriginal = (agent) => {
+  // 汇损 = 税金原币 × 汇损率
+  return calculateTaxOriginal(agent) * (parseFloat(agent.summary.汇损率) || 0)
+}
+
+// 计算税金（人民币）
+const calculateTax = (agent) => {
+  return routeValueRMB() * (parseFloat(agent.summary.税率) || 0)
+}
+
+// 计算汇损（人民币）= 税金 × 汇损率
 const calculateLoss = (agent) => {
-  const routeValue = parseFloat(props.routeValue) || 0
-  const lossRate = parseFloat(agent.summary.汇损率) || 0
-  const result = routeValue * lossRate
-  
-  // 🔍 调试输出
-  console.log('=== 汇损计算 ===')
-  console.log('货值 routeValue:', routeValue, '类型:', typeof routeValue)
-  console.log('汇损率 lossRate:', lossRate, '类型:', typeof lossRate)
-  console.log('汇损 result:', result)
-  console.log('===============')
-  
-  return result
+  return calculateTax(agent) * (parseFloat(agent.summary.汇损率) || 0)
 }
 
 // 计算总计
@@ -762,15 +757,12 @@ const updateSummary = (agent) => {
     }
   }
   
-  const routeValue = parseFloat(props.routeValue) || 0
   const taxRate = parseFloat(agent.summary.税率) || 0
   const lossRate = parseFloat(agent.summary.汇损率) || 0
-  
-  // 更新税金
-  agent.summary.税金 = routeValue * taxRate
-  
-  // 更新汇损
-  agent.summary.汇损 = routeValue * lossRate
+
+  // 更新税金（人民币）；汇损 = 税金 × 汇损率
+  agent.summary.税金 = routeValueRMB() * taxRate
+  agent.summary.汇损 = agent.summary.税金 * lossRate
   
   // 更新小计和总计
   agent.summary.小计 = calculateSubtotal(agent)
@@ -902,5 +894,30 @@ defineExpose({
   margin-left: 12px;
   color: #8c8c8c;
   font-size: 14px;
+}
+
+.amount-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.original-amount {
+  color: #1890ff;
+  font-size: 12px;
+}
+
+.rmb-amount {
+  color: #52c41a;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.total-amount {
+  color: #f5222d;
+  font-weight: 700;
+  font-size: 16px;
 }
 </style>

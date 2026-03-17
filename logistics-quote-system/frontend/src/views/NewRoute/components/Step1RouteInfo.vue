@@ -104,15 +104,21 @@
         
         <el-col :span="12">
           <el-form-item label="货值" prop="货值">
-            <el-input 
+            <el-input
               v-model="formData.货值"
               type="number"
               placeholder="0.00"
               clearable
               @input="handleNumberInput('货值', $event)"
-            >
-              <template #append>¥</template>
-            </el-input>
+              style="width: calc(100% - 90px);"
+            />
+            <el-select v-model="formData.货值币种" style="width: 88px; margin-left: 2px;">
+              <el-option label="RMB" value="RMB" />
+              <el-option label="USD" value="USD" />
+              <el-option label="EUR" value="EUR" />
+              <el-option label="SGD" value="SGD" />
+              <el-option label="GBP" value="GBP" />
+            </el-select>
           </el-form-item>
         </el-col>
       </el-row>
@@ -162,7 +168,8 @@ const formData = reactive({
   实际重量: props.modelValue.实际重量 || 0,
   计费重量: props.modelValue.计费重量 || 0,
   总体积: props.modelValue.总体积 || 0,
-  货值: props.modelValue.货值 || 0
+  货值: props.modelValue.货值 || 0,
+  货值币种: props.modelValue.货值币种 || 'RMB'
 })
 
 // ✅ 调试信息
@@ -276,6 +283,7 @@ const populate = (data) => {
   formData.计费重量 = parseFloat(data.计费重量) || 0
   formData.总体积   = parseFloat(data.总体积)   || 0
   formData.货值     = parseFloat(data.货值)     || 0
+  formData.货值币种 = data.货值币种 || 'RMB'
   
   if (data.交易开始日期 && data.交易结束日期) {
     formData.dateRange = [data.交易开始日期, data.交易结束日期]

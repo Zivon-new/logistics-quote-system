@@ -160,18 +160,24 @@ class FeeTotalExtractor(BaseExtractor):
         
         return fee_totals
     
+    # 任意单位的行级别快速检测正则（数字后紧跟斜杠+单位词）
+    _LINE_UNIT_PATTERN = re.compile(
+        r'\d+(?:\.\d+)?(?:[A-Z]{3,4})?\s*/\s*'
+        r'(?:kg|KG|Kg|cbm|CBM|Cbm|吨|方|立方|m3|M3|票|个|件|场|次|箱|台|批|组|套|块|条|张|份|趟|pcs|PCS|set|SET|人)',
+        re.IGNORECASE
+    )
+
     def _extract_from_line(self, line: str, extracted_fees: Set[tuple]) -> List[FeeTotal]:
         """
         从单行文本中提取费用
-        
-        ✅ 支持多种格式：
-        1. "XX费：数字 币种"
-        2. "XX费：币种数字" 或 "XX费：数字"
-        3. "XX费币种数字"（紧贴）
-        4. "XX费 币种数字"（空格分隔）
-        5. "币种数字XX费"（数字在前）
-        6. "+XX费币种数字"（+号开头）
+
+        规则：带单位（/票、/个、/kg 等）的行属于费用明细，整行跳过；
+        没有单位的才是整单费用。
         """
+        # 行级别判断：只要行内出现"数字/单位"就整行跳过
+        if self._LINE_UNIT_PATTERN.search(line):
+            return []
+
         line_totals = []
         
         # ✅ Pattern1: "XX费：数字 币种"（币种在数字后面，有空格）
@@ -202,6 +208,36 @@ class FeeTotalExtractor(BaseExtractor):
             if result:
                 line_totals.append(result)
         
+        # ✅ Pattern_abbr: 全大写缩写费用名，如 "THC: USD180" / "LCL: USD50"
+        pattern_abbr = re.compile(
+            r'\b([A-Z]{2,6})\s*[:：]\s*'           # 全大写缩写（2-6字符）+ 冒号
+            r'([A-Z]{3,4}|USD|EUR|SGD|GBP|RMB)\s*'  # 币种
+            r'(\d+(?:\.\d+)?)',                     # 数字
+            re.IGNORECASE
+        )
+        for match in pattern_abbr.finditer(line):
+            keyword = match.group(1).upper()
+            # 跳过纯货币词（USD/EUR等自身被误匹配为费用名）
+            if keyword in ('USD', 'EUR', 'SGD', 'GBP', 'RMB', 'CNY', 'HKD', 'JPY'):
+                continue
+            # 跳过 "min"（最低收费描述）
+            if keyword.lower() == 'min':
+                continue
+            currency_str = match.group(2)
+            amount = float(match.group(3))
+            if amount <= 0:
+                continue
+            match_end = match.end()
+            next_chars = line[match_end:match_end + 5] if match_end < len(line) else ''
+            if self._is_any_unit_slash(next_chars) or '%' in next_chars:
+                continue
+            fee_key = (keyword, amount, currency_str.upper())
+            if fee_key in extracted_fees:
+                continue
+            extracted_fees.add(fee_key)
+            currency = self._parse_currency(currency_str)
+            line_totals.append(FeeTotal(费用名称=keyword, 原币金额=amount, 币种=currency))
+
         # ✅ Pattern5（新增）: "XX费币种数字"（紧贴，无冒号，无空格）
         # 例如："操作费RMB200"、"报关费RMB300"
         pattern5 = re.compile(
@@ -269,7 +305,7 @@ class FeeTotalExtractor(BaseExtractor):
         match_end = match.end()
         if match_end < len(line):
             next_chars = line[match_end:match_end+3]
-            if '/' in next_chars.strip()[:2] or '%' in next_chars:
+            if self._is_any_unit_slash(next_chars) or '%' in next_chars:
                 return None
         
         # ✅ 关键修复：检查是否是时效（数字后面有"-"或"天"）
@@ -311,7 +347,7 @@ class FeeTotalExtractor(BaseExtractor):
         match_end = match.end()
         if match_end < len(line):
             next_chars = line[match_end:match_end+3]
-            if '/' in next_chars.strip()[:2] or '%' in next_chars:
+            if self._is_any_unit_slash(next_chars) or '%' in next_chars:
                 return None
         
         # ✅ 关键修复：检查是否是时效（数字后面有"-"或"天"）
@@ -339,34 +375,38 @@ class FeeTotalExtractor(BaseExtractor):
         
         if any(kw in keyword for kw in ['工作日', '运输时间', '时效', '天数', '时间']):
             return None
-        
+
+        # 跳过 min（最低收费说明，不是费用名）
+        if keyword.strip().lower() in ('min', 'max', 'minimum', 'maximum'):
+            return None
+
         if not self._is_valid_fee_name(keyword):
             return None
-        
+
         if amount <= 0:
             return None
-        
+
         fee_name = self._match_fee_name(keyword)
-        
+
         if not fee_name:
             if keyword.endswith('费') or keyword.endswith('费用'):
                 fee_name = keyword
             else:
                 fee_name = keyword + '费'
-        
+
         if not fee_name:
             return None
-        
+
         currency = self._parse_currency(currency_str)
-        
+
         fee_key = (fee_name, amount, currency)
         if fee_key in extracted_fees:
             return None
         extracted_fees.add(fee_key)
-        
+
         if self.logger:
             self.logger.debug(f"          提取(P2): {fee_name} {amount} {currency}")
-        
+
         return FeeTotal(费用名称=fee_name, 原币金额=amount, 币种=currency)
     
     def _process_pattern5(self, match, line: str, extracted_fees: Set[tuple]) -> Optional[FeeTotal]:
@@ -379,7 +419,7 @@ class FeeTotalExtractor(BaseExtractor):
         match_end = match.end()
         if match_end < len(line):
             next_chars = line[match_end:match_end+3]
-            if '/' in next_chars.strip()[:2] or '%' in next_chars:
+            if self._is_any_unit_slash(next_chars) or '%' in next_chars:
                 return None
         
         # ✅ 关键修复：检查是否是时效（数字后面有"-"或"天"）
@@ -431,7 +471,7 @@ class FeeTotalExtractor(BaseExtractor):
         match_end = match.end()
         if match_end < len(line):
             next_chars = line[match_end:match_end+3]
-            if '/' in next_chars.strip()[:2] or '%' in next_chars:
+            if self._is_any_unit_slash(next_chars) or '%' in next_chars:
                 return None
         
         # ✅ 关键修复：检查是否是时效（数字后面有"-"或"天"）
@@ -482,7 +522,7 @@ class FeeTotalExtractor(BaseExtractor):
         match_end = match.end()
         if match_end < len(line):
             next_chars = line[match_end:match_end+3]
-            if '/' in next_chars.strip()[:2] or '%' in next_chars:
+            if self._is_any_unit_slash(next_chars) or '%' in next_chars:
                 return None
         
         # ✅ 关键修复：检查是否是时效（数字后面有"-"或"天"）
@@ -571,30 +611,40 @@ class FeeTotalExtractor(BaseExtractor):
         
         return FeeTotal(费用名称=fee_name, 原币金额=amount, 币种=currency)
     
+    # 重量/体积单位（预处理时移除）
+    _WEIGHT_VOLUME_UNITS = r'(?:kg|KG|Kg|cbm|CBM|Cbm|吨|方|立方|m3|M3)'
+
+    # 所有单位（包括按票/按件等）——带任意单位的费用属于费用明细，不是整单费用
+    _ALL_UNITS = r'(?:kg|KG|Kg|cbm|CBM|Cbm|吨|方|立方|m3|M3|票|个|件|场|次|箱|台|批|组|套|块|条|张|份|趟|pcs|PCS|set|SET)'
+
     def _preprocess_mixed_text(self, text: str) -> str:
-        """智能预处理包含单价的文本"""
+        """
+        预处理：只移除重量/体积单价（如 2.9/kg、380/cbm），保留其余文本结构。
+        """
         if not text:
             return text
-        
-        # 匹配单价格式，支持币种在中间
-        unit_price_pattern = r'\d+(?:\.\d+)?(?:[元]|[A-Z]{3,4})?/\w+'
-        
-        has_unit_price = re.search(unit_price_pattern, text, re.IGNORECASE)
-        
-        if not has_unit_price:
-            return text
-        
-        cleaned_text = re.sub(
-            unit_price_pattern,
-            '',
-            text,
-            flags=re.IGNORECASE
+
+        unit_price_pattern = (
+            r'\d+(?:\.\d+)?(?:[元]|[A-Z]{3,4})?\s*/' + self._WEIGHT_VOLUME_UNITS
         )
-        
+
+        if not re.search(unit_price_pattern, text, re.IGNORECASE):
+            return text
+
+        cleaned_text = re.sub(unit_price_pattern, '', text, flags=re.IGNORECASE)
+
         if self.logger:
-            self.logger.debug(f"      预处理单价文本")
-        
+            self.logger.debug(f"      预处理：移除重量/体积单价")
+
         return cleaned_text
+
+    def _is_weight_volume_slash(self, next_chars: str) -> bool:
+        """判断 / 后面跟的是否是重量/体积单位（用于预处理判断）"""
+        return bool(re.match(r'^/\s*' + self._WEIGHT_VOLUME_UNITS, next_chars.strip(), re.IGNORECASE))
+
+    def _is_any_unit_slash(self, next_chars: str) -> bool:
+        """判断 / 后面是否跟任意单位——带单位的费用属于费用明细，整单费用提取器应跳过"""
+        return bool(re.match(r'^/\s*' + self._ALL_UNITS, next_chars.strip(), re.IGNORECASE))
     
     def _clean_fee_name(self, fee_name: str) -> str:
         """清理费用名称"""
@@ -611,14 +661,21 @@ class FeeTotalExtractor(BaseExtractor):
         
         return fee_name.strip()
     
+    # 无效费用名词黑名单（限定词、量词、方向词等）
+    _INVALID_FEE_WORDS = frozenset(['min', 'max', 'minimum', 'maximum', 'per', 'via', 'and', 'or'])
+
     def _is_valid_fee_name(self, text: str) -> bool:
         """判断是否是有效的费用名称"""
         if not text:
             return False
-        
+
         if len(text) < 2:
             return False
-        
+
+        # 过滤英文限定词
+        if text.strip().lower() in self._INVALID_FEE_WORDS:
+            return False
+
         if re.match(r'^[\d一二三四五六七八九十]+[天个月年次]', text):
             return False
         

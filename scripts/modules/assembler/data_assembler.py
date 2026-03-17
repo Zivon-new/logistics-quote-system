@@ -392,6 +392,7 @@ class DataAssembler:
         weight = get_value(route_obj, 'weight', '实际重量')
         volume = get_value(route_obj, 'volume', '总体积')
         value = get_value(route_obj, 'value', '货值')
+        value_currency = get_value(route_obj, 'value_currency', '货值币种') or 'RMB'
         
         # 交易日期（优先使用route对象的日期，否则使用文件名提取的日期）
         start_date = get_value(route_obj, '交易开始日期') or getattr(self, 'transaction_start_date', None)
@@ -408,7 +409,8 @@ class DataAssembler:
             '实际重量(/kg)': self._format_decimal(weight, 2),
             '计费重量(/kg)': self._format_decimal(weight, 2),  # 默认等于实际重量
             '总体积(/cbm)': self._format_decimal(volume, 3),
-            '货值': self._format_decimal(value, 2)
+            '货值': self._format_decimal(value, 2),
+            '货值币种': value_currency
         }
         
         return route_dict

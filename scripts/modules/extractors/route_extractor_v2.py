@@ -44,6 +44,7 @@ class Route:
     weight: Optional[float] = None
     volume: Optional[float] = None
     value: Optional[float] = None
+    value_currency: str = 'RMB'
     
     def to_dict(self):
         return asdict(self)
@@ -128,7 +129,7 @@ class RouteExtractorV2(BaseExtractor):
             route.途径地 = self._final_clean_location(route.途径地)
         
         # 提取其他字段
-        route.value = self._extract_value(sheet)
+        route.value, route.value_currency = self._extract_value(sheet)
         route.weight = self._extract_weight(sheet)
         route.volume = self._extract_volume(sheet)
         
@@ -355,28 +356,61 @@ class RouteExtractorV2(BaseExtractor):
         
         return True
     
-    def _extract_value(self, sheet) -> Optional[float]:
-        """提取货值"""
+    # 货币符号/代码 → 标准币种
+    _CURRENCY_SYMBOL_MAP = {
+        '￥': 'RMB', '¥': 'RMB', '元': 'RMB', 'CNY': 'RMB', 'RMB': 'RMB',
+        '$': 'USD', 'USD': 'USD',
+        '€': 'EUR', 'EUR': 'EUR',
+        '£': 'GBP', 'GBP': 'GBP',
+        'SGD': 'SGD', 'MYR': 'MYR', 'HKD': 'HKD', 'JPY': 'JPY',
+        'AUD': 'AUD', 'CAD': 'CAD',
+    }
+
+    def _parse_currency_symbol(self, sym: str) -> str:
+        """将捕获的货币符号/代码转换为标准币种代码"""
+        if not sym:
+            return 'RMB'
+        sym = sym.strip()
+        return self._CURRENCY_SYMBOL_MAP.get(sym, 'RMB')
+
+    def _extract_value(self, sheet):
+        """提取货值，返回 (float | None, currency_str)"""
+        # 同时匹配文本货币代码（如 USD、CNY）
+        text_currency_pattern = re.compile(
+            r'货值\s*[:：]?\s*(USD|CNY|RMB|EUR|GBP|SGD|MYR|HKD|JPY|AUD|CAD)?\s*'
+            r'([￥$€£]?)\s*(\d+(?:[,，]\d{3})*(?:\.\d+)?)',
+            re.IGNORECASE
+        )
         for row_idx in range(1, min(21, sheet.max_row + 1)):
             for col_idx in range(1, min(10, sheet.max_column + 1)):
                 cell = sheet.cell(row=row_idx, column=col_idx)
                 if not cell.value:
                     continue
-                
+
                 cell_text = str(cell.value).strip()
+
+                # 先尝试带"货值"关键字的扩展模式（含文本货币代码）
+                m = text_currency_pattern.search(cell_text)
+                if m:
+                    try:
+                        amount_str = m.group(3).replace(',', '').replace('，', '')
+                        amount = float(amount_str)
+                        currency = self._parse_currency_symbol(m.group(1) or m.group(2))
+                        return amount, currency
+                    except (ValueError, AttributeError):
+                        pass
+
+                # 再尝试原有 value_patterns
                 for pattern in self.value_patterns:
                     match = pattern.search(cell_text)
                     if match:
                         try:
-                            if len(match.groups()) >= 2:
-                                amount_str = match.group(2)
-                            else:
-                                amount_str = match.group(1)
-                            amount_str = amount_str.replace(',', '').replace('，', '')
-                            return float(amount_str)
+                            sym = match.group(1)
+                            amount_str = match.group(2).replace(',', '').replace('，', '')
+                            return float(amount_str), self._parse_currency_symbol(sym)
                         except (ValueError, AttributeError):
                             continue
-        return None
+        return None, 'RMB'
     
     def _extract_weight(self, sheet) -> Optional[float]:
         """

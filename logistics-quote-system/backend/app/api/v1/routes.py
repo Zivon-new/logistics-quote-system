@@ -62,6 +62,7 @@ async def get_routes(
             "计费重量(/kg)": float(route.计费重量) if route.计费重量 else 0,
             "总体积(/cbm)": float(route.总体积) if route.总体积 else 0,
             "货值": float(route.货值) if route.货值 else 0,
+            "货值币种": route.货值币种 or 'RMB',
             "创建时间": str(route.创建时间) if route.创建时间 else None,
             "agents": []
         }
@@ -170,6 +171,7 @@ async def get_route_detail(
         "计费重量(/kg)": float(route.计费重量) if route.计费重量 else 0,
         "总体积(/cbm)": float(route.总体积) if route.总体积 else 0,
         "货值": float(route.货值) if route.货值 else 0,
+        "货值币种": route.货值币种 or 'RMB',
         "货物名称": route.货物名称,
         "创建时间": str(route.创建时间) if route.创建时间 else None,
         "agents": [],

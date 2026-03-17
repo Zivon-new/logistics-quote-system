@@ -119,7 +119,7 @@
               </div>
               <div class="summary-item">
                 <span class="label">货值：</span>
-                <span class="value">¥{{ route.货值 || 0 }}</span>
+                <span class="value">{{ route.货值币种 || 'RMB' }} {{ route.货值 || 0 }}</span>
               </div>
               <div class="summary-item">
                 <span class="label">代理商：</span>
@@ -233,6 +233,10 @@ const startExtract = async () => {
       
       extractedRoutes.value = result.data.routes.map((route, index) => ({
         ...route,
+        // 字段名标准化（后端输出带单位后缀，统一转为无后缀）
+        实际重量: route['实际重量(/kg)'] ?? route.实际重量 ?? 0,
+        计费重量: route['计费重量(/kg)'] ?? route.计费重量 ?? 0,
+        总体积:   route['总体积(/cbm)'] ?? route.总体积   ?? 0,
         _index: index,
         // 关联货物和代理商数据
         goods_details: result.data.goods_details?.filter(g => g.路线索引 === index) || [],

@@ -37,6 +37,7 @@
           :route-weight="formData.route.计费重量"
           :route-volume="formData.route.总体积"
           :route-value="debugRouteValue"
+          :route-value-currency="formData.route.货值币种 || 'RMB'"
         />
 
         <!-- Step 4: 预览确认 -->
@@ -116,7 +117,8 @@ const formData = reactive({
     实际重量: 0,
     计费重量: 0,
     总体积: 0,
-    货值: 0
+    货值: 0,
+    货值币种: 'RMB'
   },
   goodsDetails: [],
   goodsTotal: [],
@@ -168,7 +170,7 @@ watch(() => props.initialData, (newVal) => {
     
     console.log('✅ ManualInput数据更新完成:', formData.route)
   }
-}, { deep: true, immediate: true })
+}, { immediate: true })
 
 watch(() => props.routeId, async (newId) => {
   if (props.isEdit && newId && !props.initialData) {
@@ -223,9 +225,9 @@ const loadEditData = async (routeId) => {
       是否赔付: String(a.是否赔付 ?? '0'),
       赔付内容: a.赔付内容 || '',
       代理备注: a.代理备注 || '',
-      fee_items: a.fee_items || [],
-      fee_total: a.fee_total || [],
-      summary: a.summary || { 税率: 0, 汇损率: 0, 备注: '' }
+      fee_items: (a.fee_items || []).map(item => ({ ...item })),
+      fee_total: (a.fee_total || []).map(ft => ({ ...ft })),
+      summary: a.summary ? { ...a.summary } : { 税率: 0, 汇损率: 0, 备注: '' }
     }))
 
     await nextTick()
@@ -261,7 +263,8 @@ onMounted(async () => {
     formData.route.计费重量 = props.initialData['计费重量(/kg)'] || props.initialData.计费重量 || props.initialData['计费重量_kg'] || 0
     formData.route.总体积 = props.initialData['总体积(/cbm)'] || props.initialData.总体积 || props.initialData['总体积_cbm'] || 0
     formData.route.货值 = props.initialData.货值 || 0
-    
+    formData.route.货值币种 = props.initialData.货值币种 || props.initialData['货值币种'] || 'RMB'
+
     console.log('✅ 路线基本信息填充完成:', formData.route)
     
     await nextTick()
@@ -303,9 +306,21 @@ onMounted(async () => {
         是否赔付: String(a.是否赔付 ?? '0'),
         赔付内容: a.赔付内容 || '',
         代理备注: a.代理备注 || '',
-        fee_items: a.fee_items || [],
-        fee_total: a.fee_total || [],
-        summary: a.summary || {
+        fee_items: (a.fee_items || []).map(item => {
+          let qty = parseFloat(item.数量) || 0
+          if (qty === 0) {
+            if (item.单位 === '/kg') qty = parseFloat(formData.route.计费重量) || 0
+            else if (item.单位 === '/cbm') qty = parseFloat(formData.route.总体积) || 0
+            else qty = 1
+          }
+          return { ...item, 数量: qty }
+        }),
+        fee_total: (a.fee_total || []).map(ft => ({ ...ft })),
+        summary: a.summary ? {
+          税率: parseFloat(a.summary.税率) || 0,
+          汇损率: parseFloat(a.summary.汇损率) || 0,
+          备注: a.summary.备注 || ''
+        } : {
           税率: 0,
           汇损率: 0,
           备注: ''
@@ -329,6 +344,20 @@ const nextStep = async () => {
     if (currentStep.value === 0 && step1Ref.value) {
       const valid = await step1Ref.value.validate()
       if (!valid) return
+      // 离开step1时强制同步最新值到formData.route
+      if (step1Ref.value.getValues) {
+        const s1 = step1Ref.value.getValues()
+        formData.route.起始地 = s1.起始地 || formData.route.起始地
+        formData.route.途径地 = s1.途径地 ?? formData.route.途径地
+        formData.route.目的地 = s1.目的地 || formData.route.目的地
+        formData.route.交易开始日期 = s1.交易开始日期 || formData.route.交易开始日期
+        formData.route.交易结束日期 = s1.交易结束日期 || formData.route.交易结束日期
+        formData.route.实际重量 = Number(s1.实际重量 ?? 0)
+        formData.route.计费重量 = Number(s1.计费重量 ?? 0)
+        formData.route.总体积 = Number(s1.总体积 ?? 0)
+        formData.route.货值 = Number(s1.货值 ?? 0)
+        formData.route.货值币种 = s1.货值币种 || 'RMB'
+      }
     }
     
     if (currentStep.value === 1 && step2Ref.value) {
@@ -364,6 +393,7 @@ const onRouteUpdate = (val) => {
   if (val.计费重量 !== undefined) formData.route.计费重量 = val.计费重量
   if (val.总体积 !== undefined) formData.route.总体积 = val.总体积
   if (val.货值 !== undefined) formData.route.货值 = val.货值
+  if (val.货值币种 !== undefined) formData.route.货值币种 = val.货值币种
 }
 
 const handleSubmit = async () => {

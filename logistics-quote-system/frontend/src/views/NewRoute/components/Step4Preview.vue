@@ -41,7 +41,10 @@
           {{ formData.route.总体积 }} cbm
         </el-descriptions-item>
         <el-descriptions-item label="货值" :span="2">
-          ¥{{ formData.route.货值?.toFixed(2) }}
+          {{ formData.route.货值币种 || 'RMB' }} {{ formData.route.货值?.toFixed(2) }}
+          <span v-if="formData.route.货值币种 && formData.route.货值币种 !== 'RMB'" style="color:#999; font-size:12px; margin-left:8px;">
+            ≈ ¥{{ routeValueRMB().toFixed(2) }}
+          </span>
         </el-descriptions-item>
       </el-descriptions>
     </el-card>
@@ -214,18 +217,29 @@
         <h4>费用汇总</h4>
         <el-descriptions :column="2" border size="small" class="summary-info">
           <el-descriptions-item label="小计">
+            <template v-for="(amount, currency) in calculateSubtotalByCurrency(agent)" :key="currency">
+              <span v-if="currency !== 'RMB'" style="color:#1890ff; font-size:12px; margin-right:6px;">
+                {{ currency }} {{ amount.toFixed(2) }} →
+              </span>
+            </template>
             <span class="amount-value">¥{{ calculateSubtotal(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="税率">
             {{ (agent.summary.税率 * 100).toFixed(2) }}%
           </el-descriptions-item>
           <el-descriptions-item label="税金">
+            <span v-if="formData.route.货值币种 && formData.route.货值币种 !== 'RMB'" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ formData.route.货值币种 }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0)).toFixed(2) }} →
+            </span>
             <span class="amount-value">¥{{ calculateTax(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="汇损率">
             {{ (agent.summary.汇损率 * 100).toFixed(4) }}%
           </el-descriptions-item>
           <el-descriptions-item label="汇损">
+            <span v-if="formData.route.货值币种 && formData.route.货值币种 !== 'RMB'" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ formData.route.货值币种 }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0) * (agent.summary.汇损率 || 0)).toFixed(2) }} →
+            </span>
             <span class="amount-value">¥{{ calculateLoss(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="总计">
@@ -291,6 +305,22 @@ const calculateRMB = (feeItem) => {
   return originalAmount * rate
 }
 
+// 按币种统计原币小计（用于展示）
+const calculateSubtotalByCurrency = (agent) => {
+  const byCurrency = {}
+  const add = (currency, amount) => {
+    currency = currency || 'RMB'
+    byCurrency[currency] = (byCurrency[currency] || 0) + amount
+  }
+  if (agent.fee_items) {
+    agent.fee_items.forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
+  }
+  if (agent.fee_total) {
+    agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
+  }
+  return byCurrency
+}
+
 // 计算小计
 const calculateSubtotal = (agent) => {
   let total = 0
@@ -306,16 +336,22 @@ const calculateSubtotal = (agent) => {
   return total
 }
 
-// 计算税金 - ✅ 使用货值计算
-const calculateTax = (agent) => {
-  const routeValue = parseFloat(props.formData.route.货值) || 0
-  return routeValue * (agent.summary.税率 || 0)
+// 货值转换为人民币（考虑货值币种的汇率）
+const routeValueRMB = () => {
+  const value = parseFloat(props.formData.route.货值) || 0
+  const currency = props.formData.route.货值币种 || 'RMB'
+  const rate = exchangeRates[currency] || 1
+  return value * rate
 }
 
-// 计算汇损 - ✅ 使用货值计算
+// 计算税金 - 使用货值（换算为人民币后）计算
+const calculateTax = (agent) => {
+  return routeValueRMB() * (agent.summary.税率 || 0)
+}
+
+// 计算汇损 = 税金 × 汇损率
 const calculateLoss = (agent) => {
-  const routeValue = parseFloat(props.formData.route.货值) || 0
-  return routeValue * (agent.summary.汇损率 || 0)
+  return calculateTax(agent) * (agent.summary.汇损率 || 0)
 }
 
 // 计算总计

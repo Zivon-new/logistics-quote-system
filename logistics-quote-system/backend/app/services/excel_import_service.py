@@ -93,8 +93,11 @@ class ExcelImportService:
             route_agents = result.get('route_agents', [])
             goods_details = result.get('goods_details', [])
             goods_total = result.get('goods_total', [])
-            
-            print(f"[DEBUG] Extracted: {len(routes)} routes, {len(route_agents)} agents")
+            fee_items = result.get('fee_items', [])
+            fee_totals = result.get('fee_totals', [])
+            summaries = result.get('summary', [])
+
+            print(f"[DEBUG] Extracted: {len(routes)} routes, {len(route_agents)} agents, {len(fee_items)} fee_items, {len(fee_totals)} fee_totals, {len(summaries)} summaries")
             
             # ========== 转换数据格式为前端期望的格式 ==========
             # 前端期望：data.routes（数组）、data.goods_details、data.agents
@@ -106,7 +109,27 @@ class ExcelImportService:
                     route['_index'] = idx
                     route['路线索引'] = idx
             
-            # 为每个agent添加路线索引
+            # 将fee_items、fee_totals、summary按代理路线ID分组
+            summary_by_agent = {}
+            for s in summaries:
+                aid = s.get('代理路线ID')
+                summary_by_agent[aid] = s
+
+            fee_items_by_agent = {}
+            for fi in fee_items:
+                aid = fi.get('代理路线ID')
+                if aid not in fee_items_by_agent:
+                    fee_items_by_agent[aid] = []
+                fee_items_by_agent[aid].append(fi)
+
+            fee_totals_by_agent = {}
+            for ft in fee_totals:
+                aid = ft.get('代理路线ID')
+                if aid not in fee_totals_by_agent:
+                    fee_totals_by_agent[aid] = []
+                fee_totals_by_agent[aid].append(ft)
+
+            # 为每个agent添加路线索引及费用数据
             for agent in route_agents:
                 if isinstance(agent, dict):
                     # route_agents已经有路线ID，需要转换为索引
@@ -117,6 +140,11 @@ class ExcelImportService:
                         if route_dict.get('路线ID') == route_id:
                             agent['路线索引'] = idx
                             break
+                    # 附加费用数据和summary
+                    agent_id = agent.get('代理路线ID')
+                    agent['fee_items'] = fee_items_by_agent.get(agent_id, [])
+                    agent['fee_total'] = fee_totals_by_agent.get(agent_id, [])
+                    agent['summary'] = summary_by_agent.get(agent_id)
             
             # 为每个goods_details添加路线索引
             for goods in goods_details:
@@ -140,9 +168,11 @@ class ExcelImportService:
             
             print(f"\n[DEBUG] 数据转换完成:")
             print(f"  routes: {len(routes)} 条（已添加索引）")
-            print(f"  agents: {len(route_agents)} 个（已添加路线索引）")
+            print(f"  agents: {len(route_agents)} 个（已添加路线索引+费用数据）")
             print(f"  goods_details: {len(goods_details)} 个")
-            print(f"  goods_total: {len(goods_total)} 个\n")
+            print(f"  goods_total: {len(goods_total)} 个")
+            print(f"  fee_items: {len(fee_items)} 个（已附加到agents）")
+            print(f"  fee_totals: {len(fee_totals)} 个（已附加到agents）\n")
             
             # ✅ 返回前端期望的格式
             return {
