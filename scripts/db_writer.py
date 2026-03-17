@@ -72,7 +72,8 @@ class DatabaseImporter:
             'goods_details': 0,
             'fee_items': 0,
             'fee_totals': 0,
-            'summary': 0
+            'summary': 0,
+            'import_tax_items': 0
         }
         
         # ✅ v2.5: 合并模式相关
@@ -359,7 +360,7 @@ class DatabaseImporter:
             
             # 5. 导入summary
             try:
-                self._import_summary(actual_data_dir)  # ✅ 修复
+                self._import_summary(actual_data_dir)
                 self.conn.commit()
                 self.logger.info("  ✅ summary提交成功")
             except Exception as e:
@@ -367,7 +368,18 @@ class DatabaseImporter:
                 self.conn.rollback()
                 import traceback
                 self.logger.error(traceback.format_exc())
-            
+
+            # 6. 导入import_tax_items
+            try:
+                self._import_import_tax_items(actual_data_dir)
+                self.conn.commit()
+                self.logger.info("  ✅ import_tax_items提交成功")
+            except Exception as e:
+                self.logger.error(f"  ❌ import_tax_items导入失败: {e}")
+                self.conn.rollback()
+                import traceback
+                self.logger.error(traceback.format_exc())
+
             self.logger.info("✅ 导入流程完成")
             
             # 显示统计
@@ -390,6 +402,7 @@ class DatabaseImporter:
         
         # ✅ 表名和主键ID的映射
         tables_with_pk = [
+            ('import_tax_items', '税项ID'),
             ('summary', '汇总ID'),
             ('fee_total', '整单费用ID'),
             ('fee_items', '费用ID'),
@@ -784,6 +797,39 @@ class DatabaseImporter:
         
         self.logger.info(f"  ✅ 导入成功: {len(summaries)}条")
     
+    def _import_import_tax_items(self, data_dir: str):
+        """导入import_tax_items表"""
+        self.logger.info("\n" + "="*60)
+        self.logger.info("8. 导入 import_tax_items")
+        self.logger.info("="*60)
+
+        items = self._load_json(data_dir, 'import_tax_items.json')
+        if not items:
+            self.logger.warning("  ⚠️  没有import_tax_items数据")
+            return
+
+        for item in items:
+            json_item_id = item.get('税项ID')
+            json_agent_id = item.get('代理路线ID')
+
+            if '税项ID' in item:
+                del item['税项ID']
+
+            if json_agent_id in self.agent_id_map:
+                item['代理路线ID'] = self.agent_id_map[json_agent_id]
+            else:
+                self.logger.warning(f"  ⚠️  找不到代理路线ID映射: {json_agent_id}")
+                continue
+
+            columns = ', '.join([f"`{k}`" for k in item.keys()])
+            placeholders = ', '.join(['%s'] * len(item))
+            sql = f"INSERT INTO import_tax_items ({columns}) VALUES ({placeholders})"
+
+            self.cursor.execute(sql, list(item.values()))
+            self.stats['import_tax_items'] += 1
+
+        self.logger.info(f"  ✅ 导入成功: {len(items)}条")
+
     def _print_stats(self):
         """打印统计信息"""
         self.logger.info("\n" + "="*60)

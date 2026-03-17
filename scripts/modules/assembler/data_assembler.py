@@ -37,6 +37,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 from collections import defaultdict
 
+from scripts.modules.extractors.import_tax_extractor import parse_import_tax_text
+
 
 class DataAssembler:
     """
@@ -305,19 +307,40 @@ class DataAssembler:
         
         if self.logger:
             self.logger.info(f"  组装了{len(summaries_all)}个summary")
-        
-        # ========== 6. 验证数据 ==========
+
+        # ========== ✅ 6. 新增：从进口税率原文解析 import_tax_items ==========
+        import_tax_items_all = []
+        import_tax_item_id_counter = 1
+
+        for summary_idx, summary_dict in enumerate(summaries_all):
+            raw_text = summary_dict.get('进口税率原文')
+            if not raw_text:
+                continue
+            agent_id_for_tax = summary_dict.get('代理路线ID')
+            items = parse_import_tax_text(raw_text)
+            for item in items:
+                d = item.to_dict()
+                d['税项ID'] = import_tax_item_id_counter
+                d['代理路线ID'] = agent_id_for_tax
+                import_tax_items_all.append(d)
+                import_tax_item_id_counter += 1
+
+        if self.logger:
+            self.logger.info(f"  解析了{len(import_tax_items_all)}条import_tax_items")
+
+        # ========== 8. 验证数据 ==========
         self._validate_data(routes, route_agents, goods_details_all, goods_total_all)
-        
-        # ========== 7. 返回结果 ==========
+
+        # ========== 9. 返回结果 ==========
         result = {
             'routes': routes,
             'route_agents': route_agents,
             'goods_details': goods_details_all,
             'goods_total': goods_total_all,
-            'fee_items': fee_items_all,        # ✅ 新增
-            'fee_totals': fee_totals_all,      # ✅ 新增
-            'summary': summaries_all,           # ✅ 新增 summary
+            'fee_items': fee_items_all,
+            'fee_totals': fee_totals_all,
+            'summary': summaries_all,
+            'import_tax_items': import_tax_items_all,
             'validation_errors': self.validation_errors
         }
         
@@ -432,22 +455,23 @@ class DataAssembler:
         # 获取agent的各个字段
         agent_name = get_value(agent_obj, '代理商', 'agent_name')
         remark = get_value(agent_obj, '代理备注', 'remark')
-        
+
         # 时效相关
         timeliness = get_value(agent_obj, '时效', 'timeliness')
         timeliness_remark = get_value(agent_obj, '时效备注', 'timeliness_remark')
-        
+        timeliness_days = get_value(agent_obj, '时效天数')
+
         # 赔付相关
         is_compensate = get_value(agent_obj, '是否赔付', 'is_compensate')
         compensate_content = get_value(agent_obj, '赔付内容', 'compensate_content')
-        
+
         # 不含内容
         not_include = get_value(agent_obj, '不含', 'not_include')
-        
+
         # 运输方式和贸易类型
         transport_method = get_value(agent_obj, '运输方式')
         trade_type = get_value(agent_obj, '贸易类型')
-        
+
         # 构建符合数据库字段的字典
         agent_dict = {
             '代理路线ID': agent_id,
@@ -458,11 +482,12 @@ class DataAssembler:
             '代理备注': remark,
             '时效': timeliness,
             '时效备注': timeliness_remark,
+            '时效天数': timeliness_days,
             '不含': not_include,
             '是否赔付': self._format_boolean(is_compensate),
             '赔付内容': compensate_content
         }
-        
+
         return agent_dict
     
     def _convert_goods_detail_to_db_format(self, goods_obj, goods_id: int, route_id: int) -> Dict[str, Any]:
@@ -501,21 +526,32 @@ class DataAssembler:
                     return value
             return None
         
+        # 计算原币金额 = 单价 × 数量（若未直接提供）
+        unit_price = self._format_decimal(get_value(goods_obj, '单价'), 4)
+        qty = self._format_decimal(get_value(goods_obj, '数量'), 3)
+        total_price = self._format_decimal(get_value(goods_obj, '总价'), 2)
+        if total_price is None and unit_price and qty:
+            total_price = self._format_decimal(unit_price * qty, 2)
+
         goods_dict = {
             '货物ID': goods_id,
             '路线ID': route_id,
             '货物名称': get_value(goods_obj, '货物名称') or '',
+            'SKU': get_value(goods_obj, 'SKU'),
+            'HS编码': get_value(goods_obj, 'HS编码'),
+            '原产国': get_value(goods_obj, '原产国'),
+            '货物大类': get_value(goods_obj, '货物大类'),
             '是否新品': get_value(goods_obj, '是否新品') or 0,
             '货物种类': get_value(goods_obj, '货物种类'),
-            '数量': self._format_decimal(get_value(goods_obj, '数量'), 3),
-            '单价': self._format_decimal(get_value(goods_obj, '单价'), 4),
+            '数量': qty,
+            '单价': unit_price,
             '币种': get_value(goods_obj, '币种') or 'RMB',
             '重量(/kg)': self._format_decimal(get_value(goods_obj, '重量'), 3),
             '总重量(/kg)': self._format_decimal(get_value(goods_obj, '总重量'), 3),
-            '总价': self._format_decimal(get_value(goods_obj, '总价'), 2),
+            '总价': total_price,
             '备注': get_value(goods_obj, '备注')
         }
-        
+
         return goods_dict
     
     def _convert_goods_total_to_db_format(self, goods_obj, goods_id: int, route_id: int) -> Dict[str, Any]:
@@ -680,11 +716,15 @@ class DataAssembler:
         summary_dict = {
             '汇总ID': summary_id,
             '代理路线ID': agent_id,
-            '税率': self._format_decimal(get_value(summary_obj, '税率'), 4),      # 4位小数
-            '汇损率': self._format_decimal(get_value(summary_obj, '汇损率'), 6),  # 6位小数
+            '运费小计': self._format_decimal(get_value(summary_obj, '运费小计', '小计'), 2),
+            '税金金额': self._format_decimal(get_value(summary_obj, '税金金额', '税金'), 2),
+            '总计金额': self._format_decimal(get_value(summary_obj, '总计金额', '总计'), 2),
+            '税率': self._format_decimal(get_value(summary_obj, '税率'), 4),
+            '汇损率': self._format_decimal(get_value(summary_obj, '汇损率'), 6),
+            '进口税率原文': get_value(summary_obj, '进口税率原文'),
             '备注': get_value(summary_obj, '备注')
         }
-        
+
         return summary_dict
     
     def _format_date(self, date_value: Any) -> Optional[str]:

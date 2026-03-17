@@ -64,7 +64,7 @@
             <el-input-number :controls="false" v-model="scope.row.总重量" :min="0" :precision="2" size="small" style="width: 100%;" />
           </template>
         </el-table-column>
-        <el-table-column label="总价(¥)" width="120">
+        <el-table-column label="总价" width="120">
           <template #default="scope">
             <el-input-number :controls="false" v-model="scope.row.总价" :min="0" :precision="2" size="small" style="width: 100%;" />
           </template>
@@ -116,8 +116,15 @@
             </el-row>
             <el-row :gutter="20">
               <el-col :span="12">
-                <el-form-item label="货值(¥)">
-                  <el-input-number :controls="false" v-model="item.货值" :precision="2" :min="0" style="width: 100%;" />
+                <el-form-item label="货值">
+                  <el-input-number :controls="false" v-model="item.货值" :precision="2" :min="0" style="width: 70%;" />
+                  <el-select v-model="item.货值币种" size="default" style="width: 28%; margin-left: 2%;">
+                    <el-option label="RMB" value="RMB" />
+                    <el-option label="USD" value="USD" />
+                    <el-option label="EUR" value="EUR" />
+                    <el-option label="SGD" value="SGD" />
+                    <el-option label="GBP" value="GBP" />
+                  </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -207,6 +214,7 @@ const addGoodsTotal = () => {
     货物名称: '',
     实际重量: props.routeWeight || 0,
     货值: props.routeValue || 0,
+    货值币种: 'RMB',
     总体积: props.routeVolume || 0,
     备注: ''
   })

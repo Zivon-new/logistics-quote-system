@@ -262,6 +262,7 @@ async def get_route_detail(
             "实际重量(/kg)": float(g.实际重量) if g.实际重量 else 0,
             "总体积(/cbm)": float(g.总体积) if g.总体积 else 0,
             "货值": float(g.货值) if g.货值 else 0,
+            "货值币种": g.货值币种 or 'RMB',
             "备注": g.备注
         }
         for g in goods_total
@@ -364,27 +365,46 @@ async def create_full_route(
                     summary_data.pop(bad_key, None)
                 
                 if summary_data and any(v for v in summary_data.values() if v not in [0, 0.0, '', None, {}]):
+                    def _sf(val, default=0.0):
+                        try:
+                            return float(val) if val is not None else default
+                        except (TypeError, ValueError):
+                            return default
                     upsert_sql = text("""
-                        INSERT INTO summary (`代理路线ID`, `小计`, `税率`, `税金`, `汇损率`, `汇损`, `总计`, `备注`)
-                        VALUES (:agent_id, :小计, :税率, :税金, :汇损率, :汇损, :总计, :备注)
+                        INSERT INTO summary (
+                            `代理路线ID`, `小计`, `运费小计`, `税率`, `进口税率原文`,
+                            `税金`, `税金金额`, `汇损率`, `汇损`, `总计`, `总计金额`, `备注`
+                        )
+                        VALUES (
+                            :agent_id, :小计, :运费小计, :税率, :进口税率原文,
+                            :税金, :税金金额, :汇损率, :汇损, :总计, :总计金额, :备注
+                        )
                         ON DUPLICATE KEY UPDATE
-                            `小计` = VALUES(`小计`),
-                            `税率` = VALUES(`税率`),
-                            `税金` = VALUES(`税金`),
-                            `汇损率` = VALUES(`汇损率`),
-                            `汇损` = VALUES(`汇损`),
-                            `总计` = VALUES(`总计`),
-                            `备注` = VALUES(`备注`)
+                            `小计`        = VALUES(`小计`),
+                            `运费小计`    = VALUES(`运费小计`),
+                            `税率`        = VALUES(`税率`),
+                            `进口税率原文`= VALUES(`进口税率原文`),
+                            `税金`        = VALUES(`税金`),
+                            `税金金额`    = VALUES(`税金金额`),
+                            `汇损率`      = VALUES(`汇损率`),
+                            `汇损`        = VALUES(`汇损`),
+                            `总计`        = VALUES(`总计`),
+                            `总计金额`    = VALUES(`总计金额`),
+                            `备注`        = VALUES(`备注`)
                     """)
                     db.execute(upsert_sql, {
-                        'agent_id': agent_id,
-                        '小计': float(summary_data.get('小计', 0) or 0),
-                        '税率': float(summary_data.get('税率', 0) or 0),
-                        '税金': float(summary_data.get('税金', 0) or 0),
-                        '汇损率': float(summary_data.get('汇损率', 0) or 0),
-                        '汇损': float(summary_data.get('汇损', 0) or 0),
-                        '总计': float(summary_data.get('总计', 0) or 0),
-                        '备注': summary_data.get('备注', '') or ''
+                        'agent_id':    agent_id,
+                        '小计':        _sf(summary_data.get('运费小计') or summary_data.get('小计')),
+                        '运费小计':    summary_data.get('运费小计'),
+                        '税率':        _sf(summary_data.get('税率')),
+                        '进口税率原文': summary_data.get('进口税率原文'),
+                        '税金':        _sf(summary_data.get('税金金额') or summary_data.get('税金')),
+                        '税金金额':    summary_data.get('税金金额'),
+                        '汇损率':      _sf(summary_data.get('汇损率')),
+                        '汇损':        _sf(summary_data.get('汇损')),
+                        '总计':        _sf(summary_data.get('总计金额') or summary_data.get('总计')),
+                        '总计金额':    summary_data.get('总计金额'),
+                        '备注':        summary_data.get('备注') or '',
                     })
             
             print(f"  ✅ 已创建 {len(agent_map)} 个代理商")
@@ -595,27 +615,46 @@ async def update_route(
                     summary_data.pop(bad_key, None)
                 
                 if summary_data and any(v for v in summary_data.values() if v not in [0, 0.0, '', None, {}]):
+                    def _sf(val, default=0.0):
+                        try:
+                            return float(val) if val is not None else default
+                        except (TypeError, ValueError):
+                            return default
                     upsert_sql = text("""
-                        INSERT INTO summary (`代理路线ID`, `小计`, `税率`, `税金`, `汇损率`, `汇损`, `总计`, `备注`)
-                        VALUES (:agent_id, :小计, :税率, :税金, :汇损率, :汇损, :总计, :备注)
+                        INSERT INTO summary (
+                            `代理路线ID`, `小计`, `运费小计`, `税率`, `进口税率原文`,
+                            `税金`, `税金金额`, `汇损率`, `汇损`, `总计`, `总计金额`, `备注`
+                        )
+                        VALUES (
+                            :agent_id, :小计, :运费小计, :税率, :进口税率原文,
+                            :税金, :税金金额, :汇损率, :汇损, :总计, :总计金额, :备注
+                        )
                         ON DUPLICATE KEY UPDATE
-                            `小计` = VALUES(`小计`),
-                            `税率` = VALUES(`税率`),
-                            `税金` = VALUES(`税金`),
-                            `汇损率` = VALUES(`汇损率`),
-                            `汇损` = VALUES(`汇损`),
-                            `总计` = VALUES(`总计`),
-                            `备注` = VALUES(`备注`)
+                            `小计`        = VALUES(`小计`),
+                            `运费小计`    = VALUES(`运费小计`),
+                            `税率`        = VALUES(`税率`),
+                            `进口税率原文`= VALUES(`进口税率原文`),
+                            `税金`        = VALUES(`税金`),
+                            `税金金额`    = VALUES(`税金金额`),
+                            `汇损率`      = VALUES(`汇损率`),
+                            `汇损`        = VALUES(`汇损`),
+                            `总计`        = VALUES(`总计`),
+                            `总计金额`    = VALUES(`总计金额`),
+                            `备注`        = VALUES(`备注`)
                     """)
                     db.execute(upsert_sql, {
-                        'agent_id': agent_id,
-                        '小计': float(summary_data.get('小计', 0) or 0),
-                        '税率': float(summary_data.get('税率', 0) or 0),
-                        '税金': float(summary_data.get('税金', 0) or 0),
-                        '汇损率': float(summary_data.get('汇损率', 0) or 0),
-                        '汇损': float(summary_data.get('汇损', 0) or 0),
-                        '总计': float(summary_data.get('总计', 0) or 0),
-                        '备注': summary_data.get('备注', '') or ''
+                        'agent_id':    agent_id,
+                        '小计':        _sf(summary_data.get('运费小计') or summary_data.get('小计')),
+                        '运费小计':    summary_data.get('运费小计'),
+                        '税率':        _sf(summary_data.get('税率')),
+                        '进口税率原文': summary_data.get('进口税率原文'),
+                        '税金':        _sf(summary_data.get('税金金额') or summary_data.get('税金')),
+                        '税金金额':    summary_data.get('税金金额'),
+                        '汇损率':      _sf(summary_data.get('汇损率')),
+                        '汇损':        _sf(summary_data.get('汇损')),
+                        '总计':        _sf(summary_data.get('总计金额') or summary_data.get('总计')),
+                        '总计金额':    summary_data.get('总计金额'),
+                        '备注':        summary_data.get('备注') or '',
                     })
             
             print(f"  ✅ 已更新 {len(agent_map)} 个代理商")

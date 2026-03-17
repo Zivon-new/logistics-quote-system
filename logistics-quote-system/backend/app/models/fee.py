@@ -2,7 +2,7 @@
 """
 费用相关模型
 """
-from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, func, ForeignKey
+from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, func, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -47,15 +47,19 @@ class FeeTotal(Base):
 class Summary(Base):
     """汇总表模型"""
     __tablename__ = "summary"
-    
+
     汇总ID = Column("汇总ID", Integer, primary_key=True, index=True, autoincrement=True)
-    代理路线ID = Column("代理路线ID", Integer, ForeignKey("route_agents.代理路线ID"), nullable=False, unique=True)  # ✅ 添加ForeignKey
+    代理路线ID = Column("代理路线ID", Integer, ForeignKey("route_agents.代理路线ID"), nullable=False, unique=True)
     小计 = Column("小计", DECIMAL(18, 2), default=0.00)
+    运费小计 = Column("运费小计", DECIMAL(18, 2), nullable=True)
     税率 = Column("税率", DECIMAL(10, 4), default=0.0000)
+    进口税率原文 = Column("进口税率原文", Text, nullable=True)
     税金 = Column("税金", DECIMAL(18, 2), default=0.00)
+    税金金额 = Column("税金金额", DECIMAL(18, 2), nullable=True)
     汇损率 = Column("汇损率", DECIMAL(10, 6), default=0.000000)
     汇损 = Column("汇损", DECIMAL(18, 2), default=0.00)
     总计 = Column("总计", DECIMAL(18, 2), default=0.00)
+    总计金额 = Column("总计金额", DECIMAL(18, 2), nullable=True)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
     

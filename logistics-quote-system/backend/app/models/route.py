@@ -50,6 +50,7 @@ class RouteAgent(Base):
     贸易类型 = Column("贸易类型", String(100), nullable=True)
     代理备注 = Column("代理备注", String(255), nullable=True)
     时效 = Column("时效", String(50), nullable=True)
+    时效天数 = Column("时效天数", SmallInteger, nullable=True)
     时效备注 = Column("时效备注", String(255), nullable=True)
     不含 = Column("不含", String(511), nullable=True)
     是否赔付 = Column("是否赔付", String(255), default='0')

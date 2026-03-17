@@ -51,6 +51,7 @@ class Agent:
     代理商: Optional[str] = None
     代理备注: Optional[str] = None
     时效: Optional[str] = None
+    时效天数: Optional[int] = None   # 🆕 从时效文本解析的数字天数（取上限值）
     时效备注: Optional[str] = None
     不含: Optional[str] = None
     是否赔付: Optional[str] = None
@@ -295,7 +296,11 @@ class AgentExtractorV2(BaseExtractor):
         # ========== 处理时效 ==========
         if timeliness_texts:
             agent.时效, agent.时效备注 = self._process_timeliness(timeliness_texts)
-        
+            if agent.时效:
+                _m = re.search(r'(\d+)', agent.时效)
+                if _m:
+                    agent.时效天数 = int(_m.group(1))
+
         # ========== 处理"不含" ==========
         if not_include_texts:
             agent.不含 = self._process_not_include(not_include_texts)
@@ -972,11 +977,18 @@ class AgentExtractorV2(BaseExtractor):
             # 转换为Agent对象
             merged = []
             for idx, llm_agent_dict in enumerate(llm_result):
+                _timeliness = llm_agent_dict.get('时效')
+                _timeliness_days = None
+                if _timeliness:
+                    _tm = re.search(r'(\d+)', _timeliness)
+                    if _tm:
+                        _timeliness_days = int(_tm.group(1))
                 agent = Agent(
                     代理商=llm_agent_dict.get('代理商'),
                     代理备注=llm_agent_dict.get('代理备注'),
-                    时效=llm_agent_dict.get('时效'),
+                    时效=_timeliness,
                     时效备注=llm_agent_dict.get('时效备注'),
+                    时效天数=_timeliness_days,
                     不含=llm_agent_dict.get('不含'),
                     是否赔付=llm_agent_dict.get('是否赔付'),
                     赔付内容=llm_agent_dict.get('赔付内容'),

@@ -1,15 +1,16 @@
 # scripts/modules/extractors/summary_extractor.py
 """
-Summary提取器
+Summary提取器 v2.0
 
-【核心功能】
-✅ 提取税率（百分比）
-✅ 提取汇损率（百分比）
-✅ 提取备注（排除已被其他表提取的内容）
+【v2.0 更新】
+✅ 新增字段：运费小计、税金金额、总计金额、进口税率原文、汇损金额
+✅ 完整保存进口税率原文（多行文本块）
+✅ 从Excel直接读取小计/税金/总计金额（不再依赖计算）
+✅ 兼容旧版单一税率字段
 """
 
 import re
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass, asdict
 
 from .base_extractor import BaseExtractor
@@ -17,321 +18,295 @@ from .base_extractor import BaseExtractor
 
 @dataclass
 class Summary:
-    """Summary数据类"""
-    税率: Optional[float] = None      # 例如：0.19 表示19%
-    汇损率: Optional[float] = None    # 例如：0.04 表示4%
-    备注: Optional[str] = None
-    
+    """Summary数据类 v2.0"""
+    # ── 金额字段（从Excel直接读取）──
+    运费小计:     Optional[float] = None   # 运费小计（不含税）
+    小计:         Optional[float] = None   # 兼容旧版
+    税金金额:     Optional[float] = None   # 实际税金金额
+    税金:         Optional[float] = None   # 兼容旧版（同税金金额）
+    汇损:         Optional[float] = None   # 汇损金额
+    总计金额:     Optional[float] = None   # 含税总计金额
+    总计:         Optional[float] = None   # 兼容旧版（同总计金额）
+
+    # ── 税率字段 ──
+    税率:         Optional[float] = None   # 综合税率（兼容旧版，取第一个识别到的税率）
+    汇损率:       Optional[float] = None   # 汇损率
+    进口税率原文: Optional[str]  = None   # 完整进口税率文本块（多行）
+
+    # ── 备注 ──
+    备注:         Optional[str]  = None
+
     def to_dict(self):
         return asdict(self)
 
 
+# ── 关键词定义 ──────────────────────────────────────────────
+_XIAOJI_KWS   = ['小计', '运费小计', '费用小计', '合计（不含税）', '不含税小计', 'subtotal']
+_ZONGJI_KWS   = ['总计', '合计', '总费用', '含税总计', 'total']
+_SHUIJIN_KWS  = ['税金', '进口税', '税费', 'tax', 'import tax', '预估税金', '税金小计']
+_HUISUN_KWS   = ['汇损', '汇率损失', '汇差']
+_TAX_RATE_KWS = ['税率', '税金', '进口税率', 'tax rate', 'tariff']
+_IMPORT_KWS   = ['进口税率', '进口税', '关税', 'import tariff', 'hs', 'hs code',
+                 '原产', '原产地', '原产国', '税率', '关税率']
+
+
+def _to_float(val) -> Optional[float]:
+    """安全转换为浮点数"""
+    if val is None:
+        return None
+    try:
+        s = str(val).replace(',', '').replace('，', '').replace(' ', '').strip()
+        s = re.sub(r'[^\d.\-]', '', s)
+        return float(s) if s else None
+    except Exception:
+        return None
+
+
+def _row_text(sheet, row_idx: int, max_col: int = 20) -> str:
+    """获取整行文本"""
+    parts = []
+    for col in range(1, min(max_col, sheet.max_column + 1)):
+        v = sheet.cell(row=row_idx, column=col).value
+        if v is not None:
+            parts.append(str(v).strip())
+    return ' '.join(parts)
+
+
+def _row_cells(sheet, row_idx: int, max_col: int = 20) -> list:
+    """获取整行单元格值列表（保留 None）"""
+    return [sheet.cell(row=row_idx, column=c).value
+            for c in range(1, min(max_col, sheet.max_column + 1))]
+
+
+def _extract_number_from_row(sheet, row_idx: int) -> Optional[float]:
+    """
+    从一行中提取第一个有效数字（跳过纯文本列）。
+    优先取靠右的数字列（金额通常在右侧）。
+    """
+    candidates = []
+    for col in range(1, min(20, sheet.max_column + 1)):
+        v = sheet.cell(row=row_idx, column=col).value
+        if v is None:
+            continue
+        f = _to_float(v)
+        if f is not None and f > 0:
+            candidates.append((col, f))
+    # 取最后一个（最右侧）有效数字
+    return candidates[-1][1] if candidates else None
+
+
+def _extract_percentage(text: str) -> Optional[float]:
+    """从文本中提取百分比，返回小数（19% → 0.19）"""
+    if not text:
+        return None
+    m = re.search(r'(\d+\.?\d*)\s*%', text)
+    if m:
+        return float(m.group(1)) / 100.0
+    m = re.search(r'\b0\.\d+\b', text)
+    if m:
+        return float(m.group(0))
+    return None
+
+
+def _kw_in(text: str, keywords: list) -> bool:
+    t = text.lower()
+    return any(k.lower() in t for k in keywords)
+
+
 class SummaryExtractor(BaseExtractor):
-    """Summary提取器"""
-    
-    QUALITY_THRESHOLD = 0.5
-    
+    """Summary提取器 v2.0"""
+
+    QUALITY_THRESHOLD = 0.3
+
     def __init__(self, logger=None, llm_client=None, enable_llm=True):
         super().__init__(logger, llm_client, enable_llm)
-        
-        # 需要排除的关键词（已被其他表提取）
-        self.exclude_keywords = [
-            # Agent表已提取
-            '时效', '不含', '赔付', '陆运', '海运', '空运',
-            # Routes表已提取
-            '路线', '起始', '目的地', '代理',
-            # Fees表已提取
-            '费用明细', '小计', '总计', '操作费', '报关费', '运费',
-            # Goods表已提取
-            '货物', '品名', '数量', '重量', '体积'
-        ]
-    
-    def _extract_with_rules(self, sheet, agent_start_row=None, agent_end_row=None, **kwargs) -> Summary:
-        """
-        规则提取
-        
-        Args:
-            sheet: Excel sheet对象
-            agent_start_row: 代理商区域起始行
-            agent_end_row: 代理商区域结束行
-        """
+
+    # ── 主提取入口 ────────────────────────────────────────────
+    def _extract_with_rules(self, sheet, agent_start_row=None,
+                            agent_end_row=None, **kwargs) -> Summary:
         summary = Summary()
-        
-        # 如果没有指定区域，扫描整个sheet
-        if not agent_start_row:
-            agent_start_row = 1
-        if not agent_end_row:
-            agent_end_row = sheet.max_row
-        
-        # 1. 找到"小计"和"总计"的位置
-        xiaoji_row = None
-        zongji_row = None
-        
-        for row_idx in range(agent_start_row, min(agent_end_row + 1, sheet.max_row + 1)):
-            row_text = self._get_row_text(sheet, row_idx)
-            
-            if '小计' in row_text and not xiaoji_row:
-                xiaoji_row = row_idx
-                if self.logger:
-                    self.logger.debug(f"    找到小计：行{row_idx}")
-            
-            if '总计' in row_text and xiaoji_row:
-                zongji_row = row_idx
-                if self.logger:
-                    self.logger.debug(f"    找到总计：行{row_idx}")
-                break
-        
-        if not xiaoji_row:
-            if self.logger:
-                self.logger.debug("    未找到小计行")
-            return summary
-        
-        # 2. 在小计到总计之间，提取税率和汇损率
-        search_end = zongji_row if zongji_row else min(xiaoji_row + 5, agent_end_row)
-        
-        for row_idx in range(xiaoji_row, search_end + 1):
-            row_text = self._get_row_text(sheet, row_idx)
-            
-            # 提取税率
-            if not summary.税率:
-                tax_rate = self._extract_percentage(row_text, ['税率', '税金'])
-                if tax_rate:
-                    summary.税率 = tax_rate
-                    if self.logger:
-                        self.logger.debug(f"    提取税率：{tax_rate*100}%")
-            
-            # 提取汇损率
-            if not summary.汇损率:
-                exchange_rate = self._extract_percentage(row_text, ['汇损'])
-                if exchange_rate:
-                    summary.汇损率 = exchange_rate
-                    if self.logger:
-                        self.logger.debug(f"    提取汇损率：{exchange_rate*100}%")
-        
-        # 3. 提取备注（从总计之后开始）
+        r_start = agent_start_row or 1
+        r_end   = agent_end_row   or sheet.max_row
+
+        # 第一遍：定位关键行号
+        xiaoji_row  = None
+        shuijin_row = None
+        zongji_row  = None
+        import_rows: List[int] = []   # 进口税率相关行
+
+        for ri in range(r_start, min(r_end + 1, sheet.max_row + 1)):
+            txt = _row_text(sheet, ri)
+            if not txt:
+                continue
+
+            if not xiaoji_row and _kw_in(txt, _XIAOJI_KWS):
+                xiaoji_row = ri
+            if not shuijin_row and _kw_in(txt, _SHUIJIN_KWS):
+                shuijin_row = ri
+            if not zongji_row and xiaoji_row and _kw_in(txt, _ZONGJI_KWS):
+                zongji_row = ri
+            if _kw_in(txt, _IMPORT_KWS):
+                import_rows.append(ri)
+
+        # 第二遍：提取金额
+        if xiaoji_row:
+            v = _extract_number_from_row(sheet, xiaoji_row)
+            if v:
+                summary.运费小计 = v
+                summary.小计     = v   # 兼容旧版
+
+        if shuijin_row:
+            v = _extract_number_from_row(sheet, shuijin_row)
+            if v:
+                summary.税金金额 = v
+                summary.税金     = v   # 兼容旧版
+
+        if zongji_row:
+            v = _extract_number_from_row(sheet, zongji_row)
+            if v:
+                summary.总计金额 = v
+                summary.总计     = v   # 兼容旧版
+
+        # 第三遍：在小计→总计区间提取税率、汇损率、汇损
+        search_end = zongji_row or min((xiaoji_row or r_start) + 8, r_end)
+        for ri in range(xiaoji_row or r_start, search_end + 1):
+            txt = _row_text(sheet, ri)
+            if not txt:
+                continue
+
+            # 税率（兼容旧版）
+            if not summary.税率 and _kw_in(txt, _TAX_RATE_KWS):
+                pct = _extract_percentage(txt)
+                if pct:
+                    summary.税率 = pct
+
+            # 汇损率
+            if not summary.汇损率 and _kw_in(txt, _HUISUN_KWS):
+                pct = _extract_percentage(txt)
+                if pct:
+                    summary.汇损率 = pct
+                v = _extract_number_from_row(sheet, ri)
+                if v and v != summary.汇损率:
+                    summary.汇损 = v
+
+        # 第四遍：提取进口税率原文（完整文本块）
+        if import_rows:
+            lines = []
+            # 以第一个进口税率行为起点，向下收集连续有内容的行（最多15行）
+            start = import_rows[0]
+            for ri in range(start, min(start + 15, r_end + 1)):
+                txt = _row_text(sheet, ri).strip()
+                if txt:
+                    lines.append(txt)
+                elif lines:  # 遇到空行且已有内容则停止
+                    break
+            if lines:
+                summary.进口税率原文 = '\n'.join(lines)
+                # 从原文再次尝试提取整体税率（如果前面没提到）
+                if not summary.税率:
+                    for line in lines:
+                        pct = _extract_percentage(line)
+                        if pct and 0 < pct <= 1.5:
+                            summary.税率 = pct
+                            break
+
+        # 第五遍：提取备注（总计行之后）
         if zongji_row:
             remark_lines = []
-            remark_start = zongji_row + 1
-            
-            for row_idx in range(remark_start, min(agent_end_row + 1, sheet.max_row + 1)):
-                row_text = self._get_row_text(sheet, row_idx)
-                
-                # 跳过空行
-                if not row_text or len(row_text.strip()) < 2:
+            for ri in range(zongji_row + 1, min(r_end + 1, sheet.max_row + 1)):
+                txt = _row_text(sheet, ri).strip()
+                if not txt or len(txt) < 3:
                     continue
-                
-                # 跳过已被其他表提取的内容
-                if self._should_exclude(row_text):
+                if _kw_in(txt, _XIAOJI_KWS + _ZONGJI_KWS + _SHUIJIN_KWS):
                     continue
-                
-                # 收集备注
-                remark_lines.append(row_text.strip())
-            
+                remark_lines.append(txt)
             if remark_lines:
-                summary.备注 = '\n'.join(remark_lines)
-                if self.logger:
-                    self.logger.debug(f"    提取备注：{len(remark_lines)}行")
-        
+                summary.备注 = '\n'.join(remark_lines[:10])  # 最多10行备注
+
+        if self.logger:
+            self.logger.debug(
+                f"  Summary: 小计={summary.运费小计}, 税金={summary.税金金额}, "
+                f"总计={summary.总计金额}, 税率={summary.税率}, "
+                f"进口税率原文={'有' if summary.进口税率原文 else '无'}"
+            )
+
         return summary
-    
-    def _extract_percentage(self, text: str, keywords: list) -> Optional[float]:
-        """
-        从文本中提取百分比
-        
-        例如：
-        - "税率：19%" → 0.19
-        - "汇损：4%" → 0.04
-        """
-        if not text:
-            return None
-        
-        # 检查是否包含关键词
-        has_keyword = any(kw in text for kw in keywords)
-        if not has_keyword:
-            return None
-        
-        # 提取百分比：支持多种格式
-        # 格式1：19%
-        # 格式2：0.19
-        # 格式3：19
-        
-        # 尝试匹配 XX% 格式
-        match = re.search(r'(\d+\.?\d*)\s*%', text)
-        if match:
-            value = float(match.group(1))
-            return value / 100.0
-        
-        # 尝试匹配 0.XX 格式
-        match = re.search(r'0\.\d+', text)
-        if match:
-            return float(match.group(0))
-        
-        return None
-    
-    def _get_row_text(self, sheet, row_idx: int) -> str:
-        """获取整行的文本（合并所有列）"""
-        texts = []
-        for col_idx in range(1, min(20, sheet.max_column + 1)):
-            try:
-                cell = sheet.cell(row=row_idx, column=col_idx)
-                if cell.value:
-                    texts.append(str(cell.value).strip())
-            except:
-                pass
-        return ' '.join(texts)
-    
-    def _should_exclude(self, text: str) -> bool:
-        """
-        判断是否应该排除这行文本
-        
-        排除规则：
-        1. 包含已被其他表提取的关键词
-        2. 以特定关键词开头（时效、不含、赔付等）
-        """
-        if not text:
-            return True
-        
-        text_lower = text.lower().strip()
-        
-        # 排除以特定关键词开头的行
-        exclude_prefixes = [
-            '时效', '不含', '赔付', '费用明细', '小计', '总计',
-            '代理', '路线', '货物', '品名'
-        ]
-        
-        for prefix in exclude_prefixes:
-            if text.startswith(prefix) or text.startswith(prefix + '：') or text.startswith(prefix + ':'):
-                return True
-        
-        # 排除包含多个排除关键词的行
-        keyword_count = sum(1 for kw in self.exclude_keywords if kw in text)
-        if keyword_count >= 2:
-            return True
-        
-        return False
-    
-    # ========== BaseExtractor 必需方法 ==========
-    
+
+    # ── BaseExtractor 必需方法 ────────────────────────────────
     def _evaluate_quality(self, result: Summary, sheet, **kwargs) -> float:
-        """评估提取质量"""
         if not result:
             return 0.0
-        
         score = 0.0
-        
-        # 税率存在：+0.4
-        if result.税率 is not None:
-            score += 0.4
-        
-        # 汇损率存在：+0.4
-        if result.汇损率 is not None:
-            score += 0.4
-        
-        # 备注存在：+0.2
-        if result.备注:
-            score += 0.2
-        
+        if result.运费小计 is not None:  score += 0.25
+        if result.税金金额 is not None:  score += 0.20
+        if result.总计金额 is not None:  score += 0.20
+        if result.进口税率原文:           score += 0.20
+        if result.税率 is not None:       score += 0.10
+        if result.汇损率 is not None:     score += 0.05
         return score
-    
+
+    def _is_valid(self, result: Summary) -> bool:
+        return result and (
+            result.运费小计 is not None or
+            result.税金金额 is not None or
+            result.总计金额 is not None or
+            result.进口税率原文 is not None
+        )
+
+    def _get_default(self) -> Summary:
+        return Summary()
+
     def _build_enhancement_prompt(self, result: Summary, sheet, **kwargs) -> str:
-        """
-        构建LLM增强prompt
-        
-        ✅ 修复：添加真实的prompt，用于提取税率、汇损率、备注
-        """
-        # 获取agent区域的行范围
         agent_start_row = kwargs.get('agent_start_row', 1)
-        agent_end_row = kwargs.get('agent_end_row', sheet.max_row)
-        
-        # 序列化sheet内容（只序列化相关区域）
-        sheet_text = self._serialize_agent_region(sheet, agent_start_row, agent_end_row)
-        
-        prompt = f"""请从以下Excel内容中提取Summary信息（税率、汇损率、备注）。
+        agent_end_row   = kwargs.get('agent_end_row', sheet.max_row)
+        lines = []
+        for ri in range(agent_start_row, min(agent_end_row + 1, sheet.max_row + 1)):
+            txt = _row_text(sheet, ri)
+            if txt:
+                lines.append(f"行{ri}: {txt}")
+        content = '\n'.join(lines)
+        if len(content) > 2000:
+            content = content[:2000] + '\n...(截断)'
+
+        return f"""请从以下Excel内容中提取汇总信息。
 
 【文本内容】
-{sheet_text}
+{content}
 
-【提取规则】
-1. 税率：查找"税率"、"税金"等关键词，提取百分比（如19%）
-   - 支持格式："税率：19%"、"税率0.19"、"税 19%"
-   - 如果没有找到，返回null
-   
-2. 汇损率：查找"汇损"关键词，提取百分比（如4%）
-   - 支持格式："汇损：4%"、"汇损0.04"
-   - 如果没有找到，返回null
+【提取目标】
+1. 运费小计（不含税）：查找"小计""运费小计"等行的金额数字
+2. 税金金额：查找"税金""进口税"等行的金额数字
+3. 总计金额：查找"总计""合计"等行的金额数字
+4. 税率：查找百分比（如19%，返回0.19）
+5. 汇损率：查找"汇损"百分比
+6. 进口税率原文：完整复制"进口税率"/"进口税"相关的文本内容（可多行）
 
-3. 备注：提取除了以下内容之外的其他说明文字：
-   - 不要提取：代理商名称、费用明细、运输方式、时效说明
-   - 不要提取：已在其他字段中的信息（如"税率"、"汇损"等）
-   - 只提取真正的备注内容（如特殊要求、注意事项等）
-   - 如果没有找到，返回null
+【返回JSON格式】
+{{
+  "运费小计": 14436.00,
+  "税金金额": 1343.78,
+  "总计金额": 23976.86,
+  "税率": 0.10,
+  "汇损率": null,
+  "进口税率原文": "交换机8517620090 印度原产，税率 0+10%\\n光缆 原产中国，税率25%+10%"
+}}
 
-【返回格式】（严格JSON格式，不要其他文字）
-{{{{
-  "税率": 0.19,
-  "汇损率": 0.04,
-  "备注": "..."
-}}}}
+注意：金额为数字，税率为0-1小数，无数据返回null。"""
 
-注意：
-- 税率和汇损率必须是0-1之间的小数（如19%返回0.19）
-- 如果某个字段没有找到，返回null
-- 备注要过滤掉费用、代理、时效等已被其他表提取的信息
-"""
-        
-        return prompt
-    
-    def _serialize_agent_region(self, sheet, start_row: int, end_row: int) -> str:
-        """
-        序列化agent区域的内容
-        
-        Args:
-            sheet: Excel sheet
-            start_row: 起始行
-            end_row: 结束行
-        
-        Returns:
-            序列化后的文本
-        """
-        lines = []
-        
-        for row_idx in range(start_row, min(end_row + 1, sheet.max_row + 1)):
-            try:
-                cells = []
-                for col_idx in range(1, min(10, sheet.max_column + 1)):
-                    cell = sheet.cell(row=row_idx, column=col_idx)
-                    if cell.value:
-                        cells.append(str(cell.value).strip())
-                
-                if cells:  # 如果这行有内容
-                    line = f"行{row_idx}: " + " | ".join(cells)
-                    lines.append(line)
-            except:
-                continue
-        
-        result = "\n".join(lines)
-        
-        # 限制长度
-        if len(result) > 1500:
-            result = result[:1500] + "\n... (内容过长，已截断)"
-        
-        return result
-    
     def _merge_results(self, rule_result: Summary, llm_result) -> Summary:
-        """合并规则和LLM结果"""
+        if not llm_result:
+            return rule_result
+        # LLM结果补充规则结果的空缺
+        for field in ['运费小计', '税金金额', '总计金额', '税率',
+                      '汇损率', '进口税率原文', '备注']:
+            if getattr(rule_result, field) is None:
+                val = (llm_result.get(field) if isinstance(llm_result, dict)
+                       else getattr(llm_result, field, None))
+                if val is not None:
+                    setattr(rule_result, field, val)
         return rule_result
-    
+
     def _extract_with_llm(self, sheet, **kwargs) -> Summary:
-        """LLM提取（暂不实现）"""
-        return Summary()
-    
-    def _is_valid(self, result: Summary) -> bool:
-        """验证结果"""
-        # 至少有税率或汇损率之一
-        return result and (result.税率 is not None or result.汇损率 is not None)
-    
-    def _get_default(self) -> Summary:
-        """获取默认值"""
         return Summary()
 
 
