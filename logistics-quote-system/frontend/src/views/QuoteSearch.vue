@@ -506,11 +506,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Download, Histogram, Tickets, Warning } from '@element-plus/icons-vue'
 import { searchQuotes } from '@/api/quote'
 
+const route = useRoute()
 const loading = ref(false)
 const dateRange = ref([])
 const quoteResults = ref([])
@@ -639,6 +641,14 @@ const getCellClass = (row, item) => {
 const searchForm = reactive({
   起始地: '', 目的地: '', 货物名称: '', 代理商: '',
   page: 1, page_size: 10
+})
+
+// 支持从港口地图跳转时预填目的地（?dest=国家名）
+onMounted(() => {
+  if (route.query.dest) {
+    searchForm.目的地 = route.query.dest
+    handleSearch()
+  }
 })
 
 const isNewProduct = (v) => v === 1 || v === '1' || v === true

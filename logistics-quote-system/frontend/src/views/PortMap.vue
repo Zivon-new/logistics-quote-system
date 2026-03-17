@@ -2,7 +2,7 @@
   <div class="portmap-page">
     <div class="page-header">
       <h2>全球港口地图</h2>
-      <p class="subtitle">基于UN/LOCODE数据，覆盖全球主要海港、空港和内陆港</p>
+      <p class="subtitle">覆盖全球 {{ allPorts.length }} 个主要港口，{{ stats.countries ?? '—' }} 个国家/地区 — 点击港口查看详情及预警</p>
     </div>
 
     <!-- 统计卡片 -->
@@ -70,6 +70,9 @@
             <el-checkbox-button value="高">高风险</el-checkbox-button>
           </el-checkbox-group>
         </el-form-item>
+        <el-form-item label="仅显示预警">
+          <el-switch v-model="filters.warningOnly" size="small" @change="applyFilter" />
+        </el-form-item>
         <el-form-item label="搜索">
           <el-input
             v-model="filters.keyword"
@@ -83,6 +86,10 @@
         <el-form-item>
           <el-button size="small" @click="resetFilter">重置</el-button>
           <span class="filter-count">显示 <strong>{{ filteredPorts.length }}</strong> / {{ allPorts.length }} 个港口</span>
+          <span v-if="warningPortCount > 0" class="warning-hint">
+            <el-icon style="color:#f5222d;vertical-align:middle"><Warning /></el-icon>
+            {{ warningPortCount }} 个港口所在国有风险预警
+          </span>
         </el-form-item>
       </el-form>
     </el-card>
@@ -108,18 +115,26 @@
           <span class="legend-item"><span class="legend-ring" style="border-color:#faad14"></span>中风险</span>
           <span class="legend-item"><span class="legend-ring" style="border-color:#f5222d"></span>高风险</span>
         </div>
+        <div class="legend-group">
+          <span class="legend-group-label">联动功能：</span>
+          <span class="legend-item" style="color:#595959">点击港口弹窗 → 查看预警 + 一键查询该目的地路线</span>
+        </div>
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Location, Flag, Cloudy } from '@element-plus/icons-vue'
+import { Location, Flag, Cloudy, Warning } from '@element-plus/icons-vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getPorts, getPortStats } from '@/api/ports'
+import request from '@/utils/request'
+
+const router = useRouter()
 
 // 修复 Leaflet 默认图标路径问题（Vite 打包时的已知 bug）
 delete L.Icon.Default.prototype._getIconUrl
@@ -139,6 +154,8 @@ const typeOptions = [
 ]
 const typeColorMap = Object.fromEntries(typeOptions.map(t => [t.value, t.color]))
 const riskBorderMap = { '低': '#52c41a', '中': '#faad14', '高': '#f5222d' }
+const riskLevelLabel = { 1: '低风险', 2: '中等风险', 3: '高风险' }
+const riskLevelColor = { 1: '#52c41a', 2: '#faad14', 3: '#f5222d' }
 
 const mapContainer = ref(null)
 const loadingPorts = ref(true)
@@ -147,11 +164,20 @@ const allPorts = ref([])
 const filteredPorts = ref([])
 const stats = ref({})
 
+// 预警数据：{ 国家代码: [预警列表] }
+const warningsByCountry = ref({})
+
 const filters = reactive({
   types: ['海港', '空港', '内陆港', '铁路港', '多式联运'],
   risks: ['低', '中', '高'],
   keyword: '',
+  warningOnly: false,
 })
+
+// 有预警的港口数量
+const warningPortCount = computed(() =>
+  allPorts.value.filter(p => warningsByCountry.value[p.country_code]?.length > 0).length
+)
 
 let map = null
 const markersLayer = ref(null)
@@ -160,8 +186,14 @@ const markersLayer = ref(null)
 const createIcon = (port) => {
   const color = typeColorMap[port.type] || '#1890ff'
   const border = riskBorderMap[port.lpi_risk] || '#faad14'
+  const hasWarning = (warningsByCountry.value[port.country_code] || []).length > 0
+  // 有预警时增加外圈闪烁效果（用更粗的红色描边）
+  const outerRing = hasWarning
+    ? `<circle cx="12" cy="12" r="11" fill="none" stroke="#f5222d" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.8"/>`
+    : ''
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+      ${outerRing}
       <circle cx="12" cy="12" r="9" fill="${color}" fill-opacity="0.85" stroke="${border}" stroke-width="2.5"/>
       <circle cx="12" cy="12" r="4" fill="white" fill-opacity="0.7"/>
     </svg>`
@@ -177,8 +209,35 @@ const createIcon = (port) => {
 const buildPopup = (port) => {
   const riskColor = riskBorderMap[port.lpi_risk] || '#faad14'
   const clearance = port.clearance_days != null ? `${port.clearance_days} 天` : '暂无数据'
+  const warnings = warningsByCountry.value[port.country_code] || []
+
+  // 预警区块
+  let warningBlock = ''
+  if (warnings.length > 0) {
+    const items = warnings.slice(0, 3).map(w => {
+      const wc = riskLevelColor[w['风险等级']] || '#faad14'
+      const wl = riskLevelLabel[w['风险等级']] || '风险'
+      return `<div style="margin-top:4px;padding:4px 6px;background:#fff1f0;border-radius:4px;border-left:3px solid ${wc}">
+        <span style="color:${wc};font-weight:600;font-size:11px">[${wl}]</span>
+        <span style="color:#434343;font-size:12px"> ${w['预警标题']}</span>
+      </div>`
+    }).join('')
+    const moreHint = warnings.length > 3 ? `<div style="color:#8c8c8c;font-size:11px;margin-top:2px">还有 ${warnings.length - 3} 条预警…</div>` : ''
+    warningBlock = `
+      <div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:6px">
+        <div style="color:#f5222d;font-weight:600;font-size:12px;margin-bottom:4px">⚠ 所在地区预警（${warnings.length}条）</div>
+        ${items}${moreHint}
+      </div>`
+  }
+
+  // 路线查询按钮（用 window 函数桥接 Vue router）
+  const btnStyle = 'display:inline-block;margin-top:8px;padding:4px 10px;background:#1890ff;color:#fff;border-radius:4px;font-size:12px;cursor:pointer;border:none;'
+  const riskBtnStyle = warnings.length > 0
+    ? 'display:inline-block;margin-top:8px;margin-left:6px;padding:4px 10px;background:#fff1f0;color:#f5222d;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid #ffa39e;'
+    : ''
+
   return `
-    <div style="min-width:200px;font-size:13px;line-height:1.8">
+    <div style="min-width:220px;max-width:300px;font-size:13px;line-height:1.8">
       <div style="font-size:15px;font-weight:700;color:#262626;margin-bottom:6px">
         ${port.name}
         <span style="font-size:11px;color:#8c8c8c;font-weight:400">&nbsp;${port.unlocode}</span>
@@ -191,11 +250,18 @@ const buildPopup = (port) => {
         <tr><td style="color:#8c8c8c">时区</td><td>${port.timezone || '—'}</td></tr>
         <tr><td style="color:#8c8c8c">清关</td><td>${clearance}</td></tr>
         <tr>
-          <td style="color:#8c8c8c">风险</td>
+          <td style="color:#8c8c8c">LPI风险</td>
           <td><span style="color:${riskColor};font-weight:600">${port.lpi_risk ?? '—'}风险</span></td>
         </tr>
         ${port.remark ? `<tr><td style="color:#8c8c8c">备注</td><td style="font-size:12px;color:#595959">${port.remark}</td></tr>` : ''}
       </table>
+      ${warningBlock}
+      <div style="margin-top:6px">
+        <button style="${btnStyle}" onclick="window.__portMapGoSearch('${port.country}')">
+          查询该目的地路线 →
+        </button>
+        ${warnings.length > 0 ? `<button style="${riskBtnStyle}" onclick="window.__portMapGoRisk('${port.country_code}')">查看预警详情</button>` : ''}
+      </div>
     </div>`
 }
 
@@ -208,7 +274,7 @@ const renderMarkers = () => {
   }
   filteredPorts.value.forEach(port => {
     const marker = L.marker([port.lat, port.lng], { icon: createIcon(port) })
-    marker.bindPopup(buildPopup(port), { maxWidth: 280 })
+    marker.bindPopup(buildPopup(port), { maxWidth: 320 })
     markersLayer.value.addLayer(marker)
   })
 }
@@ -218,6 +284,7 @@ const applyFilter = () => {
   filteredPorts.value = allPorts.value.filter(p => {
     if (!filters.types.includes(p.type)) return false
     if (!filters.risks.includes(p.lpi_risk)) return false
+    if (filters.warningOnly && !(warningsByCountry.value[p.country_code]?.length > 0)) return false
     if (kw && !p.name.toLowerCase().includes(kw) &&
         !p.country.toLowerCase().includes(kw) &&
         !(p.name_en || '').toLowerCase().includes(kw) &&
@@ -231,27 +298,56 @@ const resetFilter = () => {
   filters.types = ['海港', '空港', '内陆港', '铁路港', '多式联运']
   filters.risks = ['低', '中', '高']
   filters.keyword = ''
+  filters.warningOnly = false
   applyFilter()
 }
 
-onMounted(async () => {
-  // 加载统计数据
-  getPortStats()
-    .then(data => { stats.value = data })
-    .catch(() => {})
-    .finally(() => { loadingStats.value = false })
-
-  // 加载港口数据
-  try {
-    const data = await getPorts()
-    allPorts.value = data
-    filteredPorts.value = data
-  } catch (e) {
-    ElMessage.error('港口数据加载失败')
-    return
-  } finally {
-    loadingPorts.value = false
+// 注册全局桥接函数（供 popup HTML onclick 调用）
+const setupGlobalBridge = () => {
+  window.__portMapGoSearch = (country) => {
+    router.push({ name: 'QuoteSearch', query: { dest: country } })
   }
+  window.__portMapGoRisk = (countryCode) => {
+    router.push({ name: 'RiskProfile', query: { code: countryCode } })
+  }
+}
+
+onMounted(async () => {
+  setupGlobalBridge()
+
+  // 并行加载：统计 + 港口 + 预警
+  const [portsData, statsData, warningsData] = await Promise.allSettled([
+    getPorts(),
+    getPortStats(),
+    request({ url: '/v1/warnings/list', method: 'get' }),
+  ])
+
+  // 处理统计
+  if (statsData.status === 'fulfilled') {
+    stats.value = statsData.value
+  }
+  loadingStats.value = false
+
+  // 处理预警：按国家代码分组
+  if (warningsData.status === 'fulfilled') {
+    const wMap = {}
+    for (const w of warningsData.value) {
+      const code = w['国家代码']
+      if (!wMap[code]) wMap[code] = []
+      wMap[code].push(w)
+    }
+    warningsByCountry.value = wMap
+  }
+
+  // 处理港口
+  if (portsData.status === 'rejected') {
+    ElMessage.error('港口数据加载失败')
+    loadingPorts.value = false
+    return
+  }
+  allPorts.value = portsData.value
+  filteredPorts.value = portsData.value
+  loadingPorts.value = false
 
   // 初始化地图
   await nextTick()
@@ -259,19 +355,50 @@ onMounted(async () => {
     center: [20, 110],
     zoom: 3,
     minZoom: 2,
-    maxZoom: 12,
+    maxZoom: 14,
   })
 
-  // 使用 OpenStreetMap 瓦片
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19,
-  }).addTo(map)
+  // 高德地图瓦片（中文标注）
+  // 如因网络环境无法加载，可改用 OpenStreetMap 标准瓦片
+  const amapTile = L.tileLayer(
+    'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+    {
+      subdomains: ['1','2','3','4'],
+      attribution: '© <a href="https://www.amap.com/">高德地图</a>',
+      maxZoom: 18,
+    }
+  )
+  const osmFallback = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }
+  )
+
+  // 尝试加载高德，失败则切换到 OSM
+  amapTile.on('tileerror', () => {
+    if (map.hasLayer(amapTile)) {
+      map.removeLayer(amapTile)
+      osmFallback.addTo(map)
+    }
+  })
+  amapTile.addTo(map)
+
+  // 图层控制器
+  L.control.layers(
+    { '高德地图（中文）': amapTile, 'OpenStreetMap': osmFallback },
+    {},
+    { position: 'topright' }
+  ).addTo(map)
 
   renderMarkers()
 })
 
 onBeforeUnmount(() => {
+  // 清理全局函数
+  delete window.__portMapGoSearch
+  delete window.__portMapGoRisk
   if (map) {
     map.remove()
     map = null
@@ -302,14 +429,15 @@ onBeforeUnmount(() => {
 /* 筛选栏 */
 .filter-card { margin-bottom: 12px; border-radius: 8px; }
 .filter-card :deep(.el-card__body) { padding: 12px 16px; }
-.filter-card :deep(.el-form-item) { margin-bottom: 0; margin-right: 24px; }
+.filter-card :deep(.el-form-item) { margin-bottom: 0; margin-right: 20px; }
 .filter-count { font-size: 13px; color: #8c8c8c; margin-left: 12px; }
 .filter-count strong { color: #1890ff; }
+.warning-hint { font-size: 13px; color: #f5222d; margin-left: 16px; }
 
 /* 地图 */
 .map-card { margin-bottom: 12px; border-radius: 8px; }
 .map-card :deep(.el-card__body) { padding: 0; overflow: hidden; border-radius: 8px; }
-.map-container { height: 520px; width: 100%; border-radius: 8px; }
+.map-container { height: 540px; width: 100%; border-radius: 8px; }
 
 /* 图例 */
 .legend-card { border-radius: 8px; }
