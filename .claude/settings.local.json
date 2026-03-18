@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(cd D:/project_root && python -c \"\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom scripts.modules.extractors.sheet_format_detector import SheetFormatDetector\nfrom scripts.modules.extractors.llm_full_extractor import LLMFullExtractor, SimpleFeeItem, SimpleFeeTotal, SimpleGoodsTotal\nfrom scripts.config import Config\nprint\\('✅ 导入成功'\\)\nprint\\(f'   ENABLE_LLM_ENHANCE = {Config.ENABLE_LLM_ENHANCE}'\\)\nprint\\(f'   LLM_MAX_TOKENS = {Config.LLM_MAX_TOKENS}'\\)\nprint\\(f'   UNSTRUCTURED_FORMAT_THRESHOLD = {Config.UNSTRUCTURED_FORMAT_THRESHOLD}'\\)\n\")",
-      "Bash(cd D:/project_root && python -c \"\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom scripts.modules.extractors.sheet_format_detector import SheetFormatDetector\nfrom scripts.modules.extractors.llm_full_extractor import LLMFullExtractor, SimpleFeeItem, SimpleFeeTotal, SimpleGoodsTotal\nfrom scripts.config import Config\nprint\\('Import OK'\\)\nprint\\('ENABLE_LLM_ENHANCE =', Config.ENABLE_LLM_ENHANCE\\)\nprint\\('LLM_MAX_TOKENS =', Config.LLM_MAX_TOKENS\\)\nprint\\('UNSTRUCTURED_FORMAT_THRESHOLD =', Config.UNSTRUCTURED_FORMAT_THRESHOLD\\)\n\")"
+      "Bash(cd D:/project_root && python -c \"\nimport sys\nsys.path.insert\\(0, '.'\\)\nfrom scripts.modules.extractors.sheet_format_detector import SheetFormatDetector\nfrom scripts.modules.extractors.llm_full_extractor import LLMFullExtractor, SimpleFeeItem, SimpleFeeTotal, SimpleGoodsTotal\nfrom scripts.config import Config\nprint\\('Import OK'\\)\nprint\\('ENABLE_LLM_ENHANCE =', Config.ENABLE_LLM_ENHANCE\\)\nprint\\('LLM_MAX_TOKENS =', Config.LLM_MAX_TOKENS\\)\nprint\\('UNSTRUCTURED_FORMAT_THRESHOLD =', Config.UNSTRUCTURED_FORMAT_THRESHOLD\\)\n\")",
+      "Bash(mysql -u root -proot price_test_v2 -e \"DESCRIBE summary;\" 2>&1)",
+      "Bash(where mysql:*)",
+      "Read(//c/Program Files/MySQL/MySQL Server 8.0/bin/**)",
+      "Bash(\"C:/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -proot price_test_v2 -e \"DESCRIBE summary;\" 2>&1)",
+      "Bash(\"C:/Program Files/MySQL/MySQL Server 8.0/bin/mysql\" -u root -pJHL181116 price_test_v2 -e \"DESCRIBE summary;\" 2>&1)",
+      "Bash(unzip:*)",
+      "Bash(mysql:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"require\\(''sortablejs''\\); console.log\\(''ok''\\)\")"
     ]
   }
 }

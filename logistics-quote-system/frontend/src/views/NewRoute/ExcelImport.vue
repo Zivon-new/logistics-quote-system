@@ -1,6 +1,6 @@
 <template>
   <div class="excel-import-container">
-    <el-card>
+    <el-card v-if="currentStep < 3">
       <template #header>
         <h3>Excel批量导入</h3>
       </template>
@@ -167,7 +167,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { uploadAndExtractExcel, createRoute } from '@/api/route'
 import { UploadFilled, Document, Delete, QuestionFilled, Right, ArrowLeft } from '@element-plus/icons-vue'
@@ -300,12 +300,14 @@ const handleLocalSave = (submitData) => {
     goods_total: submitData.goods_total || original.goods_total || []
   }
   currentStep.value = 2
+  nextTick(() => window.scrollTo(0, 0))
 }
 
 // ✅ 取消编辑，返回列表
 const cancelEdit = () => {
   currentStep.value = 2
   currentEditRoute.value = null
+  nextTick(() => window.scrollTo(0, 0))
 }
 
 // 删除路线

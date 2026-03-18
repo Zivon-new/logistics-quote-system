@@ -164,9 +164,23 @@
 
       <!-- 费用明细 -->
       <div v-if="agent.fee_items && agent.fee_items.length > 0" class="fee-section">
-        <h4>费用明细（{{ agent.fee_items.length }}条）</h4>
-        <el-table :data="agent.fee_items" border size="small">
-          <el-table-column prop="费用类型" label="费用类型" min-width="140" />
+        <h4>费用明细（{{ agent.fee_items.filter(i => i.备注 !== '__GROUP_HEADER__').length }}条）</h4>
+        <el-table
+          :data="agent.fee_items"
+          border
+          size="small"
+          :span-method="feeItemSpanMethod"
+          :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
+        >
+          <el-table-column label="费用类型" min-width="140">
+            <template #default="scope">
+              <div v-if="scope.row.备注 === '__GROUP_HEADER__'" class="group-header-cell">
+                <span style="color:#1890ff; font-size:11px;">▶</span>
+                <span style="font-weight:600; color:#1d39c4; margin-left:6px;">{{ scope.row.费用类型 }}</span>
+              </div>
+              <span v-else>{{ scope.row.费用类型 }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="单价" width="100" align="right">
             <template #default="scope">
               {{ scope.row.单价?.toFixed(2) }}{{ scope.row.币种 }}{{ scope.row.单位 }}
@@ -194,9 +208,29 @@
 
       <!-- 整单费用 -->
       <div v-if="agent.fee_total && agent.fee_total.length > 0" class="fee-section">
-        <h4>整单费用（{{ agent.fee_total.length }}条）</h4>
-        <el-table :data="agent.fee_total" border size="small">
-          <el-table-column prop="费用名称" label="费用名称" min-width="180" />
+        <h4>整单费用（{{ agent.fee_total.filter(i => i.备注 !== '__GROUP_HEADER__').length }}条）</h4>
+        <el-table
+          :data="agent.fee_total"
+          border
+          size="small"
+          :span-method="({ row, columnIndex }) => {
+            if (row.备注 === '__GROUP_HEADER__') {
+              if (columnIndex === 0) return [1, 3]
+              return [0, 0]
+            }
+            return [1, 1]
+          }"
+          :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
+        >
+          <el-table-column label="费用名称" min-width="180">
+            <template #default="scope">
+              <div v-if="scope.row.备注 === '__GROUP_HEADER__'" class="group-header-cell">
+                <span style="color:#1890ff; font-size:11px;">▶</span>
+                <span style="font-weight:600; color:#1d39c4; margin-left:6px;">{{ scope.row.费用名称 }}</span>
+              </div>
+              <span v-else>{{ scope.row.费用名称 }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="原币金额" width="150" align="right">
             <template #default="scope">
               {{ scope.row.原币金额?.toFixed(2) }} {{ scope.row.币种 }}
@@ -217,19 +251,17 @@
         <h4>费用汇总</h4>
         <el-descriptions :column="2" border size="small" class="summary-info">
           <el-descriptions-item label="小计">
-            <template v-for="(amount, currency) in calculateSubtotalByCurrency(agent)" :key="currency">
-              <span v-if="currency !== 'RMB'" style="color:#1890ff; font-size:12px; margin-right:6px;">
-                {{ currency }} {{ amount.toFixed(2) }} →
-              </span>
-            </template>
+            <span v-if="getFeesCurrency(agent)" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ getFeesCurrency(agent) }} {{ calculateSubtotalByCurrency(agent)[getFeesCurrency(agent)]?.toFixed(2) }} →
+            </span>
             <span class="amount-value">¥{{ calculateSubtotal(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="税率">
             {{ (agent.summary.税率 * 100).toFixed(2) }}%
           </el-descriptions-item>
           <el-descriptions-item label="税金">
-            <span v-if="formData.route.货值币种 && formData.route.货值币种 !== 'RMB'" style="color:#1890ff; font-size:12px; margin-right:6px;">
-              {{ formData.route.货值币种 }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0)).toFixed(2) }} →
+            <span v-if="getCargoCurrency()" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ getCargoCurrency() }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0)).toFixed(2) }} →
             </span>
             <span class="amount-value">¥{{ calculateTax(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
@@ -237,12 +269,19 @@
             {{ (agent.summary.汇损率 * 100).toFixed(4) }}%
           </el-descriptions-item>
           <el-descriptions-item label="汇损">
-            <span v-if="formData.route.货值币种 && formData.route.货值币种 !== 'RMB'" style="color:#1890ff; font-size:12px; margin-right:6px;">
-              {{ formData.route.货值币种 }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0) * (agent.summary.汇损率 || 0)).toFixed(2) }} →
+            <span v-if="getCargoCurrency()" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ getCargoCurrency() }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0) * (agent.summary.汇损率 || 0)).toFixed(2) }} →
             </span>
             <span class="amount-value">¥{{ calculateLoss(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="总计">
+            <span v-if="getQuoteSingleCurrency(agent)" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ getQuoteSingleCurrency(agent) }}
+              {{ ((calculateSubtotalByCurrency(agent)[getQuoteSingleCurrency(agent)] || 0)
+                + (parseFloat(formData.route.货值) * (agent.summary.税率 || 0))
+                + (parseFloat(formData.route.货值) * (agent.summary.税率 || 0) * (agent.summary.汇损率 || 0))
+              ).toFixed(2) }} →
+            </span>
             <span class="total-amount">¥{{ calculateTotal(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item v-if="agent.summary.备注" label="备注" :span="2">
@@ -305,15 +344,18 @@ const calculateRMB = (feeItem) => {
   return originalAmount * rate
 }
 
-// 按币种统计原币小计（用于展示）
+// 按币种统计原币小计（用于展示），跳过分组标题行
 const calculateSubtotalByCurrency = (agent) => {
   const byCurrency = {}
   const add = (currency, amount) => {
+    if (!amount) return
     currency = currency || 'RMB'
     byCurrency[currency] = (byCurrency[currency] || 0) + amount
   }
   if (agent.fee_items) {
-    agent.fee_items.forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
+    agent.fee_items
+      .filter(item => item.备注 !== '__GROUP_HEADER__')
+      .forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
   }
   if (agent.fee_total) {
     agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
@@ -321,18 +363,52 @@ const calculateSubtotalByCurrency = (agent) => {
   return byCurrency
 }
 
-// 计算小计
+// 费用明细表格 span-method（5列，分组标题行全行展示）
+const feeItemSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    if (columnIndex === 0) return [1, 5]
+    return [0, 0]
+  }
+  return [1, 1]
+}
+
+// 仅看费用的单一外币（用于小计）
+const getFeesCurrency = (agent) => {
+  const byCurrency = calculateSubtotalByCurrency(agent)
+  const arr = Object.keys(byCurrency).filter(c => byCurrency[c] > 0)
+  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
+}
+
+// 货值的外币（用于税金/汇损）
+const getCargoCurrency = () => {
+  const currency = props.formData.route.货值币种 || 'RMB'
+  return (parseFloat(props.formData.route.货值) || 0) > 0 && currency !== 'RMB' ? currency : null
+}
+
+// 费用+货值全部同一外币时返回该币种（用于总计）
+const getQuoteSingleCurrency = (agent) => {
+  const byCurrency = calculateSubtotalByCurrency(agent)
+  const allCurrencies = new Set(Object.keys(byCurrency).filter(c => byCurrency[c] > 0))
+  const routeCurrency = props.formData.route.货值币种 || 'RMB'
+  if ((parseFloat(props.formData.route.货值) || 0) > 0) allCurrencies.add(routeCurrency)
+  const arr = Array.from(allCurrencies)
+  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
+}
+
+// 计算小计，跳过分组标题行
 const calculateSubtotal = (agent) => {
   let total = 0
-  
+
   if (agent.fee_items) {
-    total += agent.fee_items.reduce((sum, item) => sum + calculateRMB(item), 0)
+    total += agent.fee_items
+      .filter(item => item.备注 !== '__GROUP_HEADER__')
+      .reduce((sum, item) => sum + calculateRMB(item), 0)
   }
-  
+
   if (agent.fee_total) {
     total += agent.fee_total.reduce((sum, item) => sum + calculateRMB(item), 0)
   }
-  
+
   return total
 }
 
@@ -403,6 +479,16 @@ const calculateTotal = (agent) => {
 
 .fee-section {
   margin-top: 20px;
+}
+
+:deep(.group-header-row) td {
+  background-color: #f0f5ff !important;
+}
+
+.group-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .fee-section h4 {

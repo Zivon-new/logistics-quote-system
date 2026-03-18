@@ -131,16 +131,20 @@ async def get_forex_rates(
         'MYR': 1.6
     }
     
+    reference_date = None
     try:
-        result = db.execute(text("SELECT `币种`, `汇率` FROM forex_rate")).fetchall()
+        result = db.execute(text("SELECT `币种`, `汇率`, `参考日期` FROM forex_rate")).fetchall()
         for row in result:
             default_rates[row[0]] = float(row[1])
+            if row[2] and not reference_date:
+                reference_date = str(row[2])
     except Exception:
         pass
-    
+
     return {
         "success": True,
-        "data": default_rates
+        "data": default_rates,
+        "reference_date": reference_date
     }
 
 

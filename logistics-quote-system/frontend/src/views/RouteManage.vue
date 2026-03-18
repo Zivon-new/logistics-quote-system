@@ -244,49 +244,93 @@
                   
                   <!-- 费用明细表 (fee_items) -->
                   <div v-if="agent.fee_items?.length > 0" style="margin-bottom: 16px;">
-                    <p style="font-size: 13px; font-weight: 600; color: #595959; margin-bottom: 8px;">费用明细（{{ agent.fee_items.length }}条）</p>
-                    <el-table :data="agent.fee_items" border stripe size="small">
-                      <el-table-column prop="费用类型" label="费用类型" min-width="120" />
-                      <el-table-column label="单价" width="100" align="right">
+                    <p style="font-size: 13px; font-weight: 600; color: #595959; margin-bottom: 8px;">
+                      费用明细（{{ agent.fee_items.filter(i => i.备注 !== '__GROUP_HEADER__').length }}条）
+                    </p>
+                    <el-table
+                      :data="agent.fee_items"
+                      border
+                      size="small"
+                      :span-method="feeItemsSpanMethod"
+                      :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
+                    >
+                      <el-table-column label="费用类型" min-width="130">
+                        <template #default="scope">
+                          <template v-if="scope.row.备注 === '__GROUP_HEADER__'">
+                            <div class="group-header-cell">
+                              <span class="group-header-icon">◆</span>
+                              <span>{{ scope.row.费用类型 }}</span>
+                            </div>
+                          </template>
+                          <template v-else>{{ scope.row.费用类型 }}</template>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="单价" width="110" align="right">
                         <template #default="scope">
                           {{ scope.row.单价 }}{{ scope.row.币种 }}{{ scope.row.单位 ? '/' + scope.row.单位.replace('/','') : '' }}
                         </template>
                       </el-table-column>
-                      <el-table-column prop="数量" label="数量" width="70" align="right">
+                      <el-table-column label="数量" width="70" align="right">
                         <template #default="scope">
                           {{ Number(scope.row.数量).toFixed(0) }}
                         </template>
                       </el-table-column>
-                      <el-table-column label="原币金额" width="100" align="right">
+                      <el-table-column label="原币金额" width="110" align="right">
                         <template #default="scope">
                           {{ scope.row.原币金额?.toFixed(2) }} {{ scope.row.币种 }}
                         </template>
                       </el-table-column>
-                      <el-table-column label="人民币金额" width="100" align="right">
+                      <el-table-column label="人民币金额" width="110" align="right">
                         <template #default="scope">
-                          <span style="color: #52c41a; font-weight: 500;">¥{{ scope.row.人民币金额?.toFixed(2) }}</span>
+                          <span style="color: #389e0d; font-weight: 600;">¥{{ scope.row.人民币金额?.toFixed(2) }}</span>
                         </template>
                       </el-table-column>
-                      <el-table-column prop="备注" label="备注" min-width="100" show-overflow-tooltip />
+                      <el-table-column label="备注" min-width="90" show-overflow-tooltip>
+                        <template #default="scope">
+                          <span v-if="scope.row.备注 !== '__GROUP_HEADER__'" style="color: #8c8c8c;">{{ scope.row.备注 }}</span>
+                        </template>
+                      </el-table-column>
                     </el-table>
                   </div>
-                  
+
                   <!-- 整单费用表 (fee_total) -->
                   <div v-if="agent.fee_total?.length > 0" style="margin-bottom: 16px;">
-                    <p style="font-size: 13px; font-weight: 600; color: #595959; margin-bottom: 8px;">整单费用（{{ agent.fee_total.length }}条）</p>
-                    <el-table :data="agent.fee_total" border stripe size="small">
-                      <el-table-column prop="费用名称" label="费用名称" min-width="140" />
-                      <el-table-column label="原币金额" width="120" align="right">
+                    <p style="font-size: 13px; font-weight: 600; color: #595959; margin-bottom: 8px;">
+                      整单费用（{{ agent.fee_total.filter(i => i.备注 !== '__GROUP_HEADER__').length }}条）
+                    </p>
+                    <el-table
+                      :data="agent.fee_total"
+                      border
+                      size="small"
+                      :span-method="feeTotalSpanMethod"
+                      :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
+                    >
+                      <el-table-column label="费用名称" min-width="160">
+                        <template #default="scope">
+                          <template v-if="scope.row.备注 === '__GROUP_HEADER__'">
+                            <div class="group-header-cell">
+                              <span class="group-header-icon">◆</span>
+                              <span>{{ scope.row.费用名称 }}</span>
+                            </div>
+                          </template>
+                          <template v-else>{{ scope.row.费用名称 }}</template>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="原币金额" width="130" align="right">
                         <template #default="scope">
                           {{ scope.row.原币金额?.toFixed(2) }} {{ scope.row.币种 }}
                         </template>
                       </el-table-column>
-                      <el-table-column label="人民币金额" width="120" align="right">
+                      <el-table-column label="人民币金额" width="130" align="right">
                         <template #default="scope">
-                          <span style="color: #52c41a; font-weight: 500;">¥{{ scope.row.人民币金额?.toFixed(2) }}</span>
+                          <span style="color: #389e0d; font-weight: 600;">¥{{ scope.row.人民币金额?.toFixed(2) }}</span>
                         </template>
                       </el-table-column>
-                      <el-table-column prop="备注" label="备注" min-width="100" show-overflow-tooltip />
+                      <el-table-column label="备注" min-width="90" show-overflow-tooltip>
+                        <template #default="scope">
+                          <span v-if="scope.row.备注 !== '__GROUP_HEADER__'" style="color: #8c8c8c;">{{ scope.row.备注 }}</span>
+                        </template>
+                      </el-table-column>
                     </el-table>
                   </div>
                   
@@ -298,21 +342,52 @@
                 </div>
 
                 <!-- 汇总信息 -->
-                <div v-if="agent.summary" class="detail-section">
+                <div v-if="agent.summary" class="detail-section summary-section">
                   <h3>费用汇总</h3>
-                  <el-descriptions :column="2" border size="small">
-                    <el-descriptions-item label="小计">¥{{ agent.summary.小计?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="税率">{{ (agent.summary.税率 * 100)?.toFixed(2) }}%</el-descriptions-item>
-                    <el-descriptions-item label="税金">¥{{ agent.summary.税金?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="汇损率">{{ (agent.summary.汇损率 * 100)?.toFixed(4) }}%</el-descriptions-item>
-                    <el-descriptions-item label="汇损">¥{{ agent.summary.汇损?.toFixed(2) }}</el-descriptions-item>
-                    <el-descriptions-item label="总计" :span="2">
-                      <span class="total-amount">¥{{ agent.summary.总计?.toFixed(2) }}</span>
-                    </el-descriptions-item>
-                    <el-descriptions-item v-if="agent.summary.备注" label="备注" :span="2">
-                      {{ agent.summary.备注 }}
-                    </el-descriptions-item>
-                  </el-descriptions>
+                  <div class="summary-grid">
+                    <div class="summary-row">
+                      <div class="summary-cell">
+                        <span class="s-label">运费小计</span>
+                        <span class="s-value">
+                          <span v-if="getAgentFeesCurrency(agent)" class="s-foreign">
+                            {{ getAgentFeesCurrency(agent) }} {{ getAgentForeignSubtotal(agent, getAgentFeesCurrency(agent)).toFixed(2) }} →
+                          </span>
+                          ¥{{ agent.summary.小计?.toFixed(2) }}
+                        </span>
+                      </div>
+                      <div class="summary-cell">
+                        <span class="s-label">进口税率</span>
+                        <span class="s-value">{{ (agent.summary.税率 * 100)?.toFixed(2) }}%</span>
+                      </div>
+                      <div class="summary-cell">
+                        <span class="s-label">税金</span>
+                        <span class="s-value">¥{{ agent.summary.税金?.toFixed(2) }}</span>
+                      </div>
+                      <div class="summary-cell">
+                        <span class="s-label">汇损率</span>
+                        <span class="s-value">{{ (agent.summary.汇损率 * 100)?.toFixed(4) }}%</span>
+                      </div>
+                      <div class="summary-cell">
+                        <span class="s-label">汇损</span>
+                        <span class="s-value">¥{{ agent.summary.汇损?.toFixed(2) }}</span>
+                      </div>
+                    </div>
+                    <div class="summary-total-row">
+                      <span class="s-total-label">综合成本总计</span>
+                      <span class="s-total-value">
+                        <span v-if="getAgentFeesCurrency(agent)" class="s-total-foreign">
+                          {{ getAgentFeesCurrency(agent) }}
+                          {{ (getAgentForeignSubtotal(agent, getAgentFeesCurrency(agent))
+                            + (agent.summary.税金 || 0)
+                            + (agent.summary.汇损 || 0)).toFixed(2) }} →
+                        </span>
+                        ¥{{ agent.summary.总计?.toFixed(2) }}
+                      </span>
+                    </div>
+                    <div v-if="agent.summary.备注" class="summary-remark">
+                      备注：{{ agent.summary.备注 }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -335,7 +410,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onActivated, watch } from 'vue'
+import { ref, reactive, onMounted, onActivated, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { getRoutes, getRouteDetail, deleteRoute, updateRoute } from '@/api/route'
@@ -363,6 +438,43 @@ const pagination = reactive({
   page_size: 10,
   total: 0
 })
+
+// 获取代理商费用的单一外币（仅看 fee_items + fee_total 的 原币金额，用于小计显示）
+const getAgentFeesCurrency = (agent) => {
+  const currencies = new Set()
+  agent.fee_items?.filter(i => i.备注 !== '__GROUP_HEADER__' && (i.原币金额 || 0) > 0)
+    .forEach(i => currencies.add(i.币种 || 'RMB'))
+  agent.fee_total?.filter(i => i.备注 !== '__GROUP_HEADER__' && (i.原币金额 || 0) > 0)
+    .forEach(i => currencies.add(i.币种 || 'RMB'))
+  const arr = Array.from(currencies)
+  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
+}
+
+// 计算费用原币总额
+const getAgentForeignSubtotal = (agent, currency) => {
+  let total = 0
+  agent.fee_items?.filter(i => i.备注 !== '__GROUP_HEADER__' && i.币种 === currency)
+    .forEach(i => { total += parseFloat(i.原币金额) || 0 })
+  agent.fee_total?.filter(i => i.备注 !== '__GROUP_HEADER__' && i.币种 === currency)
+    .forEach(i => { total += parseFloat(i.原币金额) || 0 })
+  return total
+}
+
+// 分组标题 span-method（费用明细表：6列）
+const feeItemsSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    return columnIndex === 0 ? [1, 6] : [0, 0]
+  }
+  return [1, 1]
+}
+
+// 分组标题 span-method（整单费用表：4列）
+const feeTotalSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    return columnIndex === 0 ? [1, 4] : [0, 0]
+  }
+  return [1, 1]
+}
 
 // 判断是否为新品（兼容多种数据类型）
 const isNewProduct = (value) => {
@@ -583,13 +695,18 @@ onActivated(() => {
 
 .agent-wrapper {
   margin-bottom: 20px;
+  border: 1px solid #e8f4ff;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(24, 144, 255, 0.06);
 }
 
 .detail-section {
-  margin-bottom: 20px;
-  padding: 16px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
   background: #fafafa;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .detail-section h3 {
@@ -675,10 +792,119 @@ onActivated(() => {
   font-weight: 500;
 }
 
-/* 总计样式 */
+/* 总计样式（保留兼容旧用法） */
 .total-amount {
   color: #f5222d;
   font-size: 18px;
   font-weight: 600;
+}
+
+/* ── 分组标题行 ─────────────────────────────────── */
+:deep(.group-header-row) td {
+  background: linear-gradient(90deg, #e6f0ff 0%, #f0f5ff 100%) !important;
+  border-top: 2px solid #91caff !important;
+  border-bottom: 2px solid #91caff !important;
+  padding: 0 !important;
+}
+
+.group-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1677ff;
+  letter-spacing: 0.5px;
+}
+
+.group-header-icon {
+  font-size: 9px;
+  color: #4096ff;
+}
+
+/* ── 费用汇总新样式 ──────────────────────────────── */
+.summary-section .detail-section {
+  background: #fff;
+}
+
+.summary-grid {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.summary-cell {
+  flex: 1;
+  min-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px;
+  border-right: 1px solid #f0f0f0;
+  gap: 4px;
+}
+
+.summary-cell:last-child {
+  border-right: none;
+}
+
+.s-label {
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+.s-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.s-foreign {
+  font-size: 11px;
+  color: #1677ff;
+  margin-right: 4px;
+  font-weight: 500;
+}
+
+.summary-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: linear-gradient(90deg, #fff7e6, #fffbe6);
+}
+
+.s-total-foreign {
+  font-size: 13px;
+  color: #1677ff;
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+.s-total-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #595959;
+}
+
+.s-total-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #d4380d;
+}
+
+.summary-remark {
+  padding: 6px 20px;
+  font-size: 12px;
+  color: #8c8c8c;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
 }
 </style>

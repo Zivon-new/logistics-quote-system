@@ -151,26 +151,49 @@
         <div class="section">
           <div class="section-header">
             <h4 class="section-title">费用明细</h4>
-            <el-button 
-              type="primary" 
-              size="small"
-              :icon="Plus"
-              @click="addFeeItem(agentIndex)"
-            >
-              添加费用
-            </el-button>
+            <div style="display:flex; gap:8px;">
+              <el-button
+                type="default"
+                size="small"
+                @click="addGroupHeader(agentIndex)"
+              >
+                + 分组标题
+              </el-button>
+              <el-button
+                type="primary"
+                size="small"
+                :icon="Plus"
+                @click="addFeeItem(agentIndex)"
+              >
+                添加费用
+              </el-button>
+            </div>
           </div>
 
-          <el-table 
+          <el-table
             v-if="agent.fee_items && agent.fee_items.length > 0"
+            :ref="el => onFeeItemTableRef(el, agentIndex)"
             :data="agent.fee_items"
             border
             size="small"
             class="fee-table"
+            :span-method="feeItemSpanMethod"
+            :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
           >
             <el-table-column label="费用类型" min-width="140">
               <template #default="scope">
-                <el-input 
+                <template v-if="scope.row.备注 === '__GROUP_HEADER__'">
+                  <div class="group-header-cell">
+                    <span class="group-header-icon">▶</span>
+                    <el-input
+                      v-model="scope.row.费用类型"
+                      placeholder="分组名称，如：DFW出口"
+                      size="small"
+                    />
+                  </div>
+                </template>
+                <el-input
+                  v-else
                   v-model="scope.row.费用类型"
                   placeholder="如：空运费"
                   size="small"
@@ -277,16 +300,14 @@
               </template>
             </el-table-column>
 
-            <el-table-column label="操作" width="70" align="center" fixed="right">
+            <el-table-column label="操作" width="70" align="center">
               <template #default="scope">
-                <el-button 
-                  type="danger" 
+                <el-button
+                  type="danger"
                   size="small"
                   link
                   @click="removeFeeItem(agentIndex, scope.$index)"
-                >
-                  删除
-                </el-button>
+                >删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -304,26 +325,49 @@
         <div class="section">
           <div class="section-header">
             <h4 class="section-title">整单费用（可选）</h4>
-            <el-button 
-              type="primary" 
-              size="small"
-              :icon="Plus"
-              @click="addFeeTotal(agentIndex)"
-            >
-              添加整单费用
-            </el-button>
+            <div style="display:flex; gap:8px;">
+              <el-button
+                type="default"
+                size="small"
+                @click="addFeeTotalGroupHeader(agentIndex)"
+              >
+                + 分组标题
+              </el-button>
+              <el-button
+                type="primary"
+                size="small"
+                :icon="Plus"
+                @click="addFeeTotal(agentIndex)"
+              >
+                添加整单费用
+              </el-button>
+            </div>
           </div>
 
-          <el-table 
+          <el-table
             v-if="agent.fee_total && agent.fee_total.length > 0"
+            :ref="el => onFeeTotalTableRef(el, agentIndex)"
             :data="agent.fee_total"
             border
             size="small"
             class="fee-table"
+            :span-method="feeTotalSpanMethod"
+            :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
           >
             <el-table-column label="费用名称" min-width="180">
               <template #default="scope">
-                <el-input 
+                <template v-if="scope.row.备注 === '__GROUP_HEADER__'">
+                  <div class="group-header-cell">
+                    <span class="group-header-icon">▶</span>
+                    <el-input
+                      v-model="scope.row.费用名称"
+                      placeholder="分组名称，如：新加坡进口"
+                      size="small"
+                    />
+                  </div>
+                </template>
+                <el-input
+                  v-else
                   v-model="scope.row.费用名称"
                   placeholder="如：报关费"
                   size="small"
@@ -402,17 +446,20 @@
 
         <!-- 费用汇总 -->
         <div class="section">
-          <h4 class="section-title">费用汇总</h4>
+          <h4 class="section-title">
+            费用汇总
+            <span v-if="forexReferenceDate" class="forex-date-tip">
+              （汇率参考日期：{{ forexReferenceDate }}）
+            </span>
+          </h4>
           <el-form :model="agent.summary" label-width="120px" class="summary-form">
             <el-row :gutter="16">
               <el-col :span="12">
                 <el-form-item label="小计">
                   <div class="amount-display">
-                    <template v-for="(amount, currency) in calculateSubtotalByCurrency(agent)" :key="currency">
-                      <span v-if="currency !== 'RMB'" class="original-amount">
-                        {{ currency }} {{ amount.toFixed(2) }} →
-                      </span>
-                    </template>
+                    <span v-if="getFeesCurrency(agent)" class="original-amount">
+                      {{ getFeesCurrency(agent) }} {{ calculateSubtotalByCurrency(agent)[getFeesCurrency(agent)]?.toFixed(2) }} →
+                    </span>
                     <span class="rmb-amount">¥{{ calculateSubtotal(agent).toFixed(2) }}</span>
                   </div>
                 </el-form-item>
@@ -438,8 +485,8 @@
               <el-col :span="12">
                 <el-form-item label="税金">
                   <div class="amount-display">
-                    <span v-if="routeValueCurrency !== 'RMB'" class="original-amount">
-                      {{ routeValueCurrency }} {{ calculateTaxOriginal(agent).toFixed(2) }} →
+                    <span v-if="getCargoCurrency()" class="original-amount">
+                      {{ getCargoCurrency() }} {{ calculateTaxOriginal(agent).toFixed(2) }} →
                     </span>
                     <span class="rmb-amount">¥{{ calculateTax(agent).toFixed(2) }}</span>
                   </div>
@@ -466,8 +513,8 @@
               <el-col :span="12">
                 <el-form-item label="汇损">
                   <div class="amount-display">
-                    <span v-if="routeValueCurrency !== 'RMB'" class="original-amount">
-                      {{ routeValueCurrency }} {{ calculateLossOriginal(agent).toFixed(2) }} →
+                    <span v-if="getCargoCurrency()" class="original-amount">
+                      {{ getCargoCurrency() }} {{ calculateLossOriginal(agent).toFixed(2) }} →
                     </span>
                     <span class="rmb-amount">¥{{ calculateLoss(agent).toFixed(2) }}</span>
                   </div>
@@ -477,6 +524,14 @@
               <el-col :span="12">
                 <el-form-item label="总计">
                   <div class="amount-display">
+                    <span v-if="getQuoteSingleCurrency(agent)" class="original-amount">
+                      {{ getQuoteSingleCurrency(agent) }}
+                      {{ (
+                        (calculateSubtotalByCurrency(agent)[getQuoteSingleCurrency(agent)] || 0)
+                        + calculateTaxOriginal(agent)
+                        + calculateLossOriginal(agent)
+                      ).toFixed(2) }} →
+                    </span>
                     <span class="total-amount">¥{{ calculateTotal(agent).toFixed(2) }}</span>
                   </div>
                 </el-form-item>
@@ -516,9 +571,10 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onBeforeUnmount, nextTick } from 'vue'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import Sortable from 'sortablejs'
 
 const props = defineProps({
   modelValue: {
@@ -554,6 +610,76 @@ const exchangeRates = reactive({
   'JPY': 0.05,
   'MYR': 1.6
 })
+const forexReferenceDate = ref('')  // 汇率参考日期
+
+// ── 拖拽排序 ──────────────────────────────────────────────
+const sortableMap = new Map() // key: 'fi-{agentIndex}' | 'ft-{agentIndex}'
+
+const createSortable = (key, tableEl, items) => {
+  // 先清理旧实例（无论后续是否成功创建，都要删除，避免 map 里留着 el=null 的废实例）
+  if (sortableMap.has(key)) {
+    try { sortableMap.get(key).destroy() } catch {}
+    sortableMap.delete(key)
+  }
+  if (!tableEl?.$el) return
+  const tbody = tableEl.$el.querySelector('.el-table__body-wrapper tbody')
+    || tableEl.$el.querySelector('tbody')  // 兼容不同版本 Element Plus
+  if (!tbody) return
+
+  let dragNextSibling = null  // 拖拽开始前保存原位置的下一个兄弟节点
+
+  try {
+  sortableMap.set(key, Sortable.create(tbody, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onStart ({ oldIndex }) {
+      // 记录被拖行原来的下一个兄弟，用于还原 DOM
+      dragNextSibling = tbody.children[oldIndex + 1] || null
+    },
+    onEnd ({ newIndex, oldIndex, item }) {
+      if (newIndex === oldIndex) return
+      // 第一步：把 Sortable 对 DOM 的移动还原（让 Vue 作为唯一的 DOM 修改方）
+      tbody.insertBefore(item, dragNextSibling)
+      // 第二步：更新数据，Vue re-render 会把行放到正确位置
+      const [moved] = items.splice(oldIndex, 1)
+      items.splice(newIndex, 0, moved)
+    }
+  }))
+  } catch (e) {
+    console.warn('[Sortable] 初始化失败:', e)
+    sortableMap.delete(key)
+  }
+}
+
+const onFeeItemTableRef = (el, agentIndex) => {
+  if (el) nextTick(() => createSortable(`fi-${agentIndex}`, el, props.modelValue[agentIndex].fee_items))
+  else {
+    try { sortableMap.get(`fi-${agentIndex}`)?.destroy() } catch {}
+    sortableMap.delete(`fi-${agentIndex}`)
+  }
+}
+
+const onFeeTotalTableRef = (el, agentIndex) => {
+  if (el) nextTick(() => createSortable(`ft-${agentIndex}`, el, props.modelValue[agentIndex].fee_total))
+  else {
+    try { sortableMap.get(`ft-${agentIndex}`)?.destroy() } catch {}
+    sortableMap.delete(`ft-${agentIndex}`)
+  }
+}
+
+onBeforeUnmount(() => {
+  sortableMap.forEach(s => { try { s.destroy() } catch {} })
+  sortableMap.clear()
+})
+
+// 整单费用 span-method（6列，分组标题行横跨前5列）
+const feeTotalSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    if (columnIndex === 0) return [1, 5]
+    if (columnIndex < 5) return [0, 0]
+  }
+  return [1, 1]
+}
 
 // 页面加载时从后端获取最新汇率
 import { getExchangeRates } from '@/api/route'
@@ -562,7 +688,7 @@ const loadExchangeRates = async () => {
     const res = await getExchangeRates()
     if (res.success && res.data) {
       Object.assign(exchangeRates, res.data)
-      console.log('✅ 汇率已从后端加载:', exchangeRates)
+      if (res.reference_date) forexReferenceDate.value = res.reference_date
     }
   } catch (e) {
     console.warn('⚠️ 获取汇率失败，使用默认值')
@@ -601,6 +727,32 @@ const removeAgent = (index) => {
   props.modelValue.splice(index, 1)
 }
 
+// 费用明细表格 span-method：分组标题行横跨前8列，只保留操作列
+const feeItemSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    if (columnIndex === 0) return [1, 8]
+    if (columnIndex < 8) return [0, 0]
+  }
+  return [1, 1]
+}
+
+// 添加分组标题行
+const addGroupHeader = (agentIndex) => {
+  if (!props.modelValue[agentIndex].fee_items) {
+    props.modelValue[agentIndex].fee_items = []
+  }
+  props.modelValue[agentIndex].fee_items.push({
+    费用类型: '分组名称',
+    单价: 0,
+    单位: '',
+    数量: 0,
+    币种: 'RMB',
+    原币金额: 0,
+    人民币金额: 0,
+    备注: '__GROUP_HEADER__'
+  })
+}
+
 // 添加费用明细
 const addFeeItem = (agentIndex) => {
   if (!props.modelValue[agentIndex].fee_items) {
@@ -622,6 +774,20 @@ const addFeeItem = (agentIndex) => {
 // 删除费用明细
 const removeFeeItem = (agentIndex, feeIndex) => {
   props.modelValue[agentIndex].fee_items.splice(feeIndex, 1)
+}
+
+// 添加整单费用分组标题行
+const addFeeTotalGroupHeader = (agentIndex) => {
+  if (!props.modelValue[agentIndex].fee_total) {
+    props.modelValue[agentIndex].fee_total = []
+  }
+  props.modelValue[agentIndex].fee_total.push({
+    费用名称: '分组名称',
+    原币金额: 0,
+    币种: 'RMB',
+    人民币金额: 0,
+    备注: '__GROUP_HEADER__'
+  })
 }
 
 // 添加整单费用
@@ -686,15 +852,18 @@ const calculateRMB = (feeItem) => {
   return originalAmount * rate
 }
 
-// 按币种统计原币小计（用于展示）
+// 按币种统计原币小计（用于展示），跳过分组标题行
 const calculateSubtotalByCurrency = (agent) => {
   const byCurrency = {}
   const add = (currency, amount) => {
+    if (!amount) return
     currency = currency || 'RMB'
     byCurrency[currency] = (byCurrency[currency] || 0) + amount
   }
   if (agent.fee_items) {
-    agent.fee_items.forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
+    agent.fee_items
+      .filter(item => item.备注 !== '__GROUP_HEADER__')
+      .forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
   }
   if (agent.fee_total) {
     agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
@@ -702,11 +871,36 @@ const calculateSubtotalByCurrency = (agent) => {
   return byCurrency
 }
 
-// 计算小计（人民币合计）
+// 仅看费用（fee_items + fee_total）的单一外币，用于「小计」行显示
+const getFeesCurrency = (agent) => {
+  const byCurrency = calculateSubtotalByCurrency(agent)
+  const arr = Object.keys(byCurrency).filter(c => byCurrency[c] > 0)
+  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
+}
+
+// 货值的外币，用于「税金/汇损」行显示
+const getCargoCurrency = () => {
+  const currency = props.routeValueCurrency || 'RMB'
+  return (parseFloat(props.routeValue) || 0) > 0 && currency !== 'RMB' ? currency : null
+}
+
+// 费用+货值全部是同一外币时返回该币种，用于「总计」行显示
+const getQuoteSingleCurrency = (agent) => {
+  const byCurrency = calculateSubtotalByCurrency(agent)
+  const allCurrencies = new Set(Object.keys(byCurrency).filter(c => byCurrency[c] > 0))
+  const routeCurrency = props.routeValueCurrency || 'RMB'
+  if ((parseFloat(props.routeValue) || 0) > 0) allCurrencies.add(routeCurrency)
+  const arr = Array.from(allCurrencies)
+  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
+}
+
+// 计算小计（人民币合计），跳过分组标题行
 const calculateSubtotal = (agent) => {
   let total = 0
   if (agent.fee_items) {
-    total += agent.fee_items.reduce((sum, item) => sum + calculateRMB(item), 0)
+    total += agent.fee_items
+      .filter(item => item.备注 !== '__GROUP_HEADER__')
+      .reduce((sum, item) => sum + calculateRMB(item), 0)
   }
   if (agent.fee_total) {
     total += agent.fee_total.reduce((sum, item) => sum + calculateRMB(item), 0)
@@ -846,6 +1040,13 @@ defineExpose({
   color: #262626;
 }
 
+.forex-date-tip {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+  margin-left: 8px;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
@@ -855,6 +1056,32 @@ defineExpose({
 
 .fee-table {
   margin-top: 12px;
+}
+
+.fee-table :deep(.group-header-row) td {
+  background-color: #f0f5ff !important;
+  cursor: grab;
+}
+
+.fee-table :deep(tr:not(.group-header-row)) {
+  cursor: grab;
+}
+
+.group-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-header-icon {
+  color: #1890ff;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+:deep(.sortable-ghost) {
+  opacity: 0.4;
+  background: #d6e4ff !important;
 }
 
 .summary-form {

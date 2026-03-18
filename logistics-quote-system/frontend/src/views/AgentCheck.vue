@@ -95,6 +95,22 @@
               <el-icon style="font-size:60px;color:#d9d9d9"><Notebook /></el-icon>
             </template>
           </el-empty>
+          <!-- 功能定位说明 -->
+          <el-alert
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px;"
+          >
+            <template #title>
+              <span style="font-weight:600;">功能说明</span>
+            </template>
+            <div style="font-size:13px; line-height:1.8; margin-top:4px;">
+              本模块基于您<strong>粘贴提供的文本</strong>进行结构化解析与风险推理，
+              不主动爬取天眼查、企查查等外部数据库。
+              建议先在工商信息平台查询目标公司，将相关信息复制后粘贴至下方输入框。
+            </div>
+          </el-alert>
+
           <!-- 使用说明 -->
           <div class="usage-guide">
             <div class="usage-title">使用方法</div>
