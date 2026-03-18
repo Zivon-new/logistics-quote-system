@@ -156,21 +156,40 @@ def get_recommendations(
     dest_name = lpi_info["国家中文名"] if lpi_info else None
 
     # ── 3. 归一化打分 ─────────────────────────────────────────────────
+    # 先计算单价/kg，价格评分以单价/kg为准（消除货重差异）
+    for r in records:
+        peso = float(r["计费重量"]) if r["计费重量"] else None
+        total_price = float(r["总价"]) if r["总价"] is not None else None
+        if peso and peso > 0 and total_price is not None:
+            r["单价_per_kg"] = round(total_price / peso, 2)
+        else:
+            r["单价_per_kg"] = None
+        r["总价"] = round(total_price, 2) if total_price is not None else None
+        r["计费重量"] = peso
+        r["信用评分"] = float(r["信用评分"]) if r["信用评分"] else None
+        r["是否赔付"] = int(r["是否赔付"]) if r["是否赔付"] is not None else 0
+        r["交易开始日期"] = str(r["交易开始日期"]) if r["交易开始日期"] else None
+
     times = [r["时效天数"] for r in records if r["时效天数"] is not None]
-    prices = [float(r["总价"]) for r in records if r["总价"] is not None]
+    # 价格归一化：优先用单价/kg，无重量数据时降级用总价
+    per_kg_prices = [r["单价_per_kg"] for r in records if r["单价_per_kg"] is not None]
+    raw_prices = [r["总价"] for r in records if r["总价"] is not None]
 
     min_time, max_time = (min(times), max(times)) if times else (None, None)
-    min_price, max_price = (min(prices), max(prices)) if prices else (None, None)
+    if per_kg_prices:
+        min_price, max_price = min(per_kg_prices), max(per_kg_prices)
+        use_per_kg = True
+    else:
+        min_price, max_price = (min(raw_prices), max(raw_prices)) if raw_prices else (None, None)
+        use_per_kg = False
 
     lpi_score = _lpi_to_score(dest_lpi)
 
     for r in records:
         time_s = _normalize_inverse(r["时效天数"], min_time, max_time)
-        price_s = _normalize_inverse(
-            float(r["总价"]) if r["总价"] is not None else None,
-            min_price, max_price
-        )
-        credit_s = float(r["信用评分"]) if r["信用评分"] else 60.0
+        price_val = r["单价_per_kg"] if use_per_kg else r["总价"]
+        price_s = _normalize_inverse(price_val, min_price, max_price)
+        credit_s = r["信用评分"] if r["信用评分"] else 60.0
 
         total = round(time_s * 0.3 + price_s * 0.3 + lpi_score * 0.2 + credit_s * 0.2, 1)
 
@@ -182,28 +201,16 @@ def get_recommendations(
         }
         r["综合评分"] = total
 
-        # 单价/kg（有计费重量且有总价时计算）
-        peso = float(r["计费重量"]) if r["计费重量"] else None
-        total_price = float(r["总价"]) if r["总价"] is not None else None
-        if peso and peso > 0 and total_price is not None:
-            r["单价_per_kg"] = round(total_price / peso, 2)
-        else:
-            r["单价_per_kg"] = None
-
-        # 数据类型统一
-        r["总价"] = round(total_price, 2) if total_price is not None else None
-        r["信用评分"] = float(r["信用评分"]) if r["信用评分"] else None
-        r["计费重量"] = float(r["计费重量"]) if r["计费重量"] else None
-        r["是否赔付"] = int(r["是否赔付"]) if r["是否赔付"] is not None else 0
-        r["交易开始日期"] = str(r["交易开始日期"]) if r["交易开始日期"] else None
-
     # ── 4. 排序 ──────────────────────────────────────────────────────
     if sort_by == "time":
         # 时效天数升序（NULL排最后）
         records.sort(key=lambda x: (x["时效天数"] is None, x["时效天数"] or 9999))
     elif sort_by == "price":
-        # 总价升序（NULL排最后）
-        records.sort(key=lambda x: (x["总价"] is None, x["总价"] or 9999999))
+        # 单价/kg升序（无重量数据则用总价，NULL排最后）
+        records.sort(key=lambda x: (
+            x["单价_per_kg"] is None and x["总价"] is None,
+            x["单价_per_kg"] if x["单价_per_kg"] is not None else (x["总价"] or 9999999)
+        ))
     else:
         # 默认：综合评分降序
         records.sort(key=lambda x: x["综合评分"], reverse=True)

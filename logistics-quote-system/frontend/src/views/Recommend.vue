@@ -145,12 +145,12 @@
           <el-radio-group v-model="sortBy" @change="handleSortChange" class="sort-group">
             <el-radio-button value="score">综合评分</el-radio-button>
             <el-radio-button value="time">时效优先</el-radio-button>
-            <el-radio-button value="price">价格优先</el-radio-button>
+            <el-radio-button value="price">单价/kg优先</el-radio-button>
           </el-radio-group>
           <div class="sort-tip">
             <span v-if="sortBy === 'score'">按综合加权评分排序</span>
             <span v-else-if="sortBy === 'time'">按时效天数升序</span>
-            <span v-else>按报价总价升序</span>
+            <span v-else>按单价/kg升序（货重不同时更公平）</span>
           </div>
         </el-card>
       </div>
@@ -213,15 +213,21 @@
                 </div>
               </div>
               <div class="metric-item">
-                <div class="metric-label">总价 (RMB)</div>
-                <div class="metric-value price-val">
-                  {{ item.总价 != null ? '¥ ' + item.总价.toLocaleString() : '—' }}
+                <div class="metric-label">
+                  单价/kg
+                  <el-tooltip content="评分和排序均基于单价/kg，消除不同货重的干扰" placement="top">
+                    <el-icon style="font-size:11px;color:#8c8c8c;cursor:help;vertical-align:middle"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </div>
+                <div class="metric-value unit-primary-val">
+                  {{ item.单价_per_kg != null ? '¥ ' + item.单价_per_kg + ' /kg' : '—' }}
                 </div>
               </div>
               <div class="metric-item">
-                <div class="metric-label">单价/kg</div>
-                <div class="metric-value unit-val">
-                  {{ item.单价_per_kg != null ? '¥ ' + item.单价_per_kg : '—' }}
+                <div class="metric-label">总价</div>
+                <div class="metric-value price-val">
+                  {{ item.总价 != null ? '¥ ' + item.总价.toLocaleString() : '—' }}
+                  <span v-if="item.计费重量" class="weight-tag">{{ item.计费重量 }}kg</span>
                 </div>
               </div>
               <div class="metric-item">
@@ -276,7 +282,7 @@
           </div>
           <div class="explain-item">
             <el-tag type="success" size="small">价格 30%</el-tag>
-            <span>历史报价总额，越低越高；无记录给60分</span>
+            <span>历史报价单价/kg，越低越高；无重量数据时用总价代替</span>
           </div>
           <div class="explain-item">
             <el-tag type="warning" size="small">LPI 20%</el-tag>
@@ -494,8 +500,9 @@ const scoreDims = (item) => [
 .metric-label { font-size: 12px; color: #8c8c8c; width: 72px; flex-shrink: 0; }
 .metric-value { font-size: 13px; color: #262626; }
 .time-val { font-weight: 600; color: #096dd9; }
-.price-val { font-weight: 600; color: #d4380d; }
-.unit-val { color: #ad6800; }
+.price-val { color: #8c8c8c; font-size: 12px; }
+.unit-primary-val { font-weight: 700; color: #d4380d; font-size: 15px; }
+.weight-tag { font-size: 11px; color: #bfbfbf; margin-left: 4px; }
 .date-val { color: #8c8c8c; }
 
 /* 评分列 */
