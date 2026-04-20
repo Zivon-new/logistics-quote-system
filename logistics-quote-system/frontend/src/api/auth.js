@@ -2,6 +2,16 @@
 import request from '@/utils/request'
 
 /**
+ * 获取验证码
+ */
+export function getCaptcha() {
+  return request({
+    url: '/v1/auth/captcha',
+    method: 'get'
+  })
+}
+
+/**
  * 用户登录
  */
 export function login(data) {

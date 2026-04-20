@@ -2,11 +2,21 @@
 """
 FastAPI应用主入口
 """
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from .config import settings
 from .api.v1 import api_router
+
+logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -25,6 +35,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 挂载限速器
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 注册API路由
 app.include_router(api_router, prefix="/api")
@@ -50,13 +64,23 @@ async def health_check():
 
 
 # 全局异常处理
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """请求参数校验失败 → 400"""
+    return JSONResponse(status_code=400, content={"detail": exc.errors()})
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """已知 HTTP 异常（4xx/5xx）透传"""
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """全局异常处理器"""
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)}
-    )
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """未预期异常 → 500，记录日志"""
+    logger.error(f"未处理异常 {request.method} {request.url}: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
 
 
 if __name__ == "__main__":

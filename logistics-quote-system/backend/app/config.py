@@ -14,11 +14,11 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     
-    # 数据库配置
+    # 数据库配置（从 .env 读取，无默认密码）
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
     DB_USER: str = "root"
-    DB_PASSWORD: str = "JHL181116"
+    DB_PASSWORD: str
     DB_NAME: str = "price_test_v2"
     
     # 数据库连接URL
@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     # 智谱 GLM API
     ZHIPU_API_KEY: str = ""
 
-    # JWT配置
-    SECRET_KEY: str = "your-secret-key-change-in-production-jhl181116"
+    # JWT配置（从 .env 读取，无默认值）
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24小时
     

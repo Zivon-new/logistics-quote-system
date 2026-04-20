@@ -73,11 +73,15 @@ const routes = [
     path: '/route-manage/edit/:id',
     name: 'EditRoute',
     component: () => import('@/views/NewRoute/index.vue'),
-    meta: { 
+    meta: {
       title: '编辑路线',
       requiresAuth: true,
       requiresAdmin: true
     }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/dashboard'
   }
 ]
 

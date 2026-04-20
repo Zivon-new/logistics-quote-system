@@ -28,6 +28,8 @@ xlrd>=2.0.0
 
 # 工具
 python-dotenv==1.0.0
+slowapi==0.1.9
+Pillow>=10.0.0
 
 # 原有依赖（从你的scripts）
 zhipuai>=2.0.0

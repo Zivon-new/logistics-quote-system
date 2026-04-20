@@ -18,6 +18,9 @@ from ...models.user import User
 from ...models.route import Route, RouteAgent
 from pathlib import Path
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/routes", tags=["路线管理"])
 
@@ -300,15 +303,15 @@ async def create_full_route(
     import traceback
     
     try:
-        print(f"\n{'='*80}")
-        print(f"🆕 create_full_route 开始执行")
-        print(f"时间: {datetime.now()}")
-        print(f"接收到的数据keys: {list(data.keys())}")
+        logger.debug(f"\n{'='*80}")
+        logger.debug(f"🆕 create_full_route 开始执行")
+        logger.debug(f"时间: {datetime.now()}")
+        logger.debug(f"接收到的数据keys: {list(data.keys())}")
         
         # 第一步：创建路线
         route_data = data.get('route', {})
-        print(f"\n【第一步】创建路线基本信息...")
-        print(f"  route_data: {route_data}")
+        logger.debug(f"\n【第一步】创建路线基本信息...")
+        logger.debug(f"  route_data: {route_data}")
         
         # 清理不需要的字段
         for bad_key in ['路线ID', '创建时间']:
@@ -318,13 +321,13 @@ async def create_full_route(
         db.add(new_route)
         db.flush()
         route_id = new_route.路线ID
-        print(f"  ✅ 路线已创建，ID={route_id}")
+        logger.debug(f"  ✅ 路线已创建，ID={route_id}")
         
         # 第二步：创建代理商
         from ...models.fee import FeeItem, FeeTotal, Summary
         
         if 'agents' in data:
-            print(f"\n【第二步】创建代理商...")
+            logger.debug(f"\n【第二步】创建代理商...")
             agents = data['agents']
             
             # 去重代理商
@@ -413,29 +416,29 @@ async def create_full_route(
                         '备注':        summary_data.get('备注') or '',
                     })
             
-            print(f"  ✅ 已创建 {len(agent_map)} 个代理商")
+            logger.debug(f"  ✅ 已创建 {len(agent_map)} 个代理商")
         
         # 第三步：创建货物明细
         from ...models.goods import GoodsDetail, GoodsTotal
         
         if 'goods_details' in data:
-            print(f"\n【第三步】创建货物明细...")
+            logger.debug(f"\n【第三步】创建货物明细...")
             for goods in data['goods_details']:
                 for bad_key in ['货物ID', '路线ID', '创建时间']:
                     goods.pop(bad_key, None)
                 db.add(GoodsDetail(路线ID=route_id, **goods))
-            print(f"  ✅ 已创建 {len(data['goods_details'])} 个货物明细")
+            logger.debug(f"  ✅ 已创建 {len(data['goods_details'])} 个货物明细")
         
         if 'goods_total' in data:
-            print(f"\n【第四步】创建整单货物...")
+            logger.debug(f"\n【第四步】创建整单货物...")
             for goods in data['goods_total']:
                 for bad_key in ['整单货物ID', '路线ID', '创建时间']:
                     goods.pop(bad_key, None)
                 db.add(GoodsTotal(路线ID=route_id, **goods))
-            print(f"  ✅ 已创建 {len(data['goods_total'])} 个整单货物")
+            logger.debug(f"  ✅ 已创建 {len(data['goods_total'])} 个整单货物")
         
         db.commit()
-        print(f"\n✅ 路线创建成功！route_id={route_id}")
+        logger.debug(f"\n✅ 路线创建成功！route_id={route_id}")
         
         # 保护性写回（防止触发器覆盖手动值）
         route_data = data.get('route', {})
@@ -462,9 +465,9 @@ async def create_full_route(
             """)
             db.execute(protect_sql, protect_params)
             db.commit()
-            print(f"  保护性写回完成")
+            logger.debug(f"  保护性写回完成")
         
-        print(f"{'='*80}\n")
+        logger.debug(f"{'='*80}\n")
         
         return {
             "success": True,
@@ -474,11 +477,8 @@ async def create_full_route(
         
     except Exception as e:
         db.rollback()
-        print(f"\n❌ 创建失败:")
-        print(f"  错误: {str(e)}")
-        print(f"  堆栈:")
-        print(traceback.format_exc())
-        print(f"{'='*80}\n")
+        logger.error(f"create_full_route 失败: {str(e)}", exc_info=True)
+        logger.debug(f"{'='*80}\n")
         raise HTTPException(status_code=500, detail=f"创建失败: {str(e)}")
 
 
@@ -499,15 +499,15 @@ async def update_route(
     import traceback
     
     try:
-        print(f"\n{'='*80}")
-        print(f"🔧 update_route 开始执行")
-        print(f"时间: {datetime.now()}")
-        print(f"路线ID: {route_id}")
+        logger.debug(f"\n{'='*80}")
+        logger.debug(f"🔧 update_route 开始执行")
+        logger.debug(f"时间: {datetime.now()}")
+        logger.debug(f"路线ID: {route_id}")
         
         # ============================================================
         # 第一阶段：更新路线基本信息（独立事务）
         # ============================================================
-        print(f"\n【第一阶段】更新路线基本信息...")
+        logger.debug(f"\n【第一阶段】更新路线基本信息...")
         
         check_sql = text("SELECT COUNT(*) FROM routes WHERE `路线ID` = :route_id")
         result = db.execute(check_sql, {"route_id": route_id})
@@ -522,7 +522,7 @@ async def update_route(
             FROM routes WHERE `路线ID` = :route_id
         """)
         before_data = db.execute(before_sql, {"route_id": route_id}).fetchone()
-        print(f"  更新前: 实际重量={before_data[1]}, 计费重量={before_data[2]}, 总体积={before_data[3]}, 货值={before_data[4]}")
+        logger.debug(f"  更新前: 实际重量={before_data[1]}, 计费重量={before_data[2]}, 总体积={before_data[3]}, 货值={before_data[4]}")
         
         # 构建UPDATE语句
         # 注意：交易年份和交易月份是GENERATED列，不能UPDATE
@@ -560,10 +560,10 @@ async def update_route(
             """)
             db.execute(update_sql, update_params)
             db.commit()  # ✅ 立即commit
-            print(f"  ✅ 路线基本信息已更新并COMMIT")
+            logger.debug(f"  ✅ 路线基本信息已更新并COMMIT")
             
             verify_data = db.execute(before_sql, {"route_id": route_id}).fetchone()
-            print(f"  更新后: 实际重量={verify_data[1]}, 计费重量={verify_data[2]}, 总体积={verify_data[3]}, 货值={verify_data[4]}")
+            logger.debug(f"  更新后: 实际重量={verify_data[1]}, 计费重量={verify_data[2]}, 总体积={verify_data[3]}, 货值={verify_data[4]}")
         
         # ============================================================
         # 第二阶段：更新代理商
@@ -571,7 +571,7 @@ async def update_route(
         from ...models.fee import FeeItem, FeeTotal, Summary
         
         if 'agents' in data:
-            print(f"\n【第二阶段】更新代理商...")
+            logger.debug(f"\n【第二阶段】更新代理商...")
             
             old_agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
             for old_agent in old_agents:
@@ -663,7 +663,7 @@ async def update_route(
                         '备注':        summary_data.get('备注') or '',
                     })
             
-            print(f"  ✅ 已更新 {len(agent_map)} 个代理商")
+            logger.debug(f"  ✅ 已更新 {len(agent_map)} 个代理商")
         
         # ============================================================
         # 第三阶段：更新货物（关键优化：先INSERT后DELETE）
@@ -671,7 +671,7 @@ async def update_route(
         from ...models.goods import GoodsDetail, GoodsTotal
         
         if 'goods_details' in data:
-            print(f"\n【第三阶段】更新货物明细（先INSERT后DELETE）...")
+            logger.debug(f"\n【第三阶段】更新货物明细（先INSERT后DELETE）...")
             
             # ✅ 关键修复：先INSERT新数据
             new_goods_list = []
@@ -683,17 +683,17 @@ async def update_route(
                 db.add(new_goods)
             
             db.flush()  # flush让INSERT生效
-            print(f"  ✅ 已INSERT {len(new_goods_list)} 个新货物明细")
+            logger.debug(f"  ✅ 已INSERT {len(new_goods_list)} 个新货物明细")
             
             # ✅ 再DELETE旧数据（此时goods表不为空，触发器不会把routes改成0）
             db.query(GoodsDetail).filter(
                 GoodsDetail.路线ID == route_id,
                 ~GoodsDetail.货物ID.in_([g.货物ID for g in new_goods_list])
             ).delete(synchronize_session=False)
-            print(f"  ✅ 已DELETE旧货物明细")
+            logger.debug(f"  ✅ 已DELETE旧货物明细")
         
         if 'goods_total' in data:
-            print(f"\n【第四阶段】更新整单货物（先INSERT后DELETE）...")
+            logger.debug(f"\n【第四阶段】更新整单货物（先INSERT后DELETE）...")
             
             # ✅ 关键修复：先INSERT新数据
             new_goods_list = []
@@ -705,17 +705,17 @@ async def update_route(
                 db.add(new_goods)
             
             db.flush()
-            print(f"  ✅ 已INSERT {len(new_goods_list)} 个新整单货物")
+            logger.debug(f"  ✅ 已INSERT {len(new_goods_list)} 个新整单货物")
             
             # ✅ 再DELETE旧数据
             db.query(GoodsTotal).filter(
                 GoodsTotal.路线ID == route_id,
                 ~GoodsTotal.整单货物ID.in_([g.整单货物ID for g in new_goods_list])
             ).delete(synchronize_session=False)
-            print(f"  ✅ 已DELETE旧整单货物")
+            logger.debug(f"  ✅ 已DELETE旧整单货物")
         
         db.commit()
-        print(f"\n✅ 主事务已COMMIT")
+        logger.debug(f"\n✅ 主事务已COMMIT")
         
         # ============================================================
         # 第五阶段：保护性写回（独立事务，在所有触发器执行完毕后）
@@ -745,9 +745,9 @@ async def update_route(
             """)
             db.execute(protect_sql, protect_params)
             db.commit()
-            print(f"【第五阶段】保护性写回完成: {protect_params}")
-        print(f"\n✅ 所有更新已完成并COMMIT")
-        print(f"{'='*80}\n")
+            logger.debug(f"【第五阶段】保护性写回完成: {protect_params}")
+        logger.debug(f"\n✅ 所有更新已完成并COMMIT")
+        logger.debug(f"{'='*80}\n")
         
         return {
             "success": True,
@@ -759,11 +759,8 @@ async def update_route(
         raise
     except Exception as e:
         db.rollback()
-        print(f"\n❌ 更新失败:")
-        print(f"  错误: {str(e)}")
-        print(f"  堆栈:")
-        print(traceback.format_exc())
-        print(f"{'='*80}\n")
+        logger.error(f"update_route 失败 route_id={route_id}: {str(e)}", exc_info=True)
+        logger.debug(f"{'='*80}\n")
         raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")
 
 

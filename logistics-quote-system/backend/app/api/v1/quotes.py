@@ -4,7 +4,7 @@
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from typing import Optional, List, Dict
 from datetime import date
 from ...core.deps import get_db, get_current_user
@@ -169,6 +169,19 @@ async def search_quotes(
     # ✅ 修改：按交易开始日期倒序（最新的交易在前）
     results = query.order_by(Route.交易开始日期.desc()).offset(skip).limit(page_size).all()
     
+    # 批量预加载所有 Summary，避免循环内 N+1 查询
+    all_agent_ids = [agent.代理路线ID for route in results for agent in route.agents]
+    summary_map: Dict[int, Summary] = {}
+    if all_agent_ids:
+        latest_subq = (
+            db.query(Summary.代理路线ID, func.max(Summary.汇总ID).label("max_id"))
+            .filter(Summary.代理路线ID.in_(all_agent_ids))
+            .group_by(Summary.代理路线ID)
+            .subquery()
+        )
+        for s in db.query(Summary).join(latest_subq, Summary.汇总ID == latest_subq.c.max_id).all():
+            summary_map[s.代理路线ID] = s
+
     # 手动序列化所有数据
     quote_results = []
     for route in results:
@@ -244,11 +257,7 @@ async def search_quotes(
                 agent_dict["fee_total"].append(fee_total_dict)
                 total_fee += float(fee_total_item.人民币金额) if fee_total_item.人民币金额 else 0.00
             
-            # ✅ 修复：直接查询最新的 summary（ORDER BY 汇总ID DESC）
-            # 不使用 agent.summary（relationship），避免多条记录时取到错误的第一条
-            best_summary = db.query(Summary).filter(
-                Summary.代理路线ID == agent.代理路线ID
-            ).order_by(Summary.汇总ID.desc()).first()
+            best_summary = summary_map.get(agent.代理路线ID)
             
             if best_summary:
                 agent_dict["summary"] = {

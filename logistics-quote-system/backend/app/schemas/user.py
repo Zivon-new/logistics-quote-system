@@ -54,6 +54,8 @@ class LoginRequest(BaseModel):
     """登录请求Schema"""
     username: str = Field(..., description="用户名")
     password: str = Field(..., description="密码")
+    captcha_id: str = Field(..., description="验证码ID")
+    captcha_answer: str = Field(..., min_length=1, max_length=10, description="验证码答案")
 
 
 class LoginResponse(BaseModel):
