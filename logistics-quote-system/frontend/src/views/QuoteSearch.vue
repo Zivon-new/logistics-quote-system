@@ -473,6 +473,12 @@
             </div>
           </el-col>
         </el-row>
+
+        <!-- 附件区 -->
+        <div class="detail-section" style="margin-top:16px" v-if="currentRoute">
+          <h3>路线附件</h3>
+          <AttachmentPanel :route-id="currentRoute.路线ID" />
+        </div>
       </div>
     </el-dialog>
 
@@ -543,6 +549,7 @@ import { ElMessage } from 'element-plus'
 import { Search, Refresh, Download, Histogram, Tickets, Warning } from '@element-plus/icons-vue'
 import { searchQuotes } from '@/api/quote'
 import { getSearchOptions } from '@/api/recommend'
+import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
 const route = useRoute()
 const loading = ref(false)
