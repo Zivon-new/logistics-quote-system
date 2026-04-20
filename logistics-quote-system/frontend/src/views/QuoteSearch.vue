@@ -417,8 +417,21 @@
                 <el-table-column label="数量" width="60" align="right">
                   <template #default="{ row }">{{ Number(row.数量).toFixed(0) }}</template>
                 </el-table-column>
+                <el-table-column label="最低收费" width="90" align="right">
+                  <template #default="{ row }">
+                    <span v-if="row.最低收费" style="color:#8c8c8c;font-size:12px">
+                      min {{ row.最低收费 }} {{ row.币种 }}
+                    </span>
+                    <span v-else class="dim">—</span>
+                  </template>
+                </el-table-column>
                 <el-table-column label="原币金额" width="100" align="right">
-                  <template #default="{ row }">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</template>
+                  <template #default="{ row }">
+                    <el-tooltip v-if="row.最低收费 && row.原币金额 >= row.最低收费 && (row.单价 * row.数量) < row.最低收费" content="已应用最低收费" placement="top">
+                      <span style="color:#fa8c16;font-weight:600">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</span>
+                    </el-tooltip>
+                    <span v-else>{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</span>
+                  </template>
                 </el-table-column>
                 <el-table-column label="人民币" width="90" align="right">
                   <template #default="{ row }">

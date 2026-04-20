@@ -17,6 +17,7 @@ class FeeItem(Base):
     单价 = Column("单价", DECIMAL(18, 2), default=0.00)
     单位 = Column("单位", String(50), nullable=True)
     数量 = Column("数量", DECIMAL(18, 3), default=0)
+    最低收费 = Column("最低收费", DECIMAL(18, 2), nullable=True)
     币种 = Column("币种", String(20), default='RMB')
     原币金额 = Column("原币金额", DECIMAL(18, 2), default=0.00)
     人民币金额 = Column("人民币金额", DECIMAL(18, 2), default=0.00)

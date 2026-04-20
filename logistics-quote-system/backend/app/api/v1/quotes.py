@@ -228,6 +228,10 @@ async def search_quotes(
             # 添加费用明细
             total_fee = 0.00
             for fee in agent.fee_items:
+                最低收费 = float(fee.最低收费) if fee.最低收费 else None
+                原币金额 = float(fee.原币金额) if fee.原币金额 else 0.00
+                # 应用最低收费：取 max(原币金额, 最低收费)
+                实际原币金额 = max(原币金额, 最低收费) if 最低收费 else 原币金额
                 fee_dict = {
                     "费用ID": fee.费用ID,
                     "代理路线ID": fee.代理路线ID,
@@ -235,8 +239,9 @@ async def search_quotes(
                     "单价": float(fee.单价) if fee.单价 else 0.00,
                     "单位": fee.单位,
                     "数量": float(fee.数量) if fee.数量 else 0,
+                    "最低收费": 最低收费,
                     "币种": fee.币种,
-                    "原币金额": float(fee.原币金额) if fee.原币金额 else 0.00,
+                    "原币金额": 实际原币金额,
                     "人民币金额": float(fee.人民币金额) if fee.人民币金额 else 0.00,
                     "备注": fee.备注,
                     "创建时间": fee.创建时间.isoformat() if fee.创建时间 else None

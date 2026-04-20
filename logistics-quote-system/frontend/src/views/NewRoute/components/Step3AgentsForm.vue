@@ -257,9 +257,23 @@
               </template>
             </el-table-column>
 
+            <el-table-column label="最低收费" width="110">
+              <template #default="scope">
+                <el-input-number :controls="false"
+                  v-if="scope.row.备注 !== '__GROUP_HEADER__'"
+                  v-model="scope.row.最低收费"
+                  :precision="2"
+                  :min="0"
+                  placeholder="选填"
+                  size="small"
+                  @change="updateFeeAmount(scope.row)"
+                />
+              </template>
+            </el-table-column>
+
             <el-table-column label="币种" width="90">
               <template #default="scope">
-                <el-select 
+                <el-select
                   v-model="scope.row.币种"
                   size="small"
                   @change="updateFeeRMB(scope.row)"
@@ -276,8 +290,18 @@
 
             <el-table-column label="原币金额" width="110">
               <template #default="scope">
-                <span style="color: #1890ff; font-weight: 500;">
-                  {{ (scope.row.单价 * scope.row.数量).toFixed(2) }}
+                <el-tooltip
+                  v-if="scope.row.最低收费 > 0 && (scope.row.单价 * scope.row.数量) < scope.row.最低收费"
+                  content="已应用最低收费"
+                  placement="top"
+                >
+                  <span style="color: #fa8c16; font-weight: 600;">
+                    {{ calcOriginalAmount(scope.row).toFixed(2) }}
+                    <el-icon style="font-size:11px;vertical-align:-1px"><InfoFilled /></el-icon>
+                  </span>
+                </el-tooltip>
+                <span v-else style="color: #1890ff; font-weight: 500;">
+                  {{ calcOriginalAmount(scope.row).toFixed(2) }}
                 </span>
               </template>
             </el-table-column>
@@ -572,7 +596,7 @@
 
 <script setup>
 import { ref, reactive, onBeforeUnmount, nextTick } from 'vue'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Sortable from 'sortablejs'
 
@@ -727,11 +751,11 @@ const removeAgent = (index) => {
   props.modelValue.splice(index, 1)
 }
 
-// 费用明细表格 span-method：分组标题行横跨前8列，只保留操作列
+// 费用明细表格 span-method：分组标题行横跨前9列，只保留操作列
 const feeItemSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {
-    if (columnIndex === 0) return [1, 8]
-    if (columnIndex < 8) return [0, 0]
+    if (columnIndex === 0) return [1, 9]
+    if (columnIndex < 9) return [0, 0]
   }
   return [1, 1]
 }
@@ -746,6 +770,7 @@ const addGroupHeader = (agentIndex) => {
     单价: 0,
     单位: '',
     数量: 0,
+    最低收费: null,
     币种: 'RMB',
     原币金额: 0,
     人民币金额: 0,
@@ -764,6 +789,7 @@ const addFeeItem = (agentIndex) => {
     单价: 0,
     单位: '/kg',
     数量: props.routeWeight || 0,
+    最低收费: null,
     币种: 'RMB',
     原币金额: 0,
     人民币金额: 0,
@@ -827,9 +853,16 @@ const handleUnitChange = (feeItem) => {
   updateFeeAmount(feeItem)
 }
 
+// 计算实际原币金额（应用最低收费）
+const calcOriginalAmount = (feeItem) => {
+  const calculated = (feeItem.单价 || 0) * (feeItem.数量 || 0)
+  const minFee = feeItem.最低收费 || 0
+  return minFee > 0 ? Math.max(calculated, minFee) : calculated
+}
+
 // 更新费用原币金额
 const updateFeeAmount = (feeItem) => {
-  feeItem.原币金额 = feeItem.单价 * feeItem.数量
+  feeItem.原币金额 = calcOriginalAmount(feeItem)
   updateFeeRMB(feeItem)
 }
 
@@ -845,10 +878,10 @@ const updateFeeTotalRMB = (feeItem) => {
   feeItem.人民币金额 = feeItem.原币金额 * rate
 }
 
-// 计算人民币金额
+// 计算人民币金额（含最低收费逻辑）
 const calculateRMB = (feeItem) => {
   const rate = exchangeRates[feeItem.币种] || 1
-  const originalAmount = feeItem.原币金额 || (feeItem.单价 * feeItem.数量) || 0
+  const originalAmount = feeItem.原币金额 || calcOriginalAmount(feeItem)
   return originalAmount * rate
 }
 
