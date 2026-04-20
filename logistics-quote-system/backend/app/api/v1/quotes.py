@@ -109,8 +109,8 @@ router = APIRouter(prefix="/quotes", tags=["报价查询"])
 
 @router.get("/search", summary="搜索报价")
 async def search_quotes(
-    起始地: str = Query(..., description="起始地（模糊搜索）"),
-    目的地: str = Query(..., description="目的地（模糊搜索）"),
+    起始地: Optional[str] = Query(None, description="起始地（模糊搜索，不填则不限）"),
+    目的地: Optional[str] = Query(None, description="目的地（模糊搜索，不填则不限）"),
     货物名称: Optional[str] = Query(None, description="货物名称（模糊搜索）"),
     交易开始日期: Optional[date] = Query(None, description="交易开始日期"),
     交易结束日期: Optional[date] = Query(None, description="交易结束日期"),
@@ -141,9 +141,11 @@ async def search_quotes(
         joinedload(Route.goods_total)
     )
     
-    # 起始地和目的地（模糊搜索）
-    query = query.filter(Route.起始地.like(f"%{起始地}%"))
-    query = query.filter(Route.目的地.like(f"%{目的地}%"))
+    # 起始地和目的地（可选，模糊搜索）
+    if 起始地:
+        query = query.filter(Route.起始地.like(f"%{起始地}%"))
+    if 目的地:
+        query = query.filter(Route.目的地.like(f"%{目的地}%"))
     
     # 日期范围筛选
     if 交易开始日期:

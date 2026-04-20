@@ -7,18 +7,36 @@
       <el-form :model="searchForm" label-width="80px">
         <el-row :gutter="16">
           <el-col :span="6">
-            <el-form-item label="起始地" required>
-              <el-input v-model="searchForm.起始地" placeholder="如：深圳" clearable />
+            <el-form-item label="起始地">
+              <el-autocomplete
+                v-model="searchForm.起始地"
+                :fetch-suggestions="suggestOrigins"
+                placeholder="不填则查全部"
+                clearable
+                style="width:100%"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="6">
-            <el-form-item label="目的地" required>
-              <el-input v-model="searchForm.目的地" placeholder="如：新加坡" clearable />
+            <el-form-item label="目的地">
+              <el-autocomplete
+                v-model="searchForm.目的地"
+                :fetch-suggestions="suggestDestinations"
+                placeholder="不填则查全部"
+                clearable
+                style="width:100%"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="6">
             <el-form-item label="货物名称">
-              <el-input v-model="searchForm.货物名称" placeholder="关键词，如：服务器" clearable />
+              <el-autocomplete
+                v-model="searchForm.货物名称"
+                :fetch-suggestions="suggestGoods"
+                placeholder="关键词，如：服务器"
+                clearable
+                style="width:100%"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="6">
@@ -264,7 +282,7 @@
       </div>
     </template>
 
-    <el-empty v-else-if="!loading" description="请输入起始地和目的地查询" />
+    <el-empty v-else-if="!loading" description="输入条件后点击查询" />
 
     <!-- 费用详情弹窗 -->
     <el-dialog
@@ -511,9 +529,34 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Download, Histogram, Tickets, Warning } from '@element-plus/icons-vue'
 import { searchQuotes } from '@/api/quote'
+import { getSearchOptions } from '@/api/recommend'
 
 const route = useRoute()
 const loading = ref(false)
+
+// 下拉候选数据
+const allOrigins = ref([])
+const allDestinations = ref([])
+const allGoods = ref([])
+
+const suggestOrigins = (query, cb) => {
+  const results = query
+    ? allOrigins.value.filter(v => v.includes(query))
+    : allOrigins.value
+  cb(results.map(v => ({ value: v })))
+}
+const suggestDestinations = (query, cb) => {
+  const results = query
+    ? allDestinations.value.filter(v => v.includes(query))
+    : allDestinations.value
+  cb(results.map(v => ({ value: v })))
+}
+const suggestGoods = (query, cb) => {
+  const results = query
+    ? allGoods.value.filter(v => v.includes(query))
+    : allGoods.value
+  cb(results.map(v => ({ value: v })))
+}
 const dateRange = ref([])
 const quoteResults = ref([])
 const total = ref(0)
@@ -643,8 +686,16 @@ const searchForm = reactive({
   page: 1, page_size: 10
 })
 
-// 支持从港口地图跳转时预填目的地（?dest=国家名）
-onMounted(() => {
+onMounted(async () => {
+  // 加载下拉候选项
+  try {
+    const opts = await getSearchOptions()
+    allOrigins.value = opts.origins || []
+    allDestinations.value = opts.destinations || []
+    allGoods.value = opts.goods || []
+  } catch (_) {}
+
+  // 支持从港口地图跳转时预填目的地（?dest=国家名）
   if (route.query.dest) {
     searchForm.目的地 = route.query.dest
     handleSearch()
@@ -702,10 +753,6 @@ const sortedAgents = (agents) => {
 }
 
 const handleSearch = async () => {
-  if (!searchForm.起始地 || !searchForm.目的地) {
-    ElMessage.warning('请输入起始地和目的地')
-    return
-  }
   loading.value = true
   try {
     const params = {
