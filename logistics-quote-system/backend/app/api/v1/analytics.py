@@ -41,7 +41,6 @@ async def get_route_usage(db: Session = Depends(get_db), current_user: User = De
         SELECT
             r.起始地,
             r.目的地,
-            COALESCE(ra.运输方式, '未知') AS 运输方式,
             COUNT(DISTINCT ra.代理路线ID) AS 代理报价数,
             COUNT(DISTINCT ra.代理商)    AS 代理商数,
             ROUND(AVG(s.总计), 2)        AS 平均报价
@@ -49,15 +48,15 @@ async def get_route_usage(db: Session = Depends(get_db), current_user: User = De
         JOIN route_agents ra ON r.路线ID = ra.路线ID
         LEFT JOIN summary s ON ra.代理路线ID = s.代理路线ID
         WHERE s.总计 > 0
-        GROUP BY r.起始地, r.目的地, ra.运输方式
+        GROUP BY r.起始地, r.目的地
         ORDER BY 代理报价数 DESC
         LIMIT 15
     """)).fetchall()
     return [
         {
-            "起始地": r[0], "目的地": r[1], "运输方式": r[2],
-            "代理报价数": r[3], "代理商数": r[4],
-            "平均报价": float(r[5]) if r[5] else 0,
+            "起始地": r[0], "目的地": r[1],
+            "代理报价数": r[2], "代理商数": r[3],
+            "平均报价": float(r[4]) if r[4] else 0,
         }
         for r in rows
     ]

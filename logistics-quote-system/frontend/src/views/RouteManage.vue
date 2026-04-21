@@ -394,6 +394,12 @@
             <el-empty v-else description="暂无代理商信息" :image-size="80" />
           </el-col>
         </el-row>
+
+        <!-- 附件管理 -->
+        <div class="detail-section" style="margin-top: 20px;">
+          <h3>附件管理</h3>
+          <AttachmentPanel :route-id="currentRoute.路线ID" />
+        </div>
       </div>
     </el-dialog>
 
@@ -415,7 +421,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { getRoutes, getRouteDetail, deleteRoute, updateRoute } from '@/api/route'
 import { useUserStore } from '@/stores/user'
-import RouteEditDialog from './NewRoute/components/RouteEditDialog.vue'  // ✅ 导入编辑对话框
+import RouteEditDialog from './NewRoute/components/RouteEditDialog.vue'
+import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
 const userStore = useUserStore()
 

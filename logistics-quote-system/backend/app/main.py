@@ -3,6 +3,7 @@
 FastAPI应用主入口
 """
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -11,12 +12,37 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from apscheduler.schedulers.background import BackgroundScheduler
 from .config import settings
 from .api.v1 import api_router
+from .database import SessionLocal
+from .services.ctils_scraper import run_scrape
 
 logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
+
+
+def _scheduled_scrape():
+    """定时任务：爬取贸法通最新预警"""
+    db = SessionLocal()
+    try:
+        result = run_scrape(db, max_articles=20)
+        logger.info("定时预警同步完成: %s", result)
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    # 启动时初始化定时任务
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(_scheduled_scrape, "cron", hour=8, minute=0, id="ctils_daily")
+    scheduler.start()
+    logger.info("APScheduler 已启动（贸法通每日 08:00 同步）")
+    yield
+    scheduler.shutdown(wait=False)
+
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -25,6 +51,7 @@ app = FastAPI(
     description="国际物流报价查询系统API",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # 配置CORS

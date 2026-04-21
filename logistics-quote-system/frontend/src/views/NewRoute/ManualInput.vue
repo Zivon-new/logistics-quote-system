@@ -51,21 +51,32 @@
       <div class="step-actions">
         <el-button v-if="currentStep > 0" @click="prevStep">上一步</el-button>
         <el-button @click="$emit('cancel')">取消</el-button>
-        <el-button 
-          v-if="currentStep < 3" 
-          type="primary" 
+        <el-button
+          v-if="currentStep < 3"
+          type="primary"
           @click="nextStep"
         >
           下一步
         </el-button>
-        <el-button 
-          v-else 
-          type="success" 
+        <el-button
+          v-else
+          type="success"
           :loading="submitting"
           @click="handleSubmit"
         >
           {{ localEditMode ? '保存修改' : '确认提交' }}
         </el-button>
+      </div>
+    </el-card>
+
+    <!-- 附件上传区（编辑模式始终显示；新建模式提交成功后显示） -->
+    <el-card v-if="savedRouteId" class="attachment-card">
+      <template #header>
+        <span>附件管理</span>
+      </template>
+      <AttachmentPanel :route-id="savedRouteId" />
+      <div v-if="attachmentDone" class="attachment-done">
+        <el-button type="primary" @click="$emit('success')">完成</el-button>
       </div>
     </el-card>
   </div>
@@ -79,6 +90,7 @@ import Step1RouteInfo from './components/Step1RouteInfo.vue'
 import Step2GoodsInfo from './components/Step2GoodsInfo.vue'
 import Step3AgentsForm from './components/Step3AgentsForm.vue'
 import Step4Preview from './components/Step4Preview.vue'
+import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
 const props = defineProps({
   isEdit: {
@@ -106,6 +118,8 @@ const submitting = ref(false)
 const step1Ref = ref(null)
 const step2Ref = ref(null)
 const step3Ref = ref(null)
+const savedRouteId = ref(null)   // set after save; drives AttachmentPanel visibility
+const attachmentDone = ref(false) // show "完成" button after new-create only
 
 const formData = reactive({
   route: {
@@ -336,6 +350,11 @@ onMounted(async () => {
   } 
   else if (props.isEdit && props.routeId) {
     await loadEditData(props.routeId)
+  }
+
+  // In edit mode the routeId is already known — show attachment panel immediately
+  if (props.isEdit && props.routeId) {
+    savedRouteId.value = Number(props.routeId)
   }
 })
 
@@ -619,14 +638,17 @@ const handleSubmit = async () => {
       console.log('📤 调用 updateRoute, routeId:', props.routeId)
       const res = await updateRoute(props.routeId, submitData)
       console.log('✅ updateRoute 返回:', res)
-      ElMessage.success('路线更新成功')
+      ElMessage.success('路线更新成功，可在下方管理附件')
+      savedRouteId.value = Number(props.routeId)
+      // Edit mode: emit success after a brief moment so user sees the message
+      emit('success')
     } else {
       console.log('📤 调用 createRoute（新建）')
-      await createRoute(submitData)
-      ElMessage.success('路线创建成功')
+      const res = await createRoute(submitData)
+      ElMessage.success('路线创建成功，可上传相关附件')
+      savedRouteId.value = res.route_id
+      attachmentDone.value = true  // show "完成" button
     }
-    
-    emit('success')
   } catch (error) {
     console.error('❌ 提交失败:', error)
     console.error('❌ 错误详情:', error.response?.data)
@@ -662,6 +684,18 @@ const handleSubmit = async () => {
   justify-content: flex-end;
   gap: 12px;
   padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.attachment-card {
+  margin-top: 20px;
+}
+
+.attachment-done {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid #e5e7eb;
 }
 </style>

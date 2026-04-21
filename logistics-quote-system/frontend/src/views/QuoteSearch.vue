@@ -477,7 +477,7 @@
         <!-- 附件区 -->
         <div class="detail-section" style="margin-top:16px" v-if="currentRoute">
           <h3>路线附件</h3>
-          <AttachmentPanel :route-id="currentRoute.路线ID" />
+          <AttachmentPanel :route-id="currentRoute.路线ID" :readonly="true" />
         </div>
       </div>
     </el-dialog>

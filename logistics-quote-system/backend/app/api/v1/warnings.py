@@ -2,13 +2,14 @@
 """
 航线风险预警 API
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List
 from ...database import get_db
 from ...core.deps import get_current_user
 from ...models.user import User
+from ...services.ctils_scraper import run_scrape
 
 router = APIRouter(prefix="/warnings", tags=["航线预警"])
 
@@ -39,9 +40,20 @@ async def list_warnings(
                预警标题, 预警详情, 生效日期
         FROM route_warnings
         WHERE 是否有效 = 1
-        ORDER BY 风险等级 DESC, 生效日期 DESC
+        ORDER BY 生效日期 DESC, 风险等级 DESC
     """)).fetchall()
     return [_row_to_dict(r) for r in rows]
+
+
+@router.post("/refresh", summary="手动触发贸法通预警同步")
+async def refresh_warnings(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """抓取贸法通最新预警，后台执行，立即返回"""
+    background_tasks.add_task(run_scrape, db, 20)
+    return {"message": "预警同步已启动，稍后刷新查看最新数据"}
 
 
 # ── 供其他模块直接调用的工具函数 ──────────────────────────────────
@@ -59,7 +71,7 @@ def get_warnings_for_destinations(db: Session, destinations: List[str]) -> dict:
                预警标题, 预警详情, 生效日期, 目的地关键词
         FROM route_warnings
         WHERE 是否有效 = 1
-        ORDER BY 风险等级 DESC
+        ORDER BY 生效日期 DESC, 风险等级 DESC
     """)).fetchall()
 
     # 预处理：{keyword: [warning_dict, ...]}

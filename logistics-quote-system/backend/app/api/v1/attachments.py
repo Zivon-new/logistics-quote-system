@@ -6,6 +6,7 @@
 import os
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -127,10 +128,11 @@ async def download_attachment(
     inline_types = {"image", "pdf"}
     disposition = "inline" if row[3] in inline_types else "attachment"
 
+    # RFC 5987: 对非 ASCII 文件名进行 UTF-8 URL 编码
+    encoded_name = quote(row[1], safe='')
     return FileResponse(
         path=str(file_path),
-        filename=row[1],
-        headers={"Content-Disposition": f'{disposition}; filename="{row[1]}"'}
+        headers={"Content-Disposition": f"{disposition}; filename*=UTF-8''{encoded_name}"}
     )
 
 

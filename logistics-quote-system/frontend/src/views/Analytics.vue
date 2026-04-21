@@ -147,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, PieChart, LineChart } from 'echarts/charts'
@@ -194,7 +194,9 @@ const loadAgentDist = async (params = {}) => {
   agentDistData.value = await getRouteAgentDist(params)
 }
 
-onMounted(async () => {
+const loadAll = async () => {
+  loadingOverview.value = true
+  selectedRoute.value = null
   const [ov, routes, agent, dist] = await Promise.all([
     getOverview(), getRouteUsage(), getByAgent(), getPriceDistribution()
   ])
@@ -204,19 +206,21 @@ onMounted(async () => {
   agentData.value = agent
   distData.value = dist
   await Promise.all([loadTrend(), loadAgentDist()])
-})
+}
+
+onMounted(loadAll)
+onActivated(loadAll)
 
 // ── 路线点击 ───────────────────────────────────────────────
 const onRouteBarClick = (params) => {
-  const item = routeUsageData.value[params.dataIndex]
+  const item = routeUsageData.value[routeUsageData.value.length - 1 - params.dataIndex]
   if (!item) return
   selectedRoute.value = {
     origin: item.起始地,
     dest: item.目的地,
-    transport: item.运输方式,
-    label: `${item.起始地}→${item.目的地} ${item.运输方式}`,
+    label: `${item.起始地}→${item.目的地}`,
   }
-  loadAgentDist({ origin: item.起始地, dest: item.目的地, transport: item.运输方式 })
+  loadAgentDist({ origin: item.起始地, dest: item.目的地 })
 }
 
 const clearRoute = () => {
@@ -235,7 +239,6 @@ const routeUsageOption = computed(() => {
         const item = routeUsageData.value[routeUsageData.value.length - 1 - p[0].dataIndex]
         if (!item) return ''
         return `<b>${item.起始地} → ${item.目的地}</b><br/>
-          运输方式：${item.运输方式}<br/>
           代理报价数：<b>${item.代理报价数}</b><br/>
           涉及代理商：${item.代理商数} 家<br/>
           平均报价：¥${item.平均报价?.toLocaleString()}`

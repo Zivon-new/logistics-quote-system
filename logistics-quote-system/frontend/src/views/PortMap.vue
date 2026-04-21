@@ -85,6 +85,7 @@
         </el-form-item>
         <el-form-item>
           <el-button size="small" @click="resetFilter">重置</el-button>
+          <el-button size="small" :loading="refreshing" @click="syncWarnings">同步预警</el-button>
           <span class="filter-count">显示 <strong>{{ filteredPorts.length }}</strong> / {{ allPorts.length }} 个港口</span>
           <span v-if="warningPortCount > 0" class="warning-hint">
             <el-icon style="color:#f5222d;vertical-align:middle"><Warning /></el-icon>
@@ -225,6 +226,32 @@ const filters = reactive({
 const warningPortCount = computed(() =>
   allPorts.value.filter(p => warningsByCountry.value[p.country_code]?.length > 0).length
 )
+
+const refreshing = ref(false)
+
+// 同步贸法通预警，完成后重新加载预警数据
+const syncWarnings = async () => {
+  refreshing.value = true
+  try {
+    await request({ url: '/v1/warnings/refresh', method: 'post' })
+    // 等待后台任务约3秒后重新拉取预警列表
+    await new Promise(r => setTimeout(r, 3000))
+    const data = await request({ url: '/v1/warnings/list', method: 'get' })
+    const wMap = {}
+    for (const w of data) {
+      const code = w['国家代码']
+      if (!wMap[code]) wMap[code] = []
+      wMap[code].push(w)
+    }
+    warningsByCountry.value = wMap
+    renderMarkers()
+    ElMessage.success('预警数据已更新')
+  } catch (e) {
+    ElMessage.error('同步失败：' + (e?.message || '网络错误'))
+  } finally {
+    refreshing.value = false
+  }
+}
 
 let map = null
 const markersLayer = ref(null)
