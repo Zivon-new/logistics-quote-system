@@ -407,8 +407,23 @@
 
             <div class="detail-section">
               <h3>费用明细</h3>
-              <el-table v-if="currentAgent.fee_items?.length" :data="currentAgent.fee_items" border stripe size="small" style="margin-bottom:12px">
-                <el-table-column prop="费用类型" label="费用类型" min-width="110" />
+              <el-table
+                v-if="currentAgent.fee_items?.length"
+                :data="currentAgent.fee_items"
+                border stripe size="small"
+                style="margin-bottom:12px"
+                :span-method="detailFeeItemSpanMethod"
+                :row-class-name="detailRowClassName"
+              >
+                <el-table-column label="费用类型" min-width="110">
+                  <template #default="{ row }">
+                    <div v-if="row.备注 === '__GROUP_HEADER__'" class="detail-group-header-cell">
+                      <span class="detail-group-icon">◆</span>
+                      <span>{{ row.费用类型 }}</span>
+                    </div>
+                    <span v-else>{{ row.费用类型 }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column label="单价" width="120" align="right">
                   <template #default="{ row }">
                     {{ row.单价 }}{{ row.币种 }}{{ row.单位 ? '/' + row.单位.replace('/','') : '' }}
@@ -441,8 +456,22 @@
                 <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
               </el-table>
 
-              <el-table v-if="currentAgent.fee_total?.length" :data="currentAgent.fee_total" border stripe size="small">
-                <el-table-column prop="费用名称" label="整单费用" min-width="130" />
+              <el-table
+                v-if="currentAgent.fee_total?.length"
+                :data="currentAgent.fee_total"
+                border stripe size="small"
+                :span-method="detailFeeTotalSpanMethod"
+                :row-class-name="detailRowClassName"
+              >
+                <el-table-column label="整单费用" min-width="130">
+                  <template #default="{ row }">
+                    <div v-if="row.备注 === '__GROUP_HEADER__'" class="detail-group-header-cell">
+                      <span class="detail-group-icon">◆</span>
+                      <span>{{ row.费用名称 }}</span>
+                    </div>
+                    <span v-else>{{ row.费用名称 }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column label="原币金额" width="120" align="right">
                   <template #default="{ row }">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</template>
                 </el-table-column>
@@ -819,6 +848,23 @@ const viewDetail = (agent, route) => {
   currentRoute.value = route
   detailVisible.value = true
 }
+
+const detailRowClassName = ({ row }) =>
+  row.备注 === '__GROUP_HEADER__' ? 'detail-group-header-row' : ''
+
+const detailFeeItemSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    return columnIndex === 0 ? [1, 7] : [0, 0]
+  }
+  return [1, 1]
+}
+
+const detailFeeTotalSpanMethod = ({ row, columnIndex }) => {
+  if (row.备注 === '__GROUP_HEADER__') {
+    return columnIndex === 0 ? [1, 4] : [0, 0]
+  }
+  return [1, 1]
+}
 </script>
 
 <style scoped>
@@ -957,4 +1003,25 @@ const viewDetail = (agent, route) => {
 .warning-item-detail { font-size: 12px; color: #595959; line-height: 1.7; }
 .warning-high .warning-item-title { color: #cf1322; }
 .warning-mid .warning-item-title { color: #d46b08; }
+
+/* 费用明细弹窗 - 分组标题行 */
+:deep(.detail-group-header-row) td {
+  background: linear-gradient(90deg, #e6f0ff 0%, #f0f5ff 100%) !important;
+  border-top: 2px solid #91caff !important;
+  border-bottom: 2px solid #91caff !important;
+  padding: 0 !important;
+}
+.detail-group-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1677ff;
+}
+.detail-group-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+}
 </style>

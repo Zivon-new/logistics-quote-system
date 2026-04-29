@@ -203,12 +203,18 @@ class AgentExtractorV2(BaseExtractor):
                 agent_name = None
                 remark = None
 
-        # 方法3: 检查是否是纯方案描述
+        # 方法3: 检查是否是纯方案描述或无效内容
         if not agent_name or not is_valid_agent_name(agent_name):
             if any(kw in agent_text for kw in ['方案', '过港', '双清', '包税']):
                 if self.logger:
                     self.logger.debug(f"        列{col_idx}: '{agent_text}' 是方案描述，非代理商")
                 return None
+            # 启发式兜底：如果当前行是代理行，且文本2-20字符、含中文或字母、不是纯数字/符号，直接使用原文
+            if is_valid_agent_name(agent_text):
+                agent_name = agent_text
+                remark = None
+                if self.logger:
+                    self.logger.debug(f"        列{col_idx}: 启发式接受代理商名'{agent_text}'")
             else:
                 if self.logger:
                     self.logger.debug(f"        列{col_idx}: 无效的代理商名'{agent_text}'")

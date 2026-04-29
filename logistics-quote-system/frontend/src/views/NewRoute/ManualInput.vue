@@ -38,6 +38,7 @@
           :route-volume="formData.route.总体积"
           :route-value="debugRouteValue"
           :route-value-currency="formData.route.货值币种 || 'RMB'"
+          :goods-list="formData.goodsTotal"
         />
 
         <!-- Step 4: 预览确认 -->
@@ -241,7 +242,11 @@ const loadEditData = async (routeId) => {
       代理备注: a.代理备注 || '',
       fee_items: (a.fee_items || []).map(item => ({ ...item })),
       fee_total: (a.fee_total || []).map(ft => ({ ...ft })),
-      summary: a.summary ? { ...a.summary } : { 税率: 0, 汇损率: 0, 备注: '' }
+      summary: a.summary ? {
+        ...a.summary,
+        税率明细: (() => { try { return JSON.parse(a.summary.进口税率原文 || '[]') } catch { return [] } })(),
+        税率模式: a.summary.进口税率原文 ? 'multi' : 'simple'
+      } : { 税率: 0, 汇损率: 0, 备注: '', 税率明细: [], 税率模式: 'simple' }
     }))
 
     await nextTick()
@@ -333,11 +338,16 @@ onMounted(async () => {
         summary: a.summary ? {
           税率: parseFloat(a.summary.税率) || 0,
           汇损率: parseFloat(a.summary.汇损率) || 0,
-          备注: a.summary.备注 || ''
+          备注: a.summary.备注 || '',
+          进口税率原文: a.summary.进口税率原文 || '',
+          税率明细: (() => { try { return JSON.parse(a.summary.进口税率原文 || '[]') } catch { return [] } })(),
+          税率模式: a.summary.进口税率原文 ? 'multi' : 'simple'
         } : {
           税率: 0,
           汇损率: 0,
-          备注: ''
+          备注: '',
+          税率明细: [],
+          税率模式: 'simple'
         }
       }))
     }
@@ -537,6 +547,9 @@ const handleSubmit = async () => {
       }
       
       if (agent.summary && typeof agent.summary === 'object' && Object.keys(agent.summary).length > 0) {
+        const taxDetailJson = Array.isArray(agent.summary.税率明细) && agent.summary.税率明细.length > 0
+          ? JSON.stringify(agent.summary.税率明细)
+          : (agent.summary.进口税率原文 || '')
         cleanAgent.summary = {
           小计: Number(agent.summary.小计) || 0,
           税率: Number(agent.summary.税率) || 0,
@@ -544,7 +557,8 @@ const handleSubmit = async () => {
           汇损率: Number(agent.summary.汇损率) || 0,
           汇损: Number(agent.summary.汇损) || 0,
           总计: Number(agent.summary.总计) || 0,
-          备注: agent.summary.备注 || ''
+          备注: agent.summary.备注 || '',
+          进口税率原文: taxDetailJson
         }
       }
       

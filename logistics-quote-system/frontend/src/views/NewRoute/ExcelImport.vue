@@ -88,17 +88,27 @@
                     {{ route.交易开始日期 }} ~ {{ route.交易结束日期 }}
                   </span>
                 </div>
-                <div class="route-actions">
-                  <el-button 
-                    link 
-                    type="primary" 
+                        <div class="route-actions">
+                  <el-tag v-if="savedRouteIds[index]" type="success" size="small" effect="dark">已保存</el-tag>
+                  <el-button
+                    link
+                    type="primary"
                     @click="toggleEdit(index)"
                   >
                     完整编辑
                   </el-button>
-                  <el-button 
-                    link 
-                    type="danger" 
+                  <el-button
+                    v-if="!savedRouteIds[index]"
+                    link
+                    type="success"
+                    :loading="savingIndex === index"
+                    @click="saveSingleRoute(route, index)"
+                  >
+                    保存此路线
+                  </el-button>
+                  <el-button
+                    link
+                    type="danger"
                     @click="deleteRoute(index)"
                   >
                     删除
@@ -125,6 +135,14 @@
                 <span class="label">代理商：</span>
                 <span class="value">{{ getAgentNames(route.agents) }}</span>
               </div>
+            </div>
+
+            <!-- 附件区（保存成功后显示） -->
+            <div v-if="savedRouteIds[index]" class="route-attachment">
+              <el-divider content-position="left" style="margin:12px 0 8px">
+                <span style="font-size:13px;color:#595959">路线附件</span>
+              </el-divider>
+              <AttachmentPanel :route-id="savedRouteIds[index]" />
             </div>
           </el-card>
         </div>
@@ -172,6 +190,7 @@ import { ElMessage } from 'element-plus'
 import { uploadAndExtractExcel, createRoute } from '@/api/route'
 import { UploadFilled, Document, Delete, QuestionFilled, Right, ArrowLeft } from '@element-plus/icons-vue'
 import ManualInput from './ManualInput.vue'
+import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
 const emit = defineEmits(['success', 'cancel'])
 
@@ -180,10 +199,12 @@ const selectedFile = ref(null)
 const enableAI = ref(false)
 const extracting = ref(false)
 const saving = ref(false)
+const savingIndex = ref(-1)   // which route is being saved individually
 const progress = ref(0)
 const extractedRoutes = ref([])
 const currentEditRoute = ref(null)
 const currentEditIndex = ref(-1)
+const savedRouteIds = ref({})  // index -> routeId (saved routes)
 
 // 文件选择
 const handleFileChange = (file) => {
@@ -310,6 +331,50 @@ const cancelEdit = () => {
   nextTick(() => window.scrollTo(0, 0))
 }
 
+// 单独保存一条路线
+const saveSingleRoute = async (route, index) => {
+  savingIndex.value = index
+  try {
+    const cleanAgents = (route.agents || []).map(a => ({
+      代理商: a.代理商 || '',
+      运输方式: a.运输方式 || '',
+      贸易类型: a.贸易类型 || '',
+      时效: a.时效 || '',
+      时效备注: a.时效备注 || '',
+      不含: a.不含 || '',
+      是否赔付: a.是否赔付 || '0',
+      赔付内容: a.赔付内容 || '',
+      代理备注: a.代理备注 || '',
+      fee_items: a.fee_items || [],
+      fee_total: a.fee_total || [],
+      summary: a.summary || {}
+    }))
+    const submitData = {
+      route: {
+        起始地: route.起始地 || '',
+        途径地: route.途径地 || '',
+        目的地: route.目的地 || '',
+        交易开始日期: route.交易开始日期 || '',
+        交易结束日期: route.交易结束日期 || '',
+        实际重量: route.实际重量 || 0,
+        计费重量: route.计费重量 || 0,
+        总体积: route.总体积 || 0,
+        货值: route.货值 || 0
+      },
+      goods_details: route.goods_details || [],
+      goods_total: route.goods_total || [],
+      agents: cleanAgents
+    }
+    const res = await createRoute(submitData)
+    savedRouteIds.value[index] = res.route_id
+    ElMessage.success(`路线 ${route.起始地}→${route.目的地} 保存成功，可上传附件`)
+  } catch (error) {
+    ElMessage.error(`保存失败：${error.message || '未知错误'}`)
+  } finally {
+    savingIndex.value = -1
+  }
+}
+
 // 删除路线
 const deleteRoute = (index) => {
   extractedRoutes.value.splice(index, 1)
@@ -337,7 +402,9 @@ const saveAll = async () => {
     let successCount = 0
     let failCount = 0
 
-    for (const route of extractedRoutes.value) {
+    for (let i = 0; i < extractedRoutes.value.length; i++) {
+      if (savedRouteIds.value[i]) { successCount++; continue }  // already saved
+      const route = extractedRoutes.value[i]
       try {
         const cleanAgents = (route.agents || []).map(a => ({
           代理商: a.代理商 || '',
@@ -381,6 +448,7 @@ const saveAll = async () => {
         console.error(`路线 ${route.起始地}-${route.目的地} 保存失败:`, error)
       }
     }
+
 
     if (failCount === 0) {
       ElMessage.success(`成功导入 ${successCount} 条路线`)
@@ -555,6 +623,10 @@ const saveAll = async () => {
   font-size: 14px;
   font-weight: 500;
   color: #303133;
+}
+
+.route-attachment {
+  margin-top: 4px;
 }
 
 .route-edit-form {

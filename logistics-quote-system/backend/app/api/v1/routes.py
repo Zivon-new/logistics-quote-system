@@ -237,7 +237,8 @@ async def get_route_detail(
                 "汇损率": float(summary.汇损率) if summary.汇损率 else 0,
                 "汇损": float(summary.汇损) if summary.汇损 else 0,
                 "总计": float(summary.总计) if summary.总计 else 0,
-                "备注": summary.备注
+                "备注": summary.备注,
+                "进口税率原文": summary.进口税率原文
             } if summary else {}
         }
         route_data["agents"].append(agent_dict)

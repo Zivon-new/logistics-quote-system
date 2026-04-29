@@ -161,7 +161,16 @@ def is_valid_agent_name(name: str) -> bool:
         if name == keyword:  # 完全匹配才过滤
             return False
     
-    # 不在白名单中，返回False（严格模式）
+    # 不在白名单中：只有含中文字符的才作为兜底接受（纯英文可能是港口代码/路线名）
+    import re
+    has_chinese = bool(re.search(r'[一-鿿]', name))
+    is_price = bool(re.search(r'\d+\s*(USD|RMB|CNY|EUR|GBP|SGD|/kg|/cbm)', name, re.IGNORECASE))
+    is_description = any(kw in name for kw in ['方案', '询价', '预估', '待定', '过港', '包税', '双清', '含税'])
+
+    if has_chinese and not is_price and not is_description:
+        if 2 <= len(name) <= 20:
+            return True
+
     return False
 
 

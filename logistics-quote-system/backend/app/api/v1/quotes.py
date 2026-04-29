@@ -275,7 +275,8 @@ async def search_quotes(
                     "汇损率": float(best_summary.汇损率) if best_summary.汇损率 else 0.000000,
                     "汇损": float(best_summary.汇损) if best_summary.汇损 else 0.00,
                     "总计": float(best_summary.总计) if best_summary.总计 else 0.00,
-                    "备注": best_summary.备注
+                    "备注": best_summary.备注,
+                    "进口税率原文": best_summary.进口税率原文
                 }
             
             agent_dict["总费用"] = total_fee
