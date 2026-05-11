@@ -174,7 +174,7 @@
         <span class="edit-tip">正在编辑第 {{ currentEditIndex + 1 }} 条路线 · 保存修改后返回列表统一提交</span>
       </div>
       <ManualInput
-        :key="'excel-edit-' + currentEditIndex"
+        :key="'excel-edit-' + currentEditIndex + '-v' + editVersion"
         :initial-data="currentEditRoute"
         :local-edit-mode="true"
         @local-save="handleLocalSave"
@@ -187,7 +187,7 @@
 <script setup>
 import { ref, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { uploadAndExtractExcel, createRoute } from '@/api/route'
+import { uploadAndExtractExcel, createRoute, updateRoute } from '@/api/route'
 import { UploadFilled, Document, Delete, QuestionFilled, Right, ArrowLeft } from '@element-plus/icons-vue'
 import ManualInput from './ManualInput.vue'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
@@ -204,6 +204,7 @@ const progress = ref(0)
 const extractedRoutes = ref([])
 const currentEditRoute = ref(null)
 const currentEditIndex = ref(-1)
+const editVersion = ref(0)  // 每次进入编辑时递增，强制ManualInput重新挂载
 const savedRouteIds = ref({})  // index -> routeId (saved routes)
 
 // 文件选择
@@ -295,6 +296,7 @@ const getAgentNames = (agents) => {
 const toggleEdit = (index) => {
   currentEditIndex.value = index
   currentEditRoute.value = JSON.parse(JSON.stringify(extractedRoutes.value[index]))
+  editVersion.value++  // 每次进入编辑强制ManualInput重新挂载，避免停留在预览步骤
   currentStep.value = 3
 }
 
@@ -365,9 +367,15 @@ const saveSingleRoute = async (route, index) => {
       goods_total: route.goods_total || [],
       agents: cleanAgents
     }
-    const res = await createRoute(submitData)
-    savedRouteIds.value[index] = res.route_id
-    ElMessage.success(`路线 ${route.起始地}→${route.目的地} 保存成功，可上传附件`)
+    const existingId = savedRouteIds.value[index]
+    if (existingId) {
+      await updateRoute(existingId, submitData)
+      ElMessage.success(`路线 ${route.起始地}→${route.目的地} 更新成功`)
+    } else {
+      const res = await createRoute(submitData)
+      savedRouteIds.value[index] = res.route_id
+      ElMessage.success(`路线 ${route.起始地}→${route.目的地} 保存成功，可上传附件`)
+    }
   } catch (error) {
     ElMessage.error(`保存失败：${error.message || '未知错误'}`)
   } finally {

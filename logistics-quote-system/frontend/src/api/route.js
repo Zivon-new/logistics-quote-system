@@ -123,6 +123,13 @@ export function getExchangeRates() {
   })
 }
 
+export function refreshForexRates() {
+  return request({
+    url: '/v1/routes/refresh_forex',
+    method: 'post'
+  })
+}
+
 /**
  * 获取统计数据
  */

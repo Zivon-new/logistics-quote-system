@@ -236,6 +236,7 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                         代理路线ID=agent_id,
                         小计=summary_data.get("小计", 0),
                         税率=summary_data.get("税率", 0),
+                        进口税率原文=summary_data.get("进口税率原文"),
                         税金=summary_data.get("税金", 0),
                         汇损率=summary_data.get("汇损率", 0),
                         汇损=summary_data.get("汇损", 0),
@@ -379,6 +380,7 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                         代理路线ID=agent_id,
                         小计=summary_data.get("小计", 0),
                         税率=summary_data.get("税率", 0),
+                        进口税率原文=summary_data.get("进口税率原文"),
                         税金=summary_data.get("税金", 0),
                         汇损率=summary_data.get("汇损率", 0),
                         汇损=summary_data.get("汇损", 0),
@@ -608,5 +610,6 @@ def summary_to_dict(summary):
         "汇损率": float(summary.汇损率) if summary.汇损率 else 0,
         "汇损": float(summary.汇损) if summary.汇损 else 0,
         "总计": float(summary.总计) if summary.总计 else 0,
-        "备注": summary.备注
+        "备注": summary.备注,
+        "进口税率原文": summary.进口税率原文
     }

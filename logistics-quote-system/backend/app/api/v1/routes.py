@@ -131,7 +131,8 @@ async def get_forex_rates(
         'SGD': 5.3,
         'EUR': 7.8,
         'JPY': 0.05,
-        'MYR': 1.6
+        'MYR': 1.6,
+        'HKD': 0.93
     }
     
     reference_date = None
@@ -149,6 +150,22 @@ async def get_forex_rates(
         "data": default_rates,
         "reference_date": reference_date
     }
+
+
+@router.post("/refresh_forex", summary="手动刷新汇率")
+async def refresh_forex_rates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """管理员手动触发汇率同步（从 ExchangeRate-API 拉取最新数据）"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="仅管理员可刷新汇率")
+    from ...services.forex_scraper import update_forex_rates
+    try:
+        rates = update_forex_rates(db)
+        return {"success": True, "data": rates, "message": f"汇率已更新，共同步 {len(rates)} 种货币"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"汇率同步失败：{str(e)}")
 
 
 @router.get("/{route_id}", summary="获取路线详情")
@@ -373,13 +390,16 @@ async def create_full_route(
                 # 插入汇总
                 for bad_key in ['汇总ID', '代理路线ID', '创建时间']:
                     summary_data.pop(bad_key, None)
-                
+
                 if summary_data and any(v for v in summary_data.values() if v not in [0, 0.0, '', None, {}]):
                     def _sf(val, default=0.0):
                         try:
                             return float(val) if val is not None else default
                         except (TypeError, ValueError):
                             return default
+                    # 先 flush 让触发器跑完（autoflush=False 不会自动 flush）
+                    # 这样 upsert 是最后写入，覆盖触发器的计算结果
+                    db.flush()
                     upsert_sql = text("""
                         INSERT INTO summary (
                             `代理路线ID`, `小计`, `运费小计`, `税率`, `进口税率原文`,
@@ -571,9 +591,18 @@ async def update_route(
         # ============================================================
         from ...models.fee import FeeItem, FeeTotal, Summary
         
+        def _sf(val, default=0.0):
+            try:
+                return float(val) if val is not None else default
+            except (TypeError, ValueError):
+                return default
+
+        # 收集 agent_id → summary_data，用于最终写回
+        _agent_summaries = []
+
         if 'agents' in data:
             logger.debug(f"\n【第二阶段】更新代理商...")
-            
+
             old_agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
             for old_agent in old_agents:
                 db.query(FeeItem).filter(FeeItem.代理路线ID == old_agent.代理路线ID).delete()
@@ -581,7 +610,7 @@ async def update_route(
                 db.query(Summary).filter(Summary.代理路线ID == old_agent.代理路线ID).delete()
             db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).delete()
             db.flush()
-            
+
             # 去重代理商
             agent_map = {}
             for a in data['agents']:
@@ -593,40 +622,36 @@ async def update_route(
                         has_fee = a.get('fee_items') or a.get('fee_total') or a.get('summary')
                         if has_fee:
                             agent_map[name] = a
-            
+
             # 插入新代理商
             for agent_data in agent_map.values():
                 fee_items_data = agent_data.pop('fee_items', [])
                 fee_total_data = agent_data.pop('fee_total', [])
                 summary_data = agent_data.pop('summary', {})
-                
+
                 for bad_key in ['代理路线ID', '路线ID', '创建时间']:
                     agent_data.pop(bad_key, None)
-                
+
                 agent = RouteAgent(路线ID=route_id, **agent_data)
                 db.add(agent)
                 db.flush()
                 agent_id = agent.代理路线ID
-                
+
                 for fee_item in fee_items_data:
                     for bad_key in ['费用ID', '代理路线ID', '创建时间']:
                         fee_item.pop(bad_key, None)
                     db.add(FeeItem(代理路线ID=agent_id, **fee_item))
-                
+
                 for fee_total in fee_total_data:
                     for bad_key in ['整单费用ID', '代理路线ID', '创建时间']:
                         fee_total.pop(bad_key, None)
                     db.add(FeeTotal(代理路线ID=agent_id, **fee_total))
-                
+
                 for bad_key in ['汇总ID', '代理路线ID', '创建时间']:
                     summary_data.pop(bad_key, None)
-                
+
                 if summary_data and any(v for v in summary_data.values() if v not in [0, 0.0, '', None, {}]):
-                    def _sf(val, default=0.0):
-                        try:
-                            return float(val) if val is not None else default
-                        except (TypeError, ValueError):
-                            return default
+                    db.flush()
                     upsert_sql = text("""
                         INSERT INTO summary (
                             `代理路线ID`, `小计`, `运费小计`, `税率`, `进口税率原文`,
@@ -663,7 +688,10 @@ async def update_route(
                         '总计金额':    summary_data.get('总计金额'),
                         '备注':        summary_data.get('备注') or '',
                     })
-            
+
+                # 记录用于最终写回
+                _agent_summaries.append((agent_id, dict(summary_data)))
+
             logger.debug(f"  ✅ 已更新 {len(agent_map)} 个代理商")
         
         # ============================================================
@@ -740,16 +768,46 @@ async def update_route(
         
         if protect_clauses:
             protect_sql = text(f"""
-                UPDATE routes 
+                UPDATE routes
                 SET {', '.join(protect_clauses)}
                 WHERE `路线ID` = :route_id
             """)
             db.execute(protect_sql, protect_params)
             db.commit()
             logger.debug(f"【第五阶段】保护性写回完成: {protect_params}")
+
+        # ============================================================
+        # 第六阶段：summary 最终写回（在所有触发器都跑完之后强制写入正确值）
+        # goods_total/goods_details/routes 的触发器都会调用 recompute_summary_for_route
+        # 统一在最后一次覆盖，确保税金/汇损/进口税率原文不被触发器篡改
+        # ============================================================
+        if _agent_summaries:
+            for agent_id, s in _agent_summaries:
+                if not s:
+                    continue
+                correct_tax = _sf(s.get('税金金额') or s.get('税金'))
+                correct_loss = _sf(s.get('汇损'))
+                import_tax_text = s.get('进口税率原文') or ''
+                if correct_tax or correct_loss or import_tax_text:
+                    db.execute(text("""
+                        UPDATE summary
+                        SET `税金`         = :税金,
+                            `汇损`         = :汇损,
+                            `总计`         = `小计` + :税金 + :汇损,
+                            `进口税率原文`  = :进口税率原文
+                        WHERE `代理路线ID` = :agent_id
+                    """), {
+                        'agent_id':    agent_id,
+                        '税金':        correct_tax,
+                        '汇损':        correct_loss,
+                        '进口税率原文': import_tax_text,
+                    })
+            db.commit()
+            logger.debug(f"【第六阶段】summary 最终写回完成，共 {len(_agent_summaries)} 条")
+
         logger.debug(f"\n✅ 所有更新已完成并COMMIT")
         logger.debug(f"{'='*80}\n")
-        
+
         return {
             "success": True,
             "message": "更新成功",

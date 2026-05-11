@@ -11,11 +11,81 @@
  Target Server Version : 80044 (8.0.44)
  File Encoding         : 65001
 
- Date: 12/03/2026 14:43:18
+ Date: 06/05/2026 10:19:42
 */
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for agent_check_history
+-- ----------------------------
+DROP TABLE IF EXISTS `agent_check_history`;
+CREATE TABLE `agent_check_history`  (
+  `查调ID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `代理商ID` int UNSIGNED NULL DEFAULT NULL COMMENT '关联 agents.代理商ID，可为NULL（查调未入库的公司）',
+  `查询关键词` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户输入的公司名/关键词',
+  `llm模型` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '调用的LLM模型，如 glm-4.7',
+  `报告摘要` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT 'LLM生成的背调报告摘要（300字以内）',
+  `完整报告` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT 'LLM生成的完整报告JSON',
+  `风险评级` enum('低风险','中等风险','高风险','无法评估') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '无法评估',
+  `信息来源` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '参考的公开信息来源URL列表',
+  `token消耗` int UNSIGNED NULL DEFAULT NULL,
+  `查调耗时秒` decimal(6, 2) NULL DEFAULT NULL,
+  `操作用户` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `创建时间` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`查调ID`) USING BTREE,
+  INDEX `idx_check_keyword`(`查询关键词`(50) ASC) USING BTREE,
+  INDEX `idx_check_agent`(`代理商ID` ASC) USING BTREE,
+  INDEX `idx_check_time`(`创建时间` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'AI企业背调历史记录' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for agents
+-- ----------------------------
+DROP TABLE IF EXISTS `agents`;
+CREATE TABLE `agents`  (
+  `代理商ID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `代理商名称` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '公司全称（唯一索引）',
+  `代理商简称` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '常用缩写/简称',
+  `国家地区` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '代理商所在国家或地区',
+  `主营路线` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '逗号分隔，如\"深圳-新加坡,上海-荷兰\"',
+  `主营运输方式` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '海运/空运/铁路/多式联运',
+  `合作状态` enum('已合作','未合作','待确认') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '已合作',
+  `信用评分` tinyint UNSIGNED NULL DEFAULT NULL COMMENT '1-100，推荐引擎打分',
+  `联系方式` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `备注` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
+  `创建时间` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `更新时间` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`代理商ID`) USING BTREE,
+  UNIQUE INDEX `uk_agents_name`(`代理商名称` ASC) USING BTREE,
+  INDEX `idx_agents_status`(`合作状态` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 18 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代理商主表，规范化自 route_agents.代理商' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for country_lpi
+-- ----------------------------
+DROP TABLE IF EXISTS `country_lpi`;
+CREATE TABLE `country_lpi`  (
+  `lpiID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `国家代码` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'ISO 3166-1 alpha-2',
+  `国家名称` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `国家中文名` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `数据年份` year NOT NULL COMMENT 'LPI调查年份',
+  `LPI综合评分` decimal(4, 2) NULL DEFAULT NULL COMMENT '1-5分',
+  `通关效率` decimal(4, 2) NULL DEFAULT NULL COMMENT 'Customs（海关效率）',
+  `基础设施` decimal(4, 2) NULL DEFAULT NULL COMMENT 'Infrastructure',
+  `国际运输` decimal(4, 2) NULL DEFAULT NULL COMMENT 'International Shipments',
+  `物流能力` decimal(4, 2) NULL DEFAULT NULL COMMENT 'Logistics Competence',
+  `货物追踪` decimal(4, 2) NULL DEFAULT NULL COMMENT 'Tracking & Tracing',
+  `时效性` decimal(4, 2) NULL DEFAULT NULL COMMENT 'Timeliness',
+  `全球排名` smallint UNSIGNED NULL DEFAULT NULL,
+  `风险等级` enum('低','中低','中','中高','高') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci GENERATED ALWAYS AS ((case when (`LPI综合评分` >= 4.0) then _utf8mb4'低' when (`LPI综合评分` >= 3.5) then _utf8mb4'中低' when (`LPI综合评分` >= 3.0) then _utf8mb4'中' when (`LPI综合评分` >= 2.5) then _utf8mb4'中高' else _utf8mb4'高' end)) STORED COMMENT '基于LPI综合评分自动生成' NULL,
+  `创建时间` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`lpiID`) USING BTREE,
+  UNIQUE INDEX `uk_lpi_country_year`(`国家代码` ASC, `数据年份` ASC) USING BTREE,
+  INDEX `idx_lpi_score`(`LPI综合评分` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 78 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '世界银行物流绩效指数（LPI），用于航线风险评估' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for fee_items
@@ -28,6 +98,7 @@ CREATE TABLE `fee_items`  (
   `单价` decimal(18, 2) NULL DEFAULT 0.00,
   `单位` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `数量` decimal(18, 3) NULL DEFAULT 0.000,
+  `最低收费` decimal(18, 2) NULL DEFAULT NULL,
   `币种` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT 'RMB',
   `原币金额` decimal(18, 2) NULL DEFAULT 0.00,
   `人民币金额` decimal(18, 2) NULL DEFAULT 0.00,
@@ -36,72 +107,7 @@ CREATE TABLE `fee_items`  (
   PRIMARY KEY (`费用ID`) USING BTREE,
   INDEX `fk_fee_items_route_agents`(`代理路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_fee_items_route_agents` FOREIGN KEY (`代理路线ID`) REFERENCES `route_agents` (`代理路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 136 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of fee_items
--- ----------------------------
-INSERT INTO `fee_items` VALUES (1, 1, '海运费', 18.00, '/kg', 1740.000, 'RMB', 31320.00, 31320.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (2, 1, '附加费', 5.00, '/kg', 1740.000, 'RMB', 8700.00, 8700.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (3, 2, '运费', 22.00, '/kg', 1740.000, 'RMB', 38280.00, 38280.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (4, 3, '运费', 17.00, '/kg', 1740.000, 'RMB', 29580.00, 29580.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (5, 4, '海运费', 500.00, '/cbm', 5.460, 'RMB', 2730.00, 2730.00, '如需拆箱：500元*2=1000', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (6, 5, '海运费', 380.00, '/cbm', 5.460, 'RMB', 2074.80, 2074.80, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (7, 6, '海运费', 14.50, '/kg', 910.000, 'RMB', 13195.00, 13195.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (8, 7, '运费', 8.00, '/kg', 930.000, 'RMB', 7440.00, 7440.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (9, 7, '卸货费', 300.00, '/人/小时', 4.000, 'RMB', 1200.00, 1200.00, '按照2小时2人计算', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (10, 7, '拆箱费', 300.00, '/个', 2.000, 'RMB', 600.00, 600.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (11, 8, '集运费', 3.00, '/kg', 930.000, 'RMB', 2790.00, 2790.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (12, 8, '派送费', 800.00, '/次', 1.000, 'RMB', 800.00, 800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (13, 9, '运费', 7.00, '/kg', 0.000, 'RMB', 0.00, 0.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (14, 9, '派送费', 500.00, '/票', 1.000, 'RMB', 500.00, 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (15, 10, '运费', 11.00, '/kg', 0.000, 'RMB', 0.00, 0.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (16, 10, '超长费', 300.00, '/件', 1.000, 'RMB', 300.00, 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (17, 10, '超重费', 300.00, '/件', 1.000, 'RMB', 300.00, 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (18, 10, '尾板费', 500.00, '/票', 1.000, 'RMB', 500.00, 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (19, 11, '运费', 1.50, '/kg', 0.000, 'RMB', 0.00, 0.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (20, 12, '包装费', 60.00, '/个', 2.000, 'USD', 120.00, 120.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (21, 13, '空运费', 25.00, '/kg', 100.000, 'RMB', 2500.00, 2500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (22, 13, '操作费', 0.30, '/kg', 100.000, 'SGD', 30.00, 168.00, 'MIN SGD35', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (23, 15, '运费', 45.00, '/kg', 30.000, 'RMB', 1350.00, 1350.00, '低于30KG', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (24, 16, '运费', 68.00, '/kg', 100.000, 'RMB', 6800.00, 6800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (25, 17, '包装费', 60.00, '/个', 1.000, 'USD', 60.00, 60.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (26, 18, '空运费', 27.00, '/kg', 100.000, 'RMB', 2700.00, 2700.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (27, 18, '操作费', 0.30, '/kg', 100.000, 'SGD', 30.00, 168.00, 'MIN SGD35', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (28, 19, '空运费', 26.00, '/kg', 45.000, 'RMB', 1170.00, 1170.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (29, 19, '运费', 0.30, '/kg', 45.000, 'USD', 13.50, 13.50, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (30, 19, 'SIRIM费', 180.00, '/个', 1.000, 'USD', 180.00, 180.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (31, 20, '运费', 44.00, '/kg', 30.000, 'RMB', 1320.00, 1320.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (32, 21, '运费', 30.00, '/kg', 30.000, 'RMB', 900.00, 900.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (33, 22, '运费', 48.00, '/kg', 150.000, 'RMB', 7200.00, 7200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (34, 23, '运费', 12.97, '/kg', 3000.000, 'RMB', 38910.00, 38910.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (35, 23, '派送费', 5.70, '/kg', 3000.000, 'RMB', 17100.00, 17100.00, 'MIN 3360 RMB', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (36, 23, '卸货费', 70.00, '/台', 100.000, 'RMB', 7000.00, 7000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (37, 23, '仓储费', 1.50, '/天/kg', 15000.000, 'RMB', 22500.00, 22500.00, '免3天', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (38, 24, '舱单费', 100.00, '/票', 1.000, 'RMB', 100.00, 100.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (39, 24, '卸货费', 0.55, '/kg', 3000.000, 'RMB', 1650.00, 1650.00, '或者 CNY120/板', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (40, 24, '通关费', 12800.00, '/entry', 1.000, 'JPY', 12800.00, 12800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (41, 24, '通关手续费', 11000.00, '/entry', 1.000, 'JPY', 11000.00, 11000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (42, 24, 'THC费', 48.00, '/kg', 3000.000, 'JPY', 144000.00, 144000.00, 'min JPY6500', '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (43, 24, '操作费', 15000.00, '/hawb', 1.000, 'JPY', 15000.00, 15000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (44, 24, 'handlift费', 6000.00, '/台', 2.000, 'JPY', 12000.00, 12000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (45, 24, '上楼费', 35000.00, '/人', 4.000, 'JPY', 140000.00, 140000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (46, 25, '运费', 55.00, '/kg', 120.000, 'RMB', 6600.00, 6600.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (47, 26, '快递费', 64.00, '/kg', 120.000, 'RMB', 7680.00, 7680.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (48, 27, '运费', 2.50, '/kg', 17000.000, 'RMB', 42500.00, 42500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (49, 27, '派送费', 150.00, '/票', 1.000, 'RMB', 150.00, 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (50, 28, '运费', 1500.00, '/票', 1.000, 'RMB', 1500.00, 1500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (51, 28, '运费', 4.50, '/kg', 17000.000, 'RMB', 76500.00, 76500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (52, 30, '运费', 3.00, '/kg', 27000.000, 'RMB', 81000.00, 81000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (53, 30, '派送费', 150.00, '/票', 1.000, 'RMB', 150.00, 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (54, 31, '运费', 4.50, '/kg', 27000.000, 'RMB', 121500.00, 121500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (55, 31, '资料费', 1500.00, '/票', 1.000, 'RMB', 1500.00, 1500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (56, 14, '运费', 38.00, '/kg', 100.000, 'CNY', 3800.00, 3800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (57, 33, '运费', 84.00, '/kg', 45.000, 'CNY', 3780.00, 3780.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (58, 24, '运费', 17.00, '/kg', 3000.000, 'RMB', 51000.00, 51000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_items` VALUES (133, 144, '运费', 10.00, '/kg', 240.000, 'RMB', 2400.00, 2400.00, '666', '2026-03-11 11:00:07');
-INSERT INTO `fee_items` VALUES (134, 145, '空运费', 40.00, '/kg', 50.000, 'RMB', 2000.00, 2000.00, '666', '2026-03-11 14:57:01');
-INSERT INTO `fee_items` VALUES (135, 146, '空运费', 40.00, '/kg', 60.000, 'RMB', 2400.00, 2400.00, '777', '2026-03-11 17:43:33');
+) ENGINE = InnoDB AUTO_INCREMENT = 356 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for fee_total
@@ -119,109 +125,7 @@ CREATE TABLE `fee_total`  (
   PRIMARY KEY (`整单费用ID`) USING BTREE,
   INDEX `fk_fee_total_route_agents`(`代理路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_fee_total_route_agents` FOREIGN KEY (`代理路线ID`) REFERENCES `route_agents` (`代理路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 173 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of fee_total
--- ----------------------------
-INSERT INTO `fee_total` VALUES (1, 7, '派送费', 500.00, 'RMB', 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (2, 7, '扔垃圾费', 600.00, 'RMB', 600.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (3, 8, '卸货上楼并拆清费用费', 1200.00, 'RMB', 1200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (4, 12, '提货费', 300.00, 'USD', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (5, 12, '上楼费', 180.00, 'USD', 180.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (6, 12, 'UPS快递费', 450.00, 'USD', 450.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (7, 12, '操作费', 100.00, 'SGD', 560.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (8, 12, '清关费', 100.00, 'SGD', 560.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (9, 12, '出入库费', 45.00, 'SGD', 252.00, '一进一出分开收费', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (10, 12, '派送费', 180.00, 'SGD', 1008.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (11, 12, '上楼费', 180.00, 'SGD', 1008.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (12, 12, '手续费', 65.00, 'SGD', 364.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (13, 13, '验电费', 500.00, 'RMB', 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (14, 13, '操作费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (15, 13, '报关费', 300.00, 'RMB', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (16, 13, '申报税费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (17, 13, '报关费', 100.00, 'SGD', 560.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (18, 13, '卡车费', 180.00, 'SGD', 1008.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (19, 13, '人工费', 180.00, 'SGD', 1008.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (20, 13, '拆包装和回收垃圾费', 200.00, 'SGD', 1120.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (21, 13, '代理税金操作费', 65.00, 'SGD', 364.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (22, 15, '预约费', 500.00, 'RMB', 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (23, 15, '卸货上楼费', 500.00, 'RMB', 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (24, 16, '操作费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (25, 16, '卸货费', 800.00, 'EUR', 800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (26, 17, '提货费', 300.00, 'USD', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (27, 17, '上楼费', 180.00, 'USD', 180.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (28, 17, 'UPS快递费', 350.00, 'USD', 350.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (29, 17, '调单费', 95.00, 'EUR', 95.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (30, 17, '清关费', 115.00, 'EUR', 115.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (31, 17, '操作费', 125.00, 'EUR', 125.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (32, 17, '贸易代理费', 380.00, 'EUR', 380.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (33, 17, '派送费', 280.00, 'EUR', 280.00, '预估的，拼车，不含卸货上楼', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (34, 18, '操作费', 150.00, 'RMB', 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (35, 18, '报关费', 300.00, 'RMB', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (36, 18, '报关费', 100.00, 'SGD', 560.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (37, 18, '卡车费', 200.00, 'SGD', 1120.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (38, 18, '人工费', 200.00, 'SGD', 1120.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (39, 18, '拆包装和回收垃圾费', 250.00, 'SGD', 1400.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (40, 19, '操作费', 150.00, 'RMB', 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (41, 19, '报关费', 300.00, 'RMB', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (42, 19, '申报税费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (43, 19, '报关费', 35.00, 'USD', 35.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (44, 19, '文件费', 35.00, 'USD', 35.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (45, 19, '贸易代理费', 180.00, 'USD', 180.00, 'IF NEED', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (46, 19, '送货费', 150.00, 'USD', 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (47, 19, '卸货上楼费', 150.00, 'USD', 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (48, 19, '回收垃圾费', 80.00, 'USD', 80.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (49, 20, '操作费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (50, 20, '派送费', 450.00, 'MYR', 450.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (51, 22, '操作费', 2500.00, 'RMB', 2500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (52, 22, '如入朗华仓加收费', 1500.00, 'RMB', 1500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (53, 22, '操作费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (54, 22, '卸货上楼&回收垃圾费', 450.00, 'USD', 450.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (55, 23, '深圳香港费', 5500.00, 'RMB', 5500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (56, 23, '出口清关杂费', 1775.00, 'RMB', 1775.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (57, 23, '目的港清关杂费', 2400.00, 'RMB', 2400.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (58, 23, '派送费', 2400.00, 'RMB', 2400.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (59, 23, '杂费', 2400.00, 'RMB', 2400.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (60, 24, '报关费', 300.00, 'RMB', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (61, 24, '清关费', 300.00, 'RMB', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (62, 24, '申报税费', 200.00, 'RMB', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (63, 24, '香港本地杂费', 1000.00, 'RMB', 1000.00, '香港入仓费，停车费和隧道费等香港本地杂费实报实销 预估1000 左右', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (64, 24, '验电费', 500.00, 'RMB', 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (65, 24, '提派费', 399800.00, 'JPY', 399800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (66, 25, '派送费', 800.00, 'RMB', 800.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (67, 29, '国内报关费', 400.00, 'RMB', 400.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (68, 29, '送货费', 500.00, 'RMB', 500.00, '200-500元', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (69, 29, '国外清关费', 200.00, 'USD', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (70, 32, '国内报关费', 400.00, 'RMB', 400.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (71, 32, '送货费', 500.00, 'RMB', 500.00, '200-500元', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (72, 32, '国外清关费', 200.00, 'USD', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (73, 29, '柜费', 24000.00, 'RMB', 24000.00, '40尺柜*2 ：12000RMB*2', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (74, 11, '交会展费', 1700.00, 'RMB', 1700.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (75, 11, '拆箱丢垃圾费', 1000.00, 'RMB', 1000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (76, 14, '报关+过港费', 4500.00, 'CNY', 4500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (77, 33, '操作费', 200.00, 'CNY', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (78, 33, '报关费', 300.00, 'CNY', 300.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (79, 33, '验电费', 500.00, 'CNY', 500.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (80, 33, '报关费', 150.00, 'USD', 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (81, 33, '航站费', 280.00, 'USD', 280.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (82, 33, '贸易代理费', 200.00, 'USD', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (83, 33, '操作费', 45.00, 'USD', 45.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (84, 33, '送货费', 385.00, 'USD', 385.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (85, 33, '人工费', 200.00, 'USD', 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (86, 33, '仓储费', 100.00, 'USD', 100.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (87, 33, '待时费', 150.00, 'USD', 150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (88, 24, '贸易代理费', 35000.00, 'JPY', 35000.00, '货值*3.5%，min JPY35000（如需）', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (89, 27, '提货费', 22110.00, 'RMB', 22110.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (90, 28, '提货费', 22110.00, 'RMB', 22110.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (91, 29, '提货费', 22110.00, 'RMB', 22110.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (92, 29, '柜费', 24000.00, 'RMB', 24000.00, '40尺柜*2 ：12000RMB*2', '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (93, 30, '提货费', 6000.00, 'RMB', 6000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (94, 31, '提货费', 6000.00, 'RMB', 6000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (95, 32, '提货费', 6000.00, 'RMB', 6000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `fee_total` VALUES (170, 144, '操作费', 200.00, 'RMB', 200.00, '777', '2026-03-11 11:00:07');
-INSERT INTO `fee_total` VALUES (171, 145, '操作费', 200.00, 'USD', 200.00, '777', '2026-03-11 14:57:01');
-INSERT INTO `fee_total` VALUES (172, 146, '操作费', 200.00, 'USD', 200.00, '888', '2026-03-11 17:43:33');
+) ENGINE = InnoDB AUTO_INCREMENT = 464 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for forex_rate
@@ -233,11 +137,6 @@ CREATE TABLE `forex_rate`  (
   `更新时间` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`币种`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of forex_rate
--- ----------------------------
-INSERT INTO `forex_rate` VALUES ('SGD', 5.60000000, '2026-02-24 17:18:44');
 
 -- ----------------------------
 -- Table structure for forex_rate_history
@@ -252,11 +151,7 @@ CREATE TABLE `forex_rate_history`  (
   `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`汇率历史ID`) USING BTREE,
   INDEX `idx_currency_date`(`币种` ASC, `生效日期` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of forex_rate_history
--- ----------------------------
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for goods_details
@@ -266,6 +161,10 @@ CREATE TABLE `goods_details`  (
   `货物ID` int NOT NULL AUTO_INCREMENT,
   `路线ID` int NOT NULL,
   `货物名称` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `SKU` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '产品型号',
+  `HS编码` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '海关商品编码',
+  `原产国` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '原产地国家',
+  `货物大类` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '如: 电子产品/纺织品/化工品/机械设备/食品/其他',
   `是否新品` tinyint(1) NULL DEFAULT 0,
   `货物种类` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `数量` decimal(18, 3) NULL DEFAULT 0.000,
@@ -279,43 +178,7 @@ CREATE TABLE `goods_details`  (
   PRIMARY KEY (`货物ID`) USING BTREE,
   INDEX `fk_goods_details_routes`(`路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_goods_details_routes` FOREIGN KEY (`路线ID`) REFERENCES `routes` (`路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 86 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of goods_details
--- ----------------------------
-INSERT INTO `goods_details` VALUES (1, 7, 'CE88-D8CQ板卡', 0, '耗材', 10.000, 1200.0000, 'RMB', 0.500, 5.000, 12000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (2, 8, 'Nokia 7750-SR-1（每台2块100G接口卡）', 1, '网络设备', 2.000, 132631.0000, 'RMB', 10.000, 20.000, 265262.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (3, 8, 'OTNS8600-DCI8', 1, '网络设备', 4.000, 2500.0000, 'RMB', 15.000, 60.000, 10000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (4, 8, 'OTMT2光转换单元', 1, '网络设备', 8.000, 37000.0000, 'RMB', 1.500, 12.000, 296000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (5, 9, '100G单模模块 QSFP28-100G-LR4(1310nm,10km,LC)', 1, '耗材', 21.000, 950.0000, 'RMB', 0.100, 2.100, 19950.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (6, 9, '100G多模模块 QSFP28-100G-SR4(850nm,0.1km,MPO)', 1, '耗材', 38.000, 168.0000, 'RMB', 0.100, 3.800, 6384.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (7, 9, 'MPO（100g多模） 10m', 1, '耗材', 40.000, 80.7000, 'RMB', 0.100, 4.000, 3228.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (8, 9, '光纤跳线 单模（LC-LC）10m', 1, '耗材', 42.000, 10.1500, 'RMB', 0.100, 4.200, 426.30, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (9, 9, 'AOC（25g）5m', 1, '耗材', 66.000, 117.0000, 'RMB', 0.100, 6.600, 7722.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (10, 9, '标签纸A4', 1, '耗材', 2.000, 20.0000, 'RMB', 0.100, 0.200, 40.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (11, 9, '理线架', 1, '耗材', 4.000, 25.0000, 'RMB', 0.100, 0.400, 100.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (12, 9, '魔术贴', 1, '耗材', 1.000, 40.0000, 'RMB', 0.100, 0.100, 40.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (13, 9, '扎带', 1, '耗材', 1.000, 38.0000, 'RMB', 0.100, 0.100, 38.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (14, 10, 'Nokia 7750-SR-1（每台2块100G接口卡）', 1, '网络设备', 2.000, 132631.0000, 'RMB', 10.000, 20.000, 265262.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (15, 10, 'MPO（100g多模） 15m', 0, '耗材', 32.000, 33.6500, 'RMB', 0.100, 3.200, 1076.80, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (16, 11, 'P616 光转换单元', 1, '网络设备', 6.000, 50000.0000, 'RMB', 1.500, 9.000, 300000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (17, 11, 'Nokia 7750-SR-1（每台2块100G接口卡）', 1, '网络设备', 2.000, 132631.0000, 'RMB', 10.000, 20.000, 265262.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (18, 11, '100G单模模块 QSFP28-100G-LR4(1310nm,10km,LC)', 1, '耗材', 82.000, 950.0000, 'RMB', 0.100, 8.200, 77900.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (19, 11, 'MPO（100g多模） 10m', 1, '耗材', 30.000, 80.7000, 'RMB', 0.100, 3.000, 2421.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (20, 11, '单模（LC-LC）10m', 1, '耗材', 49.000, 10.1500, 'RMB', 0.100, 4.900, 497.35, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (21, 11, 'AOC（25g）5m', 1, '耗材', 66.000, 117.0000, 'RMB', 0.100, 6.600, 7722.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (22, 11, '标签纸A4', 1, '耗材', 2.000, 20.0000, 'RMB', 0.100, 0.200, 40.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (23, 11, '理线架', 1, '耗材', 10.000, 25.0000, 'RMB', 0.100, 1.000, 250.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (24, 11, '魔术贴', 1, '耗材', 5.000, 40.0000, 'RMB', 0.100, 0.500, 200.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (25, 11, '扎带', 1, '耗材', 5.000, 38.0000, 'RMB', 0.100, 0.500, 190.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (26, 11, '网线5m', 1, '耗材', 15.000, 19.0000, 'RMB', 0.100, 1.500, 285.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (27, 11, 'C13-C14电源线', 0, '耗材', 24.000, 25.0000, 'RMB', 0.100, 2.400, 600.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (28, 11, 'CE6865E', 0, '交换机', 2.000, 11248.0000, 'RMB', 8.000, 16.000, 22496.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (29, 12, '5120-48Y', 0, '交换机', 1.000, 11906.0000, 'RMB', 8.000, 8.000, 11906.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_details` VALUES (83, 110, '交换机', 1, '网络设备', 2.000, 50000.0000, 'RMB', 120.000, 240.000, 100000.00, '111', '2026-03-11 11:00:07');
-INSERT INTO `goods_details` VALUES (84, 107, '服务器设备', 1, '网络设备', 1.000, 10000.0000, 'RMB', 40.000, 40.000, 10000.00, '000', '2026-03-11 14:57:01');
-INSERT INTO `goods_details` VALUES (85, 109, '服务器', 1, '网络设备', 1.000, 10000.0000, 'RMB', 40.000, 40.000, 10000.00, '111', '2026-03-11 17:43:33');
+) ENGINE = InnoDB AUTO_INCREMENT = 88 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for goods_total
@@ -327,31 +190,60 @@ CREATE TABLE `goods_total`  (
   `货物名称` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `实际重量(/kg)` decimal(18, 2) NULL DEFAULT 0.00 COMMENT '整单实际重量,单位:千克',
   `货值` decimal(18, 2) NULL DEFAULT 0.00,
+  `货值币种` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'RMB',
   `总体积(/cbm)` decimal(18, 3) NULL DEFAULT 0.000 COMMENT '整单总体积,单位:立方米',
   `备注` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`整单货物ID`) USING BTREE,
   INDEX `fk_goods_total_routes`(`路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_goods_total_routes` FOREIGN KEY (`路线ID`) REFERENCES `routes` (`路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 46 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 71 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of goods_total
+-- Table structure for import_tax_items
 -- ----------------------------
-INSERT INTO `goods_total` VALUES (1, 1, '碱性电池', 1740.00, 0.00, 0.000, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (2, 2, '2件展示柜', 910.00, 100000.00, 5.460, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (3, 3, '2件展示柜', 910.00, 100000.00, 5.460, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (4, 4, '2件展示柜', 910.00, 0.00, 2.730, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (5, 4, '粮食标本', 5.00, 0.00, 0.000, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (6, 4, '电子屏', 10.00, 0.00, 0.002, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (7, 4, '酿酒陶坛', 5.00, 0.00, 0.002, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (8, 16, '4台Dell PowerEdge R7625', 150.00, 0.00, 0.000, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (9, 19, '宣传册&伴手礼', 120.00, 0.00, 0.000, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (10, 22, '长雨伞和短雨伞', 0.00, 0.00, 0.000, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (11, 23, '风扇', 0.00, 0.00, 0.000, NULL, '2026-02-25 18:09:23');
-INSERT INTO `goods_total` VALUES (43, 110, '交换机', 240.00, 100000.00, 5.000, '2台', '2026-03-11 11:00:07');
-INSERT INTO `goods_total` VALUES (44, 107, '服务器', 40.00, 10000.00, 5.000, '111', '2026-03-11 14:57:01');
-INSERT INTO `goods_total` VALUES (45, 109, '服务器设备', 40.00, 10000.00, 5.000, '222', '2026-03-11 17:43:34');
+DROP TABLE IF EXISTS `import_tax_items`;
+CREATE TABLE `import_tax_items`  (
+  `税项ID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `代理路线ID` int NOT NULL,
+  `货物描述` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `HS编码` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `原产国` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `关税率` decimal(8, 4) NULL DEFAULT NULL,
+  `增值税率` decimal(8, 4) NULL DEFAULT NULL,
+  `综合税率` decimal(8, 4) NULL DEFAULT NULL,
+  `税金金额` decimal(18, 2) NULL DEFAULT NULL,
+  `原文` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `创建时间` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`税项ID`) USING BTREE,
+  INDEX `idx_itx_agent_route`(`代理路线ID` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '进口税率明细表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for ports
+-- ----------------------------
+DROP TABLE IF EXISTS `ports`;
+CREATE TABLE `ports`  (
+  `港口ID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `UNLOCODE` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'UN/LOCODE，如 CNSZX',
+  `港口名称` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '中文名称',
+  `港口英文名` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `国家代码` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'ISO 3166-1 alpha-2',
+  `国家名称` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `城市` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `纬度` decimal(9, 6) NULL DEFAULT NULL,
+  `经度` decimal(9, 6) NULL DEFAULT NULL,
+  `港口类型` enum('海港','空港','内陆港','铁路港','多式联运') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '海港',
+  `所属时区` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '如 Asia/Shanghai',
+  `平均清关天数` decimal(4, 1) NULL DEFAULT NULL COMMENT '历史平均清关天数',
+  `LPI风险等级` enum('低','中','高') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '中' COMMENT '基于LPI综合评估',
+  `备注` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL,
+  `更新时间` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`港口ID`) USING BTREE,
+  UNIQUE INDEX `uk_ports_unlocode`(`UNLOCODE` ASC) USING BTREE,
+  INDEX `idx_ports_country`(`国家代码` ASC) USING BTREE,
+  INDEX `idx_ports_type`(`港口类型` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 134 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '全球主要港口表，基于UN/LOCODE' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for route_agents
@@ -361,10 +253,12 @@ CREATE TABLE `route_agents`  (
   `代理路线ID` int NOT NULL AUTO_INCREMENT,
   `路线ID` int NOT NULL,
   `代理商` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `代理商ID` int UNSIGNED NULL DEFAULT NULL COMMENT '关联 agents.代理商ID，规范化后填充',
   `运输方式` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `贸易类型` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `代理备注` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
   `时效` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `时效天数` smallint UNSIGNED NULL DEFAULT NULL COMMENT '从时效字段提取的数字天数，用于排序和推荐',
   `时效备注` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `不含` varchar(511) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `是否赔付` tinyint(1) NULL DEFAULT 0 COMMENT '0=否，1=是',
@@ -372,48 +266,74 @@ CREATE TABLE `route_agents`  (
   `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`代理路线ID`) USING BTREE,
   INDEX `fk_route_agents_routes`(`路线ID` ASC) USING BTREE,
+  INDEX `idx_ra_agent_id`(`代理商ID` ASC) USING BTREE,
+  INDEX `idx_ra_timeliness`(`时效天数` ASC) USING BTREE,
   CONSTRAINT `fk_route_agents_routes` FOREIGN KEY (`路线ID`) REFERENCES `routes` (`路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 147 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 272 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of route_agents
+-- Table structure for route_attachments
 -- ----------------------------
-INSERT INTO `route_agents` VALUES (1, 1, '融迅', '海运', '专线', NULL, '55天', '约50-55天左右，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', '国内提货费，保险费，二次包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (2, 1, '银顺达', '海运', '专线', '仅合作过快递，未合作过专线', '45天', '约45天左右，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', '国内提货费，保险费，二次包装费，存储费、送货时的卡车等待费、卸货上楼费、停车费等，如产生其他费用实报实销', 1, '电池专线赔偿标准：在运输过程中如货物丢失赔偿RMB40/kg，不退运费，尾程提取后丢失按照快递公司官方赔偿标准进行赔偿,最高不超过100美金/票', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (3, 1, '欧洲专线集团', '快递', '专线', '展会新加代理，未合作', '55天', '约50-55天左右，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', '国内提货费，保险费，二次包装费，存储费、送货时的卡车等待费、卸货上楼费、停车费等，如产生其他费用实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (4, 2, '越海速达', '海运', '双清', NULL, '15天', '时效：运输时间：12-15个工作日左右', '卸货拆箱等', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (5, 2, '骐盛', '海运', '双清', NULL, NULL, '运输时间：近期船期乱，时效不稳定不做保证', '卸货拆箱等', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (6, 3, '拓宇', '海运', '双清', NULL, '50天', '开船后时效50天左右到', NULL, 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (7, 4, '一诺物流', NULL, NULL, '新代理，未合作', '3天', '约2-3天，海关查验顺延', '保险费，查验费，待时费，国内转运费（天津-珠海），包装费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (8, 4, '雄展货运', NULL, NULL, '未合作，新代理', '2天', '约2天，海关查验顺延', '保险费，查验费，待时费，国内转运费（天津-珠海），包装费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (9, 5, '澳凯', '海运', '专线', '海运专线-新代理未合作', '30天', '展会货物建议尽早出运，以免遇到晚开船/查验等导致延误；开船后25-30天左右签收，受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', '国内提货费，保险费，包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 1, '货物丢件 赔偿20/kg 不退运费', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (10, 5, '蓝鹰', '海运', '专线', '海运专线-新代理未合作', '35天', '展会货物建议尽早出运，以免遇到晚开船/查验等导致延误；开船后约25-35天左右到，海运受天气原因影响较大，有晚开船、晚到港的情况，如遇托班/海关查验时间顺延', '国内提货费，保险费，包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (11, 6, '海阳中港', '海运', NULL, NULL, '4天', '展会货物建议尽早出运，以免遇到晚开船/查验等导致延误；约3-4个工作日过港（不含派送时间），如遇海关查验时间顺延，参考之前货物过港遇到查验退运，约2周左右重新发出', '香港杂费实报实销，国内提货费，保险费，包装费，存储费、送货时的卡车等待费、停车费等，如产生其他费用实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (12, 7, '融迅', '快递', '快递', '快递+贸代方案', '12天', '提货+包装需要2-3天，快递4-6天， 清关+送货2-3天，全程：8-12天，海关查验顺延', '仓储费和查验等费用，保险费，海关查验费，仓储费，待时费，快递杂费实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (13, 8, '融迅', '空运', '一般贸易', NULL, '7天', '深圳-香港1-2天，香港-新加坡4-5天，全程：5-7天，海关查验顺延', '保险费，海关查验费，国内转运费，二次包装费，新加坡仓储费，待时费，香港杂费实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (14, 8, '一般贸易过港+双清方案', '空运', '一般贸易+双清', NULL, '7天', '深圳-香港1-2天，香港-新加坡4-5天，全程：5-7天，海关查验顺延', '保险费，海关查验费，国内转运费，二次包装费，新加坡仓储费，待时费，香港杂费实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (15, 9, '越海速达', NULL, '双清', '双清', '6天', '起运后4-6天，海关查验顺延', '保险费，海关查验费，国内转运费，二次包装费，超重和超尺费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (16, 11, '融迅', NULL, '双清', '双清含税报价', '20天', '时效10-15个工作日左右；全程15-20天，海关查验顺延', '保险费，包装费，国内转运费，海关查验费，仓储费，待时费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (17, 12, '融迅', '快递', '贸易代理', '快递+贸代方案', '12天', '提货+包装需要2-3天，快递4-6天，拼车时效：2-3天（从荷兰发运-德国法兰克福），全程：8-12天，海关查验顺延', '不含卸货上楼，如果需要卸货上楼，需要准备地址： EUR 200 预估                                             不含仓储费和查验等费用，保险费，海关查验费，仓储费，待时费，快递杂费实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (18, 13, '融迅', '空运', NULL, '预估', '7天', '起运后5-7 个工作日，海关查验顺延', '仓储费，查验费，待时费等其他额外费用，保险费，海关查验费，仓储费，待时费，验电费，香港杂费实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (19, 14, '融迅', '空运', '正清', NULL, '6天', '起运后4-6天，海关查验顺延', '保险费，海关查验费，仓储费，香港杂费实报实销，', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (20, 15, '融迅', '空运', '专线', NULL, '7天', '时效2-4个工作日，再转当地派送1-3个工作日；起运后：4-7个工作日左右，海关查验顺延', '不含回收垃圾，保险、香港本地杂费等，保险费，海关查验费，二次包装费，香港杂费实报实销，拆托+回收垃圾，不含香港提货，入仓登记费等', 1, '专线有海关查验或者扣货风险，只能赔付运费，请知悉.', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (21, 15, '启文', '快递', '专线', NULL, '7天', '起运后：5-7个工作日左右，海关查验顺延', '保险费，海关查验费，二次包装费，香港杂费实报实销，拆托+回收垃圾，不含香港提货，入仓登记费等', 1, '专线有海关查验或者扣货风险，只能赔付运费，请知悉.', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (22, 16, '融迅', NULL, '专线', NULL, '8天', '约6-8工作日，如遇海关查验时间顺延', '香港本地杂费，香港杂费实报实销，尾端是当地物流派送，做不了额外操作，无指定签收单，不含预约备案，卸货上楼回收垃圾等费用，如果需要的话，先按卸货上楼：USD250，回收垃圾：USD200预估，需要有具体地址后再确认，二次包装费，保险费，存储费、送货时的卡车等待费、停车费等，无签收单，如产生其他费用实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (23, 17, '嘉里', NULL, '一般贸易', NULL, '8天', '深圳-香港预计2天时间，香港-日本预计4-6天，预计全程6-8天，海关查验顺延', '保险费，国内中转费，香港杂费实报实销，不含日本拆托+回收垃圾，待时费,海关查验费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (24, 17, '融迅', '空运', '一般贸易', NULL, '8天', '深圳-香港预计2天时间，香港-日本预计4-6天，预计全程6-8天，海关查验顺延', '保险费，国内中转费，香港杂费实报实销，不含日本拆托+回收垃圾，待时费,海关查验费，机场保税仓费用,仓储费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (25, 19, '银顺达', '空派', '专线', '专线方案', '15天', '双清包税专线：12-15天左右；展会物资需要提前，不保证时效，如遇海关查验时间顺延', '北京-深圳的运输费用，保险费，二次包装费，存储费，送货时的卡车等待费、停车费、回收垃圾的费用，及海关查验产生的相关费用等，如产生其他费用实报实销', 1, '不退运费，40/KG', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (26, 19, '银顺达', '快递', '专线', '快递方案', '6天', 'DHL：  6天左右；展会物资需要提前，不保证时效，如遇海关查验时间顺延', '北京-深圳的运输费用，保险费，二次包装费，存储费，送货时的卡车等待费、停车费、回收垃圾的费用，及海关查验产生的相关费用等，如产生其他费用实报实销', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (27, 22, '华平', '陆运', '双清', '专线   协议过期，未合作过', '12天', '专线10-12工作日左右， 不提供税单等文件；一般贸易出口放行后10-12工作日左右；如海关查验时间顺延', '保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 1, '陆运灰清的，未购买保险，丢失按运费3-5倍赔偿，如果需要，保险可以按货值3%购买，如果丢失，全赔。', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (28, 22, '越海专线', '陆运', '双清', NULL, '12天', '专线10-12工作日左右， 不提供税单等文件；一般贸易出口放行后10-12工作日左右；如海关查验时间顺延', '保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (29, 22, '华平', NULL, '正清', '正清', '12天', '专线10-12工作日左右， 不提供税单等文件；一般贸易出口放行后10-12工作日左右；如海关查验时间顺延', '收货人缴纳， 如上报价不含税金，保险费，需要提供货值，国外税金，保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (30, 23, '华平', '陆运', '专线', '专线   协议过期，未合作过', '12天', '专线10-12工作日左右， 不提供税单等文件， 以实际为准；一般贸易出口放行后10-12工作日左右，以实际为准；如海关查验时间顺延', '保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 1, '陆运灰清的，未购买保险，丢失按运费3-5倍赔偿，如果需要，保险可以按货值3%购买，如果丢失，全赔。', '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (31, 23, '越海专线', NULL, NULL, NULL, '12天', '专线10-12工作日左右， 不提供税单等文件， 以实际为准；一般贸易出口放行后10-12工作日左右，以实际为准；如海关查验时间顺延', '保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (32, 23, '华平', '陆运', '正清', '正清', '12天', '专线10-12工作日左右， 不提供税单等文件， 以实际为准；一般贸易出口放行后10-12工作日左右，以实际为准；如海关查验时间顺延', '税金实报实销， 请收货人缴纳， 如上报价不含税金（客户没提供货值），国外税金，保险费，需要提供货值/卸货费/二次包装费及其他实报实销费用', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (33, 10, '贸易代理方案', '空运', '贸易代理', NULL, NULL, NULL, '不含包装费，北京提货费至深圳费用，不含周末清关提货费，不含回收垃圾的费用，保险费', 0, NULL, '2026-02-25 18:09:23');
-INSERT INTO `route_agents` VALUES (144, 110, '融迅', '空运', '一般贸易', '555', '7天', '222', '333', 1, '444', '2026-03-11 11:00:07');
-INSERT INTO `route_agents` VALUES (145, 107, '融迅', '空运', '一般贸易', '555', '7天', '222', '333', 1, '444', '2026-03-11 14:57:01');
-INSERT INTO `route_agents` VALUES (146, 109, '融迅', '空运', '一般贸易', '666', '8天', '333', '444', 1, '555', '2026-03-11 17:43:33');
+DROP TABLE IF EXISTS `route_attachments`;
+CREATE TABLE `route_attachments`  (
+  `attachment_id` int NOT NULL AUTO_INCREMENT,
+  `route_id` int NOT NULL,
+  `original_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `stored_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `file_size` int NOT NULL DEFAULT 0,
+  `file_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `upload_time` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `uploader` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`attachment_id`) USING BTREE,
+  INDEX `idx_route_id`(`route_id` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 16 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for route_warnings
+-- ----------------------------
+DROP TABLE IF EXISTS `route_warnings`;
+CREATE TABLE `route_warnings`  (
+  `预警ID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `国家代码` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT 'ISO 3166-1 alpha-2，如 YE/IQ/UA',
+  `国家中文名` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `目的地关键词` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '匹配 routes.目的地 的关键词，如 也门/Yemen',
+  `风险类型` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '战争冲突/制裁封锁/港口罢工/海盗威胁/自然灾害/政治动荡',
+  `风险等级` tinyint NOT NULL COMMENT '1=低 2=中 3=高',
+  `预警标题` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `预警详情` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `生效日期` date NOT NULL,
+  `是否有效` tinyint(1) NOT NULL DEFAULT 1,
+  `来源` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'manual',
+  `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`预警ID`) USING BTREE,
+  INDEX `idx_country`(`国家代码` ASC) USING BTREE,
+  INDEX `idx_keyword`(`目的地关键词` ASC) USING BTREE,
+  INDEX `idx_valid`(`是否有效` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 683 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '航线风险预警' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for route_warnings_archive
+-- ----------------------------
+DROP TABLE IF EXISTS `route_warnings_archive`;
+CREATE TABLE `route_warnings_archive`  (
+  `预警ID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `国家代码` char(2) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `国家中文名` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `目的地关键词` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `风险类型` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `风险等级` tinyint NOT NULL,
+  `预警标题` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `预警详情` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  `生效日期` date NOT NULL,
+  `是否有效` tinyint(1) NOT NULL DEFAULT 1,
+  `来源` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'ctils',
+  `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  `archived_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`预警ID`) USING BTREE,
+  INDEX `idx_country`(`国家代码` ASC) USING BTREE,
+  INDEX `idx_date`(`生效日期` ASC) USING BTREE,
+  INDEX `idx_src`(`来源` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '预警归档库' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for routes
@@ -424,6 +344,8 @@ CREATE TABLE `routes`  (
   `起始地` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `途径地` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `目的地` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `起始港口ID` int UNSIGNED NULL DEFAULT NULL COMMENT '关联 ports.港口ID',
+  `目的港口ID` int UNSIGNED NULL DEFAULT NULL COMMENT '关联 ports.港口ID',
   `交易开始日期` date NULL DEFAULT NULL COMMENT '交易周期开始日期',
   `交易结束日期` date NULL DEFAULT NULL COMMENT '交易周期结束日期',
   `交易年份` year GENERATED ALWAYS AS (year(`交易开始日期`)) STORED COMMENT '虚拟列:交易年份' NULL,
@@ -432,45 +354,19 @@ CREATE TABLE `routes`  (
   `计费重量(/kg)` decimal(18, 2) NULL DEFAULT NULL COMMENT '路线计费重量,单位:千克',
   `总体积(/cbm)` decimal(18, 3) NULL DEFAULT NULL COMMENT '路线总体积,单位:立方米',
   `货值` decimal(18, 2) NULL DEFAULT 0.00,
+  `货值币种` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'RMB',
   `货物名称` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '汇总的货物名称列表',
+  `货物大类` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '电子产品/网络设备/机械设备/耗材/其他',
   `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`路线ID`) USING BTREE,
   INDEX `idx_start_date`(`交易开始日期` ASC) USING BTREE COMMENT '交易开始日期索引',
   INDEX `idx_end_date`(`交易结束日期` ASC) USING BTREE COMMENT '交易结束日期索引',
   INDEX `idx_year_month`(`交易年份` ASC, `交易月份` ASC) USING BTREE COMMENT '年月查询优化索引',
   INDEX `idx_origin`(`起始地` ASC) USING BTREE COMMENT '起始地索引',
-  INDEX `idx_destination`(`目的地` ASC) USING BTREE COMMENT '目的地索引'
-) ENGINE = InnoDB AUTO_INCREMENT = 111 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of routes
--- ----------------------------
-INSERT INTO `routes` VALUES (1, '国内', NULL, '西班牙', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 1740.00, 1740.00, 0.000, 0.00, '碱性电池', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (2, '深圳', NULL, '新加坡', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 910.00, 910.00, 5.460, 100000.00, '2件展示柜', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (3, '深圳', NULL, '英国', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 910.00, 910.00, 5.460, 100000.00, '2件展示柜', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (4, '国内', NULL, '澳门', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 930.00, 930.00, 2.734, 0.00, '2件展示柜, 电子屏, 粮食标本, 酿酒陶坛', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (5, '深圳', NULL, '澳洲', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, NULL, NULL, NULL, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (6, '深圳', NULL, '香港', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, NULL, NULL, NULL, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (7, '达拉斯', NULL, '新加坡', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 10.00, 10.00, NULL, 12000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (8, '深圳', NULL, '新加坡', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 100.00, 100.00, NULL, 571262.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (9, '深圳', NULL, '新加坡', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 30.00, 30.00, NULL, 37928.30, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (10, '香港', NULL, '达拉斯', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 30.00, 45.00, NULL, 266338.80, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (11, '国内', NULL, '法兰克福', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 100.00, 100.00, NULL, 677863.35, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (12, '达拉斯', NULL, '法兰克福', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 8.00, 8.00, NULL, 11906.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (13, '香港', NULL, '新加坡', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 100.00, 100.00, NULL, 75124.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (14, '香港', NULL, '马来', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 30.00, 45.00, NULL, 92000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (15, '香港', NULL, '马来', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 20.00, 30.00, NULL, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (16, '香港', NULL, '菲律宾马尼拉', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 150.00, 150.00, 0.000, 0.00, '4台Dell PowerEdge R7625', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (17, '深圳', '香港', '日本', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 2600.00, 3000.00, 15.000, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (18, '新加坡', NULL, '马来西亚', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, NULL, NULL, NULL, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (19, '北京', NULL, '沙特', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 120.00, 120.00, 0.000, 0.00, '宣传册&伴手礼', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (20, '国内', NULL, '荷兰', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 20.20, 20.20, NULL, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (21, '国内', NULL, '荷兰', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 45.00, 45.00, NULL, NULL, NULL, '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (22, '上海', NULL, '越南', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 0.00, 17000.00, 0.000, 0.00, '长雨伞和短雨伞', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (23, '深圳', NULL, '越南', '2025-10-20', '2025-10-24', DEFAULT, DEFAULT, 0.00, 27000.00, 0.000, 0.00, '风扇', '2026-02-25 18:09:23');
-INSERT INTO `routes` VALUES (107, '深圳', '香港', '新加坡', '2026-03-17', '2026-03-18', DEFAULT, DEFAULT, 40.00, 50.00, 5.000, 10000.00, '服务器, 服务器设备', '2026-03-11 10:13:06');
-INSERT INTO `routes` VALUES (109, '深圳', '香港', '新加坡', '2026-03-09', '2026-03-10', DEFAULT, DEFAULT, 40.00, 60.00, 5.000, 10000.00, '服务器, 服务器设备', '2026-03-11 10:39:08');
-INSERT INTO `routes` VALUES (110, '深圳', '香港', '美国圣何塞', '2026-02-03', '2026-02-04', DEFAULT, DEFAULT, 240.00, 240.00, 5.000, 100000.00, '交换机', '2026-03-11 10:48:00');
+  INDEX `idx_destination`(`目的地` ASC) USING BTREE COMMENT '目的地索引',
+  INDEX `idx_routes_origin_port`(`起始港口ID` ASC) USING BTREE,
+  INDEX `idx_routes_dest_port`(`目的港口ID` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 243 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for summary
@@ -480,56 +376,22 @@ CREATE TABLE `summary`  (
   `汇总ID` int NOT NULL AUTO_INCREMENT,
   `代理路线ID` int NOT NULL,
   `小计` decimal(18, 2) NULL DEFAULT 0.00,
+  `运费小计` decimal(18, 2) NULL DEFAULT NULL COMMENT '运费小计不含税',
   `税率` decimal(10, 4) NULL DEFAULT 0.0000,
+  `进口税率原文` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '原始进口税率描述文本',
   `税金` decimal(18, 2) NULL DEFAULT 0.00,
+  `税金金额` decimal(18, 2) NULL DEFAULT NULL COMMENT '实际税金金额从Excel读取',
   `汇损率` decimal(10, 6) NULL DEFAULT 0.000000,
   `汇损` decimal(18, 2) NULL DEFAULT 0.00,
   `总计` decimal(18, 2) NULL DEFAULT 0.00,
+  `总计金额` decimal(18, 2) NULL DEFAULT NULL COMMENT '含税总计金额从Excel读取',
   `备注` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
   `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`汇总ID`) USING BTREE,
   UNIQUE INDEX `unique_agent_route_id`(`代理路线ID` ASC) USING BTREE,
   INDEX `idx_agent_route_id`(`代理路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_summary_route_agents` FOREIGN KEY (`代理路线ID`) REFERENCES `route_agents` (`代理路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 171 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of summary
--- ----------------------------
-INSERT INTO `summary` VALUES (34, 1, 40020.00, NULL, 0.00, NULL, 0.00, 40020.00, '地址不偏远，不超尺寸，不超重参考此报价,不超尺和不超重的标准：长+宽+高<300CM，单边不得超过120CM,最小尺寸为15CM*10CM*2CM；MRW单件实重不超40KG，建议控制在25KG左右', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (35, 2, 38280.00, NULL, 0.00, NULL, 0.00, 38280.00, '海运双清包税到门，不卸货上楼', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (36, 3, 29580.00, NULL, 0.00, NULL, 0.00, 29580.00, '货交深圳，文件资质齐全可以出，双清包税到门,需要文件、资质齐全(MSDS等)', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (37, 4, 2730.00, 0.0900, 9000.00, NULL, 0.00, 11730.00, '新加坡进口GST：9%', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (38, 5, 2074.80, 0.0900, 9000.00, NULL, 0.00, 11074.80, '新加坡进口GST：9%', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (39, 6, 13195.00, 0.2000, 20000.00, NULL, 0.00, 33195.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (41, 8, 4790.00, NULL, 0.00, NULL, 0.00, 4790.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (43, 10, 1100.00, NULL, 0.00, NULL, 0.00, 1100.00, '粮食标本不接,只能送到会展门口，可以指定日期送货，不能指定时间段送货。', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (44, 11, 2700.00, NULL, 0.00, NULL, 0.00, 2700.00, '粮食标本只能少量出，量大涉政，数量变多了需要重新确认。可以送到展馆，可以指定日期和时间段送货', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (45, 12, 4802.00, 0.0900, 1080.00, NULL, 0.00, 5882.00, '不含仓储费和查验等费用,UPS有其他杂费收取 实报实销', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (46, 13, 7928.00, 0.0900, 51413.58, 0.040000, 22850.48, 82192.06, '备注：一般贸易过港需要发票，箱单，品牌授权', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (47, 15, 2350.00, NULL, 0.00, NULL, 0.00, 2350.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (48, 16, 7800.00, 0.1900, 128794.04, NULL, 0.00, 136594.04, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (49, 17, 1885.00, 0.1900, 2262.14, 0.040000, 476.24, 4623.38, 'Duty和VAT实报实销,UPS有其他杂费收取 实报实销', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (50, 18, 7518.00, 0.0900, 6761.16, NULL, 0.00, 14279.16, '有效期：本周有效', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (51, 19, 2643.50, 0.0500, 4600.00, 0.060000, 5520.00, 12763.50, '文件： 需要办理SIRIM， 英文说明书，发票，箱单，客户的账户密码，办理需要3-5个工作日', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (52, 20, 1970.00, NULL, 0.00, NULL, 0.00, 1970.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (53, 21, 900.00, NULL, 0.00, NULL, 0.00, 900.00, '尾程快递服务+不能指定签收单，只有快递截图,不含卸货，拆托+回收垃圾', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (54, 22, 11850.00, NULL, 0.00, NULL, 0.00, 11850.00, '诚哥建议税率,服务器出口菲律宾 HS CODE：8471.50.90 关税：0.00% 增值税12.50%', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (55, 23, 99985.00, 0.1000, 0.00, 0.050000, 0.00, 99985.00, '文件： 发票，箱单，POA， 不需要其他认证', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (56, 24, 824650.00, 0.1000, 0.00, 0.050000, 0.00, 824650.00, '文件： 发票，箱单，POA， 不需要其他认证', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (57, 25, 7400.00, NULL, 0.00, NULL, 0.00, 7400.00, '双清包税专线，无牌不侵权,只能送展会门口，可以指定日期送货', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (58, 26, 7680.00, NULL, 0.00, NULL, 0.00, 7680.00, '快递方案需要收货人配合清关、缴税以及提供所需文件,只能送展会门口，不可以指定日期送货.诚哥建议税号如下，有汇损，实报实销，以快递公司税单为准:宣传册 原产地：中国 出口至沙特 HS CODE：49.01.99.90.00.00 关税：0.00% 增值税：15.00%;丝巾 原产地：中国 出口至沙特 HS CODE：62.14.10.00.00.00 关税：5.00% 增值税：15.00%;丝绸扇子 原产地：中国 出口至沙特 HS CODE：63.07.90.99.00.00 关税：5.00% 增值税：15.00%;剪纸画轴 原产地：中国 出口至沙特 HS CODE：48.22.90.00.00.00 关税：5.00% 增值税：15.00%', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (59, 27, 64760.00, NULL, 0.00, NULL, 0.00, 64760.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (60, 28, 100110.00, NULL, 0.00, NULL, 0.00, 100110.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (61, 29, 71210.00, NULL, 0.00, NULL, 0.00, 71210.00, '正清出口所需文件：发票箱单 授权委托书， 申报要素等全套清关文件,越南进口：需提前签署POA及其他清关文件', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (62, 30, 87150.00, NULL, 0.00, NULL, 0.00, 87150.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (63, 31, 129000.00, NULL, 0.00, NULL, 0.00, 129000.00, NULL, '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (64, 32, 7100.00, NULL, 0.00, NULL, 0.00, 7100.00, '正清出口：发票箱单 授权委托书， 申报要素等全套清关文件，电池需要msds+陆运运输鉴定书（需要发货前先提供审核）,越南进口：需提前签署POA及其他清关文件,风扇越南需要做商检， 客户收货人做好， 如海关有其他要求也许配合', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (65, 9, 500.00, NULL, 0.00, NULL, 0.00, 500.00, '备注：一般贸易过港需要发票，箱单，品牌授权', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (66, 7, 10340.00, NULL, 0.00, NULL, 0.00, 10340.00, '备注：一般贸易过港需要发票，箱单，品牌授权', '2026-02-25 18:09:23');
-INSERT INTO `summary` VALUES (168, 144, 2600.00, 0.0900, 9000.00, 0.040000, 4000.00, 15600.00, '888', '2026-03-11 11:00:07');
-INSERT INTO `summary` VALUES (169, 145, 2200.00, 0.0900, 900.00, 0.040000, 400.00, 3500.00, '888', '2026-03-11 14:57:01');
-INSERT INTO `summary` VALUES (170, 146, 2600.00, 0.0900, 900.00, 0.040000, 400.00, 3900.00, '999', '2026-03-11 17:43:33');
+) ENGINE = InnoDB AUTO_INCREMENT = 242 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for users
@@ -549,12 +411,6 @@ CREATE TABLE `users`  (
   UNIQUE INDEX `ix_users_username`(`username` ASC) USING BTREE,
   INDEX `ix_users_id`(`id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
-
--- ----------------------------
--- Records of users
--- ----------------------------
-INSERT INTO `users` VALUES (1, 'admin', '$2b$12$0.XTND5NNtu28ZhCF2qMmu5pBI3kbqki3QTe32T86ix9C2DnXqe2a', '系统管理员', 'admin@company.com', 1, 1, '2026-02-12 13:54:14', '2026-02-12 13:54:14');
-INSERT INTO `users` VALUES (2, 'user', '$2b$12$zbHcZMEvpoZuanh5xFrA9upXLNwRlSAsXOWhP2w7k/UyBRjpuAaOq', '测试用户', 'user@company.com', 1, 0, '2026-02-12 13:54:14', '2026-02-12 13:54:14');
 
 -- ----------------------------
 -- Procedure structure for recompute_route

@@ -491,7 +491,14 @@
               <h3>费用汇总</h3>
               <el-descriptions :column="2" border size="small">
                 <el-descriptions-item label="小计">¥{{ currentAgent.summary.小计?.toFixed(2) }}</el-descriptions-item>
-                <el-descriptions-item label="税率">{{ (currentAgent.summary.税率 * 100)?.toFixed(2) }}%</el-descriptions-item>
+                <el-descriptions-item label="税率">
+                  <template v-if="currentAgent.summary.进口税率原文">
+                    <div v-for="(row, i) in parseTaxDetails(currentAgent.summary.进口税率原文)" :key="i">
+                      {{ row.货物名称 || ('货物'+(i+1)) }}：{{ row.税率说明 ? (row.税率说明 + ' ') : '' }}{{ row.综合税率 }}%
+                    </div>
+                  </template>
+                  <template v-else>{{ (currentAgent.summary.税率 * 100)?.toFixed(2) }}%</template>
+                </el-descriptions-item>
                 <el-descriptions-item label="税金">¥{{ currentAgent.summary.税金?.toFixed(2) }}</el-descriptions-item>
                 <el-descriptions-item label="汇损率">{{ (currentAgent.summary.汇损率 * 100)?.toFixed(4) }}%</el-descriptions-item>
                 <el-descriptions-item label="汇损">¥{{ currentAgent.summary.汇损?.toFixed(2) }}</el-descriptions-item>
@@ -616,6 +623,10 @@ const detailVisible = ref(false)
 const currentAgent = ref(null)
 const currentRoute = ref(null)
 
+const parseTaxDetails = (json) => {
+  try { return JSON.parse(json || '[]') } catch { return [] }
+}
+
 // 报价对比
 const selectedAgents = ref([])  // [{agent, route}]
 const compareVisible = ref(false)
@@ -691,7 +702,15 @@ const compareRows = computed(() => [
     getValue: ({ agent }) => agent.summary?.总计 > 0 ? agent.summary.总计 : null,
     render: ({ agent }) => agent.summary?.总计 > 0 ? `¥ ${agent.summary.总计.toFixed(2)}` : '—',
   },
-  { key: '税率', label: '税率', render: ({ agent }) => agent.summary?.税率 != null ? (agent.summary.税率 * 100).toFixed(2) + '%' : '—' },
+  { key: '税率', label: '税率', render: ({ agent }) => {
+    if (agent.summary?.进口税率原文) {
+      try {
+        const details = JSON.parse(agent.summary.进口税率原文)
+        return details.map((r, i) => `${r.货物名称 || ('货物'+(i+1))}：${r.税率说明 ? (r.税率说明 + ' ') : ''}${r.综合税率}%`).join('<br>')
+      } catch { return '多档税率' }
+    }
+    return agent.summary?.税率 != null ? (agent.summary.税率 * 100).toFixed(2) + '%' : '—'
+  }},
   { key: '汇损率', label: '汇损率', render: ({ agent }) => agent.summary?.汇损率 != null ? (agent.summary.汇损率 * 100).toFixed(4) + '%' : '—' },
 
   { key: 's4', isSection: true, label: '路线信息' },

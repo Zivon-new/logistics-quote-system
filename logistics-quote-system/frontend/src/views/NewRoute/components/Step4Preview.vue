@@ -256,30 +256,37 @@
             </span>
             <span class="amount-value">¥{{ calculateSubtotal(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="税率">
-            {{ (agent.summary.税率 * 100).toFixed(2) }}%
+          <el-descriptions-item label="税率" :span="agent.summary?.税率模式 === 'multi' ? 2 : 1">
+            <template v-if="agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length">
+              <div v-for="(row, i) in agent.summary.税率明细" :key="i" style="line-height:1.8;">
+                <span style="color:#606266; margin-right:6px;">{{ row.货物名称 || '货物' }}</span>
+                <span v-if="row.税率说明" style="color:#909399; margin-right:6px; font-size:12px;">{{ row.税率说明 }}</span>
+                <span style="font-weight:600; color:#303133;">{{ (parseFloat(row.综合税率) || 0).toFixed(2) }}%</span>
+              </div>
+            </template>
+            <span v-else>{{ ((agent.summary?.税率 || 0) * 100).toFixed(2) }}%</span>
           </el-descriptions-item>
           <el-descriptions-item label="税金">
-            <span v-if="getCargoCurrency()" style="color:#1890ff; font-size:12px; margin-right:6px;">
-              {{ getCargoCurrency() }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0)).toFixed(2) }} →
+            <span v-if="getCargoCurrency() && agent.summary?.税率模式 !== 'multi'" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ getCargoCurrency() }} {{ (parseFloat(formData.route.货值) * (agent.summary?.税率 || 0)).toFixed(2) }} →
             </span>
             <span class="amount-value">¥{{ calculateTax(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="汇损率">
-            {{ (agent.summary.汇损率 * 100).toFixed(4) }}%
+            {{ ((agent.summary?.汇损率 || 0) * 100).toFixed(4) }}%
           </el-descriptions-item>
           <el-descriptions-item label="汇损">
-            <span v-if="getCargoCurrency()" style="color:#1890ff; font-size:12px; margin-right:6px;">
-              {{ getCargoCurrency() }} {{ (parseFloat(formData.route.货值) * (agent.summary.税率 || 0) * (agent.summary.汇损率 || 0)).toFixed(2) }} →
+            <span v-if="getCargoCurrency() && agent.summary?.税率模式 !== 'multi'" style="color:#1890ff; font-size:12px; margin-right:6px;">
+              {{ getCargoCurrency() }} {{ (parseFloat(formData.route.货值) * (agent.summary?.税率 || 0) * (agent.summary?.汇损率 || 0)).toFixed(2) }} →
             </span>
             <span class="amount-value">¥{{ calculateLoss(agent)?.toFixed(2) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="总计">
-            <span v-if="getQuoteSingleCurrency(agent)" style="color:#1890ff; font-size:12px; margin-right:6px;">
+            <span v-if="getQuoteSingleCurrency(agent) && agent.summary?.税率模式 !== 'multi'" style="color:#1890ff; font-size:12px; margin-right:6px;">
               {{ getQuoteSingleCurrency(agent) }}
               {{ ((calculateSubtotalByCurrency(agent)[getQuoteSingleCurrency(agent)] || 0)
-                + (parseFloat(formData.route.货值) * (agent.summary.税率 || 0))
-                + (parseFloat(formData.route.货值) * (agent.summary.税率 || 0) * (agent.summary.汇损率 || 0))
+                + (parseFloat(formData.route.货值) * (agent.summary?.税率 || 0))
+                + (parseFloat(formData.route.货值) * (agent.summary?.税率 || 0) * (agent.summary?.汇损率 || 0))
               ).toFixed(2) }} →
             </span>
             <span class="total-amount">¥{{ calculateTotal(agent)?.toFixed(2) }}</span>
@@ -420,14 +427,29 @@ const routeValueRMB = () => {
   return value * rate
 }
 
-// 计算税金 - 使用货值（换算为人民币后）计算
+// 多货物税率明细单行CNY
+const calcTaxDetailRowCNY = (row) => {
+  const value = parseFloat(row.货值) || 0
+  const rate = exchangeRates[row.货值币种] || 1
+  const taxRate = (parseFloat(row.综合税率) || 0) / 100
+  return value * rate * taxRate
+}
+
+const calcMultiTaxTotal = (agent) => {
+  return (agent.summary?.税率明细 || []).reduce((sum, row) => sum + calcTaxDetailRowCNY(row), 0)
+}
+
+// 计算税金 - 支持单一税率和多货物税率模式
 const calculateTax = (agent) => {
-  return routeValueRMB() * (agent.summary.税率 || 0)
+  if (agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length) {
+    return calcMultiTaxTotal(agent)
+  }
+  return routeValueRMB() * (agent.summary?.税率 || 0)
 }
 
 // 计算汇损 = 税金 × 汇损率
 const calculateLoss = (agent) => {
-  return calculateTax(agent) * (agent.summary.汇损率 || 0)
+  return calculateTax(agent) * (agent.summary?.汇损率 || 0)
 }
 
 // 计算总计

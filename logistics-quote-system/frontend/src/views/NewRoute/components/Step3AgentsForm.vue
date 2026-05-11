@@ -237,37 +237,18 @@
               </template>
             </el-table-column>
 
-            <el-table-column label="单位" width="120">
+            <el-table-column label="单位" width="130">
               <template #default="scope">
-                <el-select
+                <el-autocomplete
                   v-model="scope.row.单位"
+                  :fetch-suggestions="queryUnits"
                   size="small"
-                  filterable
-                  allow-create
-                  default-first-option
-                  @change="handleUnitChange(scope.row)"
-                >
-                  <el-option-group label="基础单位">
-                    <el-option label="/kg" value="/kg" />
-                    <el-option label="/cbm" value="/cbm" />
-                    <el-option label="/票" value="/票" />
-                    <el-option label="/件" value="/件" />
-                    <el-option label="/个" value="/个" />
-                    <el-option label="/箱" value="/箱" />
-                    <el-option label="/板" value="/板" />
-                    <el-option label="/套" value="/套" />
-                    <el-option label="/人" value="/人" />
-                    <el-option label="/次" value="/次" />
-                    <el-option label="/天" value="/天" />
-                  </el-option-group>
-                  <el-option-group label="复合单位">
-                    <el-option label="/kg/天" value="/kg/天" />
-                    <el-option label="/cbm/天" value="/cbm/天" />
-                    <el-option label="/票/天" value="/票/天" />
-                    <el-option label="/kg/周" value="/kg/周" />
-                    <el-option label="/cbm/周" value="/cbm/周" />
-                  </el-option-group>
-                </el-select>
+                  placeholder="选择或手动输入"
+                  :trigger-on-focus="true"
+                  style="width:100%"
+                  @select="() => handleUnitChange(scope.row)"
+                  @change="() => handleUnitChange(scope.row)"
+                />
               </template>
             </el-table-column>
 
@@ -326,6 +307,7 @@
                   <el-option label="EUR" value="EUR" />
                   <el-option label="JPY" value="JPY" />
                   <el-option label="MYR" value="MYR" />
+                  <el-option label="HKD" value="HKD" />
                 </el-select>
               </template>
             </el-table-column>
@@ -489,6 +471,7 @@
                   <el-option label="USD" value="USD" />
                   <el-option label="SGD" value="SGD" />
                   <el-option label="EUR" value="EUR" />
+                  <el-option label="HKD" value="HKD" />
                 </el-select>
               </template>
             </el-table-column>
@@ -542,6 +525,14 @@
             <span v-if="forexReferenceDate" class="forex-date-tip">
               （汇率参考日期：{{ forexReferenceDate }}）
             </span>
+            <el-button
+              size="small"
+              :loading="forexRefreshing"
+              style="margin-left:10px;font-weight:400"
+              @click="handleRefreshForex"
+            >
+              {{ forexRefreshing ? '同步中...' : '刷新汇率' }}
+            </el-button>
           </h4>
           <el-form :model="agent.summary" label-width="120px" class="summary-form">
             <el-row :gutter="16">
@@ -876,7 +867,8 @@ const exchangeRates = reactive({
   'SGD': 5.3,
   'EUR': 7.8,
   'JPY': 0.05,
-  'MYR': 1.6
+  'MYR': 1.6,
+  'HKD': 0.93
 })
 const forexReferenceDate = ref('')  // 汇率参考日期
 
@@ -945,7 +937,7 @@ const feeTotalSpanMethod = ({ row, columnIndex }) => {
 }
 
 // 页面加载时从后端获取最新汇率
-import { getExchangeRates } from '@/api/route'
+import { getExchangeRates, refreshForexRates } from '@/api/route'
 const loadExchangeRates = async () => {
   try {
     const res = await getExchangeRates()
@@ -958,6 +950,23 @@ const loadExchangeRates = async () => {
   }
 }
 loadExchangeRates()
+
+const forexRefreshing = ref(false)
+const handleRefreshForex = async () => {
+  forexRefreshing.value = true
+  try {
+    const res = await refreshForexRates()
+    if (res.success && res.data) {
+      Object.assign(exchangeRates, res.data)
+      forexReferenceDate.value = new Date().toISOString().slice(0, 10)
+      ElMessage.success(`汇率已更新，共同步 ${Object.keys(res.data).length} 种货币`)
+    }
+  } catch (e) {
+    ElMessage.error('汇率同步失败，请检查网络或联系管理员')
+  } finally {
+    forexRefreshing.value = false
+  }
+}
 
 // 计费重量变化时，同步所有 /kg 行的数量
 watch(() => props.routeWeight, (newWeight) => {
@@ -982,6 +991,13 @@ watch(() => props.routeVolume, (newVol) => {
         updateFeeAmount(item)
       }
     })
+  })
+})
+
+// 货值或货值币种变化时，重新计算所有代理商的税金和汇损
+watch([() => props.routeValue, () => props.routeValueCurrency], () => {
+  props.modelValue.forEach(agent => {
+    updateSummary(agent)
   })
 })
 
@@ -1111,6 +1127,19 @@ const addFeeTotal = (agentIndex) => {
 // 删除整单费用
 const removeFeeTotal = (agentIndex, feeIndex) => {
   props.modelValue[agentIndex].fee_total.splice(feeIndex, 1)
+}
+
+// 单位建议列表（el-autocomplete 数据源）
+const UNIT_OPTIONS = [
+  '/kg', '/cbm', '/票', '/件', '/个', '/箱', '/板', '/套', '/人', '/次', '/天',
+  '/kg/天', '/cbm/天', '/票/天', '/kg/周', '/cbm/周'
+]
+const queryUnits = (query, cb) => {
+  const q = (query || '').trim()
+  const results = q
+    ? UNIT_OPTIONS.filter(u => u.includes(q)).map(u => ({ value: u }))
+    : UNIT_OPTIONS.map(u => ({ value: u }))
+  cb(results)
 }
 
 // 判断是否自动计算数量
@@ -1434,7 +1463,34 @@ const validate = () => {
 }
 
 defineExpose({
-  validate
+  validate,
+  refreshSummaries: () => {
+    props.modelValue.forEach(agent => updateSummary(agent))
+  },
+  // 用明确的货值参数刷新所有代理商汇总（绕过 stale props.routeValue，供 handleSubmit 提交前调用）
+  refreshSummariesWithValue: (routeValue, routeValueCurrency) => {
+    const rv = parseFloat(routeValue) || 0
+    const rc = routeValueCurrency || 'RMB'
+    const rvRMB = rv * (exchangeRates[rc] || 1)
+
+    props.modelValue.forEach(agent => {
+      if (!agent.summary) {
+        agent.summary = { 小计手动: false, 小计: 0, 税率: 0, 税金手动: false, 税金: 0, 汇损率: 0, 汇损手动: false, 汇损: 0, 备注: '', 税率模式: 'simple', 税率明细: [] }
+      }
+      if (!agent.summary.税金手动) {
+        agent.summary.税金 = (agent.summary.税率模式 === 'multi' && agent.summary.税率明细?.length)
+          ? calcMultiTaxTotal(agent)
+          : rvRMB * (parseFloat(agent.summary.税率) || 0)
+      }
+      if (!agent.summary.汇损手动) {
+        agent.summary.汇损 = (agent.summary.税金 || 0) * (parseFloat(agent.summary.汇损率) || 0)
+      }
+      if (!agent.summary.小计手动) {
+        agent.summary.小计 = calculateSubtotal(agent)
+      }
+      agent.summary.总计 = (agent.summary.小计 || 0) + (agent.summary.税金 || 0) + (agent.summary.汇损 || 0)
+    })
+  },
 })
 </script>
 

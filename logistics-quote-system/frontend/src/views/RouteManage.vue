@@ -64,7 +64,7 @@
         </el-table-column>
         <el-table-column label="操作" width="200" align="center" fixed="right">
           <template #default="scope">
-            <el-button type="primary" link size="small" @click="handleView(scope.row)">
+            <el-button type="primary" link size="small" @click="handleView(scope.row, (pagination.page - 1) * pagination.page_size + scope.$index + 1)">
               查看
             </el-button>
             <el-button 
@@ -119,7 +119,7 @@
             <div class="detail-section">
               <h3>基本信息</h3>
               <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="路线ID">{{ currentRoute.路线ID }}</el-descriptions-item>
+                <el-descriptions-item label="路线序号">{{ currentSeqNo }}</el-descriptions-item>
                 <el-descriptions-item label="起始地">{{ currentRoute.起始地 }}</el-descriptions-item>
                 <el-descriptions-item label="目的地">{{ currentRoute.目的地 }}</el-descriptions-item>
                 <el-descriptions-item label="途径地">{{ currentRoute.途径地 || '-' }}</el-descriptions-item>
@@ -357,7 +357,14 @@
                       </div>
                       <div class="summary-cell">
                         <span class="s-label">进口税率</span>
-                        <span class="s-value">{{ (agent.summary.税率 * 100)?.toFixed(2) }}%</span>
+                        <span class="s-value">
+                          <template v-if="agent.summary.进口税率原文">
+                            <span v-for="(row, i) in parseTaxDetails(agent.summary.进口税率原文)" :key="i" style="display:block">
+                              {{ row.货物名称 || ('货物'+(i+1)) }}：{{ row.税率说明 ? (row.税率说明 + ' ') : '' }}{{ row.综合税率 }}%
+                            </span>
+                          </template>
+                          <template v-else>{{ (agent.summary.税率 * 100)?.toFixed(2) }}%</template>
+                        </span>
                       </div>
                       <div class="summary-cell">
                         <span class="s-label">税金</span>
@@ -430,6 +437,7 @@ const loading = ref(false)
 const routeList = ref([])
 const detailVisible = ref(false)
 const currentRoute = ref(null)
+const currentSeqNo = ref(null)
 
 // ✅ 添加：编辑对话框状态
 const editDialogVisible = ref(false)
@@ -493,6 +501,10 @@ const isNewProduct = (value) => {
 const isCompensation = (value) => {
   // 兼容：数字1、字符串"1"、布尔值true
   return value === 1 || value === '1' || value === true
+}
+
+const parseTaxDetails = (json) => {
+  try { return JSON.parse(json || '[]') } catch { return [] }
 }
 
 // 获取代理商的所有费用（合并fee_items和fee_total）
@@ -583,12 +595,12 @@ const handleReset = () => {
 }
 
 // 查看详情
-const handleView = async (row) => {
+const handleView = async (row, seqNo) => {
   try {
     const res = await getRouteDetail(row.路线ID)
-    // ✅ 修复：正确解析返回数据
     if (res.success && res.data) {
       currentRoute.value = res.data
+      currentSeqNo.value = seqNo
     } else {
       ElMessage.error('获取详情失败')
     }

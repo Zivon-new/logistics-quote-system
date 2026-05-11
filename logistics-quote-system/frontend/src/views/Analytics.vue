@@ -45,19 +45,29 @@
       </el-col>
       <el-col :span="4">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#f6ffed"><el-icon style="color:#52c41a;font-size:22px"><Bottom /></el-icon></div>
+          <div class="stat-icon" style="background:#e6f7ff"><el-icon style="color:#096dd9;font-size:22px"><Money /></el-icon></div>
           <div class="stat-body">
-            <div class="stat-num">¥{{ formatNum(overview.min_price) }}</div>
-            <div class="stat-label">最低报价</div>
+            <div class="stat-num" style="font-size:18px">
+              {{ latestUsdRate ? latestUsdRate.toFixed(4) : '—' }}
+            </div>
+            <div class="stat-label">
+              USD/CNY
+              <span v-if="latestForexDate" style="font-size:11px;color:#bbb;display:block">{{ latestForexDate }}</span>
+            </div>
           </div>
         </div>
       </el-col>
       <el-col :span="4">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#fff1f0"><el-icon style="color:#f5222d;font-size:22px"><Top /></el-icon></div>
+          <div class="stat-icon" style="background:#fff7e6"><el-icon style="color:#d46b08;font-size:22px"><Odometer /></el-icon></div>
           <div class="stat-body">
-            <div class="stat-num">¥{{ formatNum(overview.max_price) }}</div>
-            <div class="stat-label">最高报价</div>
+            <div class="stat-num" style="font-size:18px">
+              {{ latestFuelPrice ? '¥' + latestFuelPrice.toFixed(1) : '—' }}
+            </div>
+            <div class="stat-label">
+              原油SC0（元/桶）
+              <span v-if="latestFuelDate" style="font-size:11px;color:#bbb;display:block">{{ latestFuelDate }}</span>
+            </div>
           </div>
         </div>
       </el-col>
@@ -143,6 +153,68 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 第四行：汇率走势（全宽） -->
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="24">
+        <el-card shadow="never" class="chart-card">
+          <template #header>
+            <span class="card-title">外汇汇率走势</span>
+            <div style="float:right;display:flex;align-items:center;gap:12px">
+              <el-checkbox-group v-model="selectedCurrencies" size="small" @change="loadForexHistory">
+                <el-checkbox-button v-for="c in allCurrencies" :key="c" :value="c">{{ c }}</el-checkbox-button>
+              </el-checkbox-group>
+              <el-radio-group v-model="forexDays" size="small" @change="loadForexHistory">
+                <el-radio-button :value="30">近30天</el-radio-button>
+                <el-radio-button :value="90">近90天</el-radio-button>
+                <el-radio-button :value="180">近180天</el-radio-button>
+              </el-radio-group>
+              <el-button size="small" :loading="forexSyncing" @click="handleForexSync">
+                {{ forexSyncing ? '同步中...' : '同步今日' }}
+              </el-button>
+              <el-button v-if="isAdmin" size="small" :loading="forexBackfilling" @click="handleForexBackfill">
+                {{ forexBackfilling ? '回填中...' : '回填30天' }}
+              </el-button>
+            </div>
+          </template>
+          <div v-if="forexEmpty" class="market-empty">
+            <el-empty description="暂无汇率历史数据" :image-size="60" />
+            <p class="empty-tip">点击「刷新汇率」按钮同步一次，之后每天 09:30 自动积累</p>
+          </div>
+          <v-chart v-else :option="forexChartOption" style="height:320px" autoresize />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 第五行：布伦特原油参考价 -->
+    <el-row :gutter="16" class="chart-row">
+      <el-col :span="24">
+        <el-card shadow="never" class="chart-card">
+          <template #header>
+            <span class="card-title">上海原油期货参考价格（SC888，元/桶）</span>
+            <div style="float:right;display:flex;align-items:center;gap:12px">
+              <el-tag type="info" size="small">上期所原油期货·空运/海运燃油附加费参考基准</el-tag>
+              <el-radio-group v-model="fuelDays" size="small" @change="loadFuelHistory">
+                <el-radio-button :value="30">近30天</el-radio-button>
+                <el-radio-button :value="90">近90天</el-radio-button>
+                <el-radio-button :value="180">近180天</el-radio-button>
+              </el-radio-group>
+              <el-button
+                v-if="isAdmin"
+                size="small"
+                :loading="fuelBackfilling"
+                @click="handleFuelBackfill"
+              >回填历史数据</el-button>
+            </div>
+          </template>
+          <div v-if="fuelEmpty" class="market-empty">
+            <el-empty description="暂无燃油价格数据" :image-size="60" />
+            <p class="empty-tip">管理员点击「回填历史数据」拉取近30条原油价格（数据来源：新浪财经 SC0）</p>
+          </div>
+          <v-chart v-else :option="fuelChartOption" style="height:300px" autoresize />
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -156,10 +228,14 @@ import {
   LegendComponent, DataZoomComponent
 } from 'echarts/components'
 import VChart from 'vue-echarts'
-import { Document, User, Location, TrendCharts, Bottom, Top } from '@element-plus/icons-vue'
+import { Document, User, Location, TrendCharts, Bottom, Top, Money, Odometer } from '@element-plus/icons-vue'
 import {
-  getOverview, getRouteUsage, getRouteAgentDist, getTrend, getByAgent, getPriceDistribution
+  getOverview, getRouteUsage, getRouteAgentDist, getTrend, getByAgent, getPriceDistribution,
+  getForexHistory, getFuelHistory, triggerFuelBackfill, triggerForexBackfill
 } from '@/api/analytics'
+import { refreshForexRates } from '@/api/route'
+import { useUserStore } from '@/stores/user'
+import { ElMessage } from 'element-plus'
 
 use([CanvasRenderer, BarChart, PieChart, LineChart,
   TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent])
@@ -178,6 +254,41 @@ const trendGranularity = ref('month')
 const trendMetric = ref('总报价额')
 const agentMetric = ref('报价次数')
 
+// ── 市场行情数据 ───────────────────────────────────────────
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.userInfo?.is_admin)
+
+const allCurrencies = ['USD', 'EUR', 'SGD', 'HKD', 'MYR', 'JPY']
+const selectedCurrencies = ref(['USD', 'EUR', 'SGD'])  // JPY量级(0.05)与其他差异太大，默认不选
+const forexDays = ref(90)
+const forexHistoryData = ref({})
+const forexEmpty = computed(() => Object.values(forexHistoryData.value).every(arr => !arr?.length))
+
+const fuelDays = ref(90)
+const fuelHistoryData = ref([])
+const fuelEmpty = computed(() => !fuelHistoryData.value.length)
+const fuelBackfilling = ref(false)
+const forexSyncing = ref(false)
+const forexBackfilling = ref(false)
+
+// ── 市场行情最新值（用于顶部卡片）─────────────────────────
+const latestUsdRate = computed(() => {
+  const arr = forexHistoryData.value['USD']
+  return arr?.length ? arr[arr.length - 1].rate : null
+})
+const latestForexDate = computed(() => {
+  const arr = forexHistoryData.value['USD']
+  return arr?.length ? arr[arr.length - 1].date : null
+})
+const latestFuelPrice = computed(() => {
+  const arr = fuelHistoryData.value
+  return arr?.length ? arr[arr.length - 1].price : null
+})
+const latestFuelDate = computed(() => {
+  const arr = fuelHistoryData.value
+  return arr?.length ? arr[arr.length - 1].date : null
+})
+
 // ── 工具 ──────────────────────────────────────────────────
 const formatNum = (n) => {
   if (!n) return '0'
@@ -194,6 +305,65 @@ const loadAgentDist = async (params = {}) => {
   agentDistData.value = await getRouteAgentDist(params)
 }
 
+const handleForexBackfill = async () => {
+  forexBackfilling.value = true
+  try {
+    const res = await triggerForexBackfill(30)
+    if (res.success) {
+      ElMessage.success(res.message)
+      await loadForexHistory()
+    }
+  } catch {
+    ElMessage.error('汇率历史回填失败，请检查网络')
+  } finally {
+    forexBackfilling.value = false
+  }
+}
+
+const handleForexSync = async () => {
+  forexSyncing.value = true
+  try {
+    const res = await refreshForexRates()
+    if (res.success) {
+      ElMessage.success(`汇率已同步，今日记录已写入历史`)
+      await loadForexHistory()
+    }
+  } catch {
+    ElMessage.error('汇率同步失败，请检查网络')
+  } finally {
+    forexSyncing.value = false
+  }
+}
+
+const loadForexHistory = async () => {
+  try {
+    const res = await getForexHistory(forexDays.value, selectedCurrencies.value.join(','))
+    if (res.success) forexHistoryData.value = res.data
+  } catch { /* 数据暂无时静默处理 */ }
+}
+
+const loadFuelHistory = async () => {
+  try {
+    const res = await getFuelHistory(fuelDays.value)
+    if (res.success) fuelHistoryData.value = res.data
+  } catch { /* 数据暂无时静默处理 */ }
+}
+
+const handleFuelBackfill = async () => {
+  fuelBackfilling.value = true
+  try {
+    const res = await triggerFuelBackfill(30)
+    if (res.success) {
+      ElMessage.success(res.message)
+      await loadFuelHistory()
+    }
+  } catch {
+    ElMessage.error('回填失败，请检查网络后重试')
+  } finally {
+    fuelBackfilling.value = false
+  }
+}
+
 const loadAll = async () => {
   loadingOverview.value = true
   selectedRoute.value = null
@@ -205,7 +375,7 @@ const loadAll = async () => {
   routeUsageData.value = routes
   agentData.value = agent
   distData.value = dist
-  await Promise.all([loadTrend(), loadAgentDist()])
+  await Promise.all([loadTrend(), loadAgentDist(), loadForexHistory(), loadFuelHistory()])
 }
 
 onMounted(loadAll)
@@ -414,6 +584,75 @@ const distChartOption = computed(() => ({
     label: { show: true, position: 'top', formatter: p => p.value + '笔' }
   }]
 }))
+
+// ── 汇率走势折线图 ─────────────────────────────────────────
+const CURRENCY_COLORS = { USD: '#1890ff', EUR: '#52c41a', SGD: '#fa8c16', JPY: '#722ed1', MYR: '#eb2f96', HKD: '#13c2c2' }
+
+const forexChartOption = computed(() => {
+  const dates = new Set()
+  Object.values(forexHistoryData.value).forEach(arr => arr?.forEach(p => dates.add(p.date)))
+  const sortedDates = [...dates].sort()
+
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const date = params[0]?.axisValue || ''
+        return `<b>${date}</b><br/>` + params.map(p => `${p.marker}${p.seriesName}：<b>${p.value?.toFixed(4)}</b>`).join('<br/>')
+      }
+    },
+    legend: { top: 4, data: selectedCurrencies.value },
+    grid: { left: 16, right: 24, top: 36, bottom: 40, containLabel: true },
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 4 }],
+    xAxis: { type: 'category', data: sortedDates, axisLabel: { rotate: 30, fontSize: 11 } },
+    yAxis: {
+      type: 'value', name: 'CNY', scale: true,
+      axisLabel: { formatter: v => v.toFixed(2) }
+    },
+    series: selectedCurrencies.value.map(currency => ({
+      name: currency,
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 2 },
+      itemStyle: { color: CURRENCY_COLORS[currency] || '#1890ff' },
+      data: sortedDates.map(d => {
+        const point = forexHistoryData.value[currency]?.find(p => p.date === d)
+        return point ? point.rate : null
+      }),
+      connectNulls: false
+    }))
+  }
+})
+
+// ── 布伦特原油折线图 ───────────────────────────────────────
+const fuelChartOption = computed(() => ({
+  tooltip: {
+    trigger: 'axis',
+    formatter: (params) => {
+      const p = params[0]
+      return `<b>${p.axisValue}</b><br/>${p.marker}SC888收盘：<b>¥${p.value?.toFixed(2)}/桶</b>`
+    }
+  },
+  grid: { left: 16, right: 24, top: 16, bottom: 40, containLabel: true },
+  dataZoom: [{ type: 'inside' }, { type: 'slider', height: 20, bottom: 4 }],
+  xAxis: { type: 'category', data: fuelHistoryData.value.map(d => d.date), axisLabel: { rotate: 30, fontSize: 11 } },
+  yAxis: { type: 'value', name: '元/桶', axisLabel: { formatter: v => '¥' + v } },
+  series: [{
+    name: '原油SC888',
+    type: 'line',
+    smooth: true,
+    symbol: 'none',
+    lineStyle: { width: 2, color: '#1890ff' },
+    areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(24,144,255,0.3)' }, { offset: 1, color: 'rgba(24,144,255,0.02)' }] } },
+    data: fuelHistoryData.value.map(d => d.price),
+    markLine: {
+      silent: true,
+      lineStyle: { color: '#ff4d4f', type: 'dashed' },
+      data: [{ type: 'average', name: '均价' }]
+    }
+  }]
+}))
 </script>
 
 <style scoped>
@@ -439,4 +678,6 @@ const distChartOption = computed(() => ({
 .chart-card :deep(.el-card__header) { padding: 10px 16px; font-size: 14px; display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-weight: 600; color: #262626; }
 .card-hint { font-size: 12px; color: #bfbfbf; margin-left: 8px; }
+.market-empty { padding: 24px 0; text-align: center; }
+.empty-tip { font-size: 12px; color: #8c8c8c; margin-top: 8px; }
 </style>

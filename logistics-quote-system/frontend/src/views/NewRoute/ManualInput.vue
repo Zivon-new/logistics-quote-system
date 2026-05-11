@@ -182,6 +182,7 @@ watch(() => props.initialData, (newVal) => {
     formData.route.计费重量 = newVal['计费重量(/kg)'] || newVal.计费重量 || newVal['计费重量_kg'] || 0
     formData.route.总体积 = newVal['总体积(/cbm)'] || newVal.总体积 || newVal['总体积_cbm'] || 0
     formData.route.货值 = newVal.货值 || 0
+    formData.route.货值币种 = newVal.货值币种 || 'RMB'
     
     console.log('✅ ManualInput数据更新完成:', formData.route)
   }
@@ -208,6 +209,7 @@ const loadEditData = async (routeId) => {
     formData.route.计费重量 = d['计费重量(/kg)'] || d.计费重量 || 0
     formData.route.总体积 = d['总体积(/cbm)'] || d.总体积 || 0
     formData.route.货值 = d.货值 || 0
+    formData.route.货值币种 = d.货值币种 || 'RMB'
 
     formData.goodsDetails = (d.goods_details || []).map(g => ({
       货物名称: g.货物名称 || '',
@@ -463,6 +465,12 @@ const handleSubmit = async () => {
       console.error('❌ step1Ref.value.getValues 不存在！')
     }
 
+    // 用明确的货值刷新所有代理商汇总，确保税金/汇损基于正确的货值计算（绕过 stale props）
+    step3Ref.value?.refreshSummariesWithValue?.(
+      Number(formData.route.货值),
+      formData.route.货值币种 || 'RMB'
+    )
+
     // ✅ pickNum：优先使用route的值（用户在Step1填的）
     const gt0 = formData.goodsTotal[0] || {}
     const pickNum = (routeVal, goodsVal, fieldName) => {
@@ -500,14 +508,15 @@ const handleSubmit = async () => {
     
     // ✅ 清理agents数据
     let cleanAgents = formData.agents
-      .filter((agent, index) => {
+      .map((agent, originalIndex) => ({ agent, originalIndex }))
+      .filter(({ agent, originalIndex: index }) => {
         const hasAgentName = agent.代理商 && agent.代理商.trim() !== ''
         if (!hasAgentName) {
           console.warn(`⚠️ 跳过空代理商 (index: ${index})`)
         }
         return hasAgentName
       })
-      .map(agent => {
+      .map(({ agent, originalIndex }) => {
       const cleanAgent = {
         代理商: agent.代理商 || '',
         运输方式: agent.运输方式 || '',
@@ -522,7 +531,7 @@ const handleSubmit = async () => {
         fee_total: [],
         summary: {}
       }
-      
+
       if (agent.fee_items && Array.isArray(agent.fee_items) && agent.fee_items.length > 0) {
         cleanAgent.fee_items = agent.fee_items.map(item => ({
           费用类型: item.费用类型 || '',
@@ -535,7 +544,7 @@ const handleSubmit = async () => {
           备注: item.备注 || ''
         }))
       }
-      
+
       if (agent.fee_total && Array.isArray(agent.fee_total) && agent.fee_total.length > 0) {
         cleanAgent.fee_total = agent.fee_total.map(total => ({
           费用名称: total.费用名称 || '',
@@ -545,11 +554,12 @@ const handleSubmit = async () => {
           备注: total.备注 || ''
         }))
       }
-      
+
       if (agent.summary && typeof agent.summary === 'object' && Object.keys(agent.summary).length > 0) {
         const taxDetailJson = Array.isArray(agent.summary.税率明细) && agent.summary.税率明细.length > 0
           ? JSON.stringify(agent.summary.税率明细)
           : (agent.summary.进口税率原文 || '')
+        // agent.summary 已由 refreshSummariesWithValue 更新为最新值，直接读取
         cleanAgent.summary = {
           小计: Number(agent.summary.小计) || 0,
           税率: Number(agent.summary.税率) || 0,
@@ -561,7 +571,7 @@ const handleSubmit = async () => {
           进口税率原文: taxDetailJson
         }
       }
-      
+
       return cleanAgent
     })
     

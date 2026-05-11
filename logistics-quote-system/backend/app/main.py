@@ -17,6 +17,8 @@ from .config import settings
 from .api.v1 import api_router
 from .database import SessionLocal
 from .services.ctils_scraper import run_scrape
+from .services.forex_scraper import update_forex_rates
+from .services.fuel_scraper import update_fuel_prices
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +35,39 @@ def _scheduled_scrape():
         db.close()
 
 
+def _scheduled_forex_update():
+    """定时任务：同步最新汇率"""
+    db = SessionLocal()
+    try:
+        rates = update_forex_rates(db)
+        logger.info("汇率自动同步完成: %s", rates)
+    except Exception as e:
+        logger.error("汇率同步失败: %s", e)
+    finally:
+        db.close()
+
+
+def _scheduled_fuel_update():
+    """定时任务：同步布伦特原油价格（每日收盘后）"""
+    db = SessionLocal()
+    try:
+        count = update_fuel_prices(db, days=3)
+        logger.info("燃油价格自动同步完成，写入 %d 条", count)
+    except Exception as e:
+        logger.error("燃油价格同步失败: %s", e)
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     # 启动时初始化定时任务
     scheduler = BackgroundScheduler()
     scheduler.add_job(_scheduled_scrape, "cron", hour=8, minute=0, id="ctils_daily")
+    scheduler.add_job(_scheduled_forex_update, "cron", hour=9, minute=30, id="forex_daily")
+    scheduler.add_job(_scheduled_fuel_update, "cron", hour=18, minute=30, id="fuel_daily")
     scheduler.start()
-    logger.info("APScheduler 已启动（贸法通每日 08:00 同步）")
+    logger.info("APScheduler 已启动（贸法通 08:00 / 汇率 09:30 / 燃油 18:30 每日同步）")
     yield
     scheduler.shutdown(wait=False)
 

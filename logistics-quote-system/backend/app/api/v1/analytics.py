@@ -174,6 +174,96 @@ async def get_by_agent(db: Session = Depends(get_db), current_user: User = Depen
     ]
 
 
+@router.get("/forex-history")
+async def get_forex_history(
+    days: int = Query(default=90, ge=7, le=365),
+    currencies: str = Query(default="USD,EUR,SGD,JPY,MYR"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """汇率历史走势：返回各货币近N天对人民币汇率"""
+    currency_list = [c.strip() for c in currencies.split(",") if c.strip()]
+    result = {c: [] for c in currency_list}
+    try:
+        placeholders = ",".join(f"'{c}'" for c in currency_list)
+        rows = db.execute(text(f"""
+            SELECT `币种`, `参考日期`, `汇率`
+            FROM forex_rate_history
+            WHERE `币种` IN ({placeholders})
+              AND `参考日期` >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
+            ORDER BY `参考日期` ASC
+        """), {"days": days}).fetchall()
+        for row in rows:
+            currency, ref_date, rate = row[0], str(row[1]), float(row[2])
+            if currency in result:
+                result[currency].append({"date": ref_date, "rate": rate})
+    except Exception:
+        pass  # 表不存在时返回空数据，前端显示空状态提示
+    return {"success": True, "data": result, "days": days}
+
+
+@router.get("/fuel-history")
+async def get_fuel_history(
+    days: int = Query(default=90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """布伦特原油价格历史（用于燃油附加费参考）"""
+    data = []
+    try:
+        # 取数据库中最新的 days 条记录（新浪数据可能截止在过去某年，不能用当前日期过滤）
+        rows = db.execute(text("""
+            SELECT `交易日期`, `收盘价`
+            FROM (
+                SELECT `交易日期`, `收盘价`
+                FROM fuel_price_history
+                ORDER BY `交易日期` DESC
+                LIMIT :days
+            ) t
+            ORDER BY `交易日期` ASC
+        """), {"days": days}).fetchall()
+        data = [{"date": str(r[0]), "price": float(r[1])} for r in rows]
+    except Exception:
+        pass
+    return {"success": True, "data": data, "days": days}
+
+
+@router.post("/forex-backfill")
+async def trigger_forex_backfill(
+    days: int = Query(default=30, ge=7, le=180),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """回填历史汇率数据（Frankfurter API）"""
+    from fastapi import HTTPException
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="仅管理员可执行")
+    from ...services.forex_scraper import backfill_forex_history
+    try:
+        count = backfill_forex_history(db, days=days)
+        return {"success": True, "message": f"汇率历史回填完成，写入 {count} 条记录"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"回填失败：{str(e)}")
+
+
+@router.post("/fuel-backfill")
+async def trigger_fuel_backfill(
+    days: int = Query(default=90, ge=30, le=365),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """管理员手动回填燃油历史数据"""
+    from fastapi import HTTPException
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="仅管理员可执行")
+    from ...services.fuel_scraper import backfill_fuel_prices
+    try:
+        count = backfill_fuel_prices(db, days=days)
+        return {"success": True, "message": f"回填完成，写入 {count} 条数据"}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"数据拉取失败：{str(e)}")
+
+
 @router.get("/price-distribution")
 async def get_price_distribution(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """报价区间分布（用于直方图）"""

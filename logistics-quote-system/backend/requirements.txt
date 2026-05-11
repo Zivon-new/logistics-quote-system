@@ -40,6 +40,8 @@ httpx>=0.24.0
 # 爬虫 & 定时任务
 pdfplumber>=0.11.0
 apscheduler>=3.10.0
+requests>=2.28.0
+akshare>=1.18.0
 
 # 测试（可选）
 pytest==7.4.0
