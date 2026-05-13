@@ -130,6 +130,9 @@ INVALID_AGENT_KEYWORDS = {
     
     # 常见无效词
     "如果", "需要", "可以",
+
+    # 状态/备注类（只在单独出现时无效，不应作为子串过滤公司名+备注格式）
+    "新代理", "仅合作", "未合作", "暂无", "暂未", "展会新加",
 }
 
 # 常见城市名 — 这些是地名而非代理商名，直接拒绝
@@ -198,21 +201,20 @@ def is_valid_agent_name(name: str) -> bool:
     ))
 
     # 描述性关键词：包含这些关键词的文本不是代理商名
+    # 注意：只放"不可能出现在公司名中间"的词。
+    # 备注类词（如'新代理'/'仅合作'）已移至 INVALID_AGENT_KEYWORDS（精确匹配），
+    # 避免误杀"東捷運通-新代理"这类"公司名-备注"格式。
     is_description = any(kw in name for kw in [
         # 贸易模式
         '方案', '询价', '预估', '待定', '过港', '包税', '双清', '含税', '正清', '贸代', '纯正清',
         # 财务说明
         '缴税', '核算', '货值', '税率',
-        # 状态备注
-        '仅合作', '未合作', '暂无', '暂未',
-        # 代理备注
-        '展会新加', '新代理',
-        # 有效期 / 时间性描述（本周有效、本月有效等）
+        # 有效期 / 时间性描述
         '有效',
         # 标签/标题
         '货物信息', '物流指定', '运输信息',
         # 服务类型描述（非公司名）
-        '贸易代理',  # "空运贸易代理" 是描述，不是公司名
+        '贸易代理',
         # 建议/说明类
         '不建议', '建议使用', '更新',
     ])
@@ -265,9 +267,17 @@ def extract_agent_name_and_remark(text: str) -> tuple:
         if len(parts) == 2:
             agent_name = parts[0].strip()
             remark = parts[1].strip()
-            
-            # 验证agent_name是否在白名单
+
+            # 白名单直接确认
             if agent_name in AGENT_WHITELIST:
+                return (agent_name, remark)
+
+            # 非白名单：若名字部分看起来像公司名，也做拆分
+            # 条件：含中文字符、合理长度、不含纯描述性词汇
+            import re as _re
+            if (2 <= len(agent_name) <= 20 and
+                    bool(_re.search(r'[一-鿿]', agent_name)) and
+                    not any(kw in agent_name for kw in ['方案', '过港', '双清', '包税', '正清', '缴税'])):
                 return (agent_name, remark)
     
     # 方法2: 使用空格分隔（多个空格）

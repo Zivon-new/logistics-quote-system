@@ -436,6 +436,11 @@ class HorizontalTableParserV2:
                         if not agents:
                             self.logger.debug("  代理行检测失败，尝试锚点 fallback")
                             agents = self.agent_extractor.extract_from_anchors(sheet)
+                        # v2.5: 最终 fallback — 仍为空时生成"未识别"占位代理，确保费用可录入
+                        if not agents:
+                            fallback_col = self.fee_extractor._detect_fee_column_from_anchors(sheet) or 2
+                            agents = [{'代理商': '未识别', '_column': fallback_col, '代理备注': '代理名提取失败，请手动修正'}]
+                            self.logger.warning(f"  代理提取彻底失败，使用占位代理（列{fallback_col}）")
                         sheet_data['agents'] = agents
                     elif step_name == 'Goods':
                         goods_result = step_func()
