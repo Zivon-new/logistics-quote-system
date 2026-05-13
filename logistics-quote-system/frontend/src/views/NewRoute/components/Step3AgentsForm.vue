@@ -1221,7 +1221,11 @@ const calculateSubtotalByCurrency = (agent) => {
   if (agent.fee_items) {
     agent.fee_items
       .filter(item => item.备注 !== '__GROUP_HEADER__')
-      .forEach(item => add(item.币种, (item.单价 || 0) * (item.数量 || 0)))
+      .forEach(item => {
+        // 必须用 calcOriginalAmount（含最低收费），而非裸的单价×数量
+        const amount = item.原币金额 != null ? item.原币金额 : calcOriginalAmount(item)
+        add(item.币种, amount)
+      })
   }
   if (agent.fee_total) {
     agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
