@@ -11,7 +11,8 @@
       "Bash(unzip:*)",
       "Bash(mysql:*)",
       "Bash(npm install:*)",
-      "Bash(node -e \"require\\(''sortablejs''\\); console.log\\(''ok''\\)\")"
+      "Bash(node -e \"require\\(''sortablejs''\\); console.log\\(''ok''\\)\")",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

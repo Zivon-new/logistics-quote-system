@@ -11,7 +11,7 @@
  Target Server Version : 80044 (8.0.44)
  File Encoding         : 65001
 
- Date: 06/05/2026 10:19:42
+ Date: 12/05/2026 13:42:34
 */
 
 SET NAMES utf8mb4;
@@ -107,7 +107,7 @@ CREATE TABLE `fee_items`  (
   PRIMARY KEY (`费用ID`) USING BTREE,
   INDEX `fk_fee_items_route_agents`(`代理路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_fee_items_route_agents` FOREIGN KEY (`代理路线ID`) REFERENCES `route_agents` (`代理路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 356 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 482 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for fee_total
@@ -125,33 +125,46 @@ CREATE TABLE `fee_total`  (
   PRIMARY KEY (`整单费用ID`) USING BTREE,
   INDEX `fk_fee_total_route_agents`(`代理路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_fee_total_route_agents` FOREIGN KEY (`代理路线ID`) REFERENCES `route_agents` (`代理路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 464 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 536 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for forex_rate
 -- ----------------------------
 DROP TABLE IF EXISTS `forex_rate`;
 CREATE TABLE `forex_rate`  (
-  `币种` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `汇率` decimal(18, 8) NOT NULL,
+  `id` int NOT NULL AUTO_INCREMENT,
+  `币种` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `汇率` decimal(12, 6) NOT NULL COMMENT '1单位外币=?人民币',
+  `参考日期` date NOT NULL,
   `更新时间` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`币种`) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_currency`(`币种` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 36 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for forex_rate_history
 -- ----------------------------
 DROP TABLE IF EXISTS `forex_rate_history`;
 CREATE TABLE `forex_rate_history`  (
-  `汇率历史ID` int NOT NULL AUTO_INCREMENT,
-  `币种` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `汇率` decimal(18, 8) NOT NULL,
-  `生效日期` date NOT NULL,
-  `失效日期` date NULL DEFAULT NULL,
-  `创建时间` datetime NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`汇率历史ID`) USING BTREE,
-  INDEX `idx_currency_date`(`币种` ASC, `生效日期` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+  `id` int NOT NULL AUTO_INCREMENT,
+  `币种` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `汇率` decimal(12, 6) NOT NULL COMMENT '1单位外币=?人民币',
+  `参考日期` date NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_currency_date`(`币种` ASC, `参考日期` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 408 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for fuel_price_history
+-- ----------------------------
+DROP TABLE IF EXISTS `fuel_price_history`;
+CREATE TABLE `fuel_price_history`  (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `收盘价` decimal(10, 4) NOT NULL COMMENT '上期所SC888收盘价，元/桶',
+  `交易日期` date NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_date`(`交易日期` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 124 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for goods_details
@@ -197,7 +210,7 @@ CREATE TABLE `goods_total`  (
   PRIMARY KEY (`整单货物ID`) USING BTREE,
   INDEX `fk_goods_total_routes`(`路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_goods_total_routes` FOREIGN KEY (`路线ID`) REFERENCES `routes` (`路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 71 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 89 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for import_tax_items
@@ -269,7 +282,7 @@ CREATE TABLE `route_agents`  (
   INDEX `idx_ra_agent_id`(`代理商ID` ASC) USING BTREE,
   INDEX `idx_ra_timeliness`(`时效天数` ASC) USING BTREE,
   CONSTRAINT `fk_route_agents_routes` FOREIGN KEY (`路线ID`) REFERENCES `routes` (`路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 272 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 290 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for route_attachments
@@ -391,7 +404,7 @@ CREATE TABLE `summary`  (
   UNIQUE INDEX `unique_agent_route_id`(`代理路线ID` ASC) USING BTREE,
   INDEX `idx_agent_route_id`(`代理路线ID` ASC) USING BTREE,
   CONSTRAINT `fk_summary_route_agents` FOREIGN KEY (`代理路线ID`) REFERENCES `route_agents` (`代理路线ID`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 242 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 273 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for users
@@ -531,11 +544,14 @@ DROP PROCEDURE IF EXISTS `recompute_summary`;
 delimiter ;;
 CREATE PROCEDURE `recompute_summary`(IN p_agent_route_id INT)
 BEGIN
-    DECLARE v_route_id INT DEFAULT 0;
+    DECLARE v_route_id INT DEFAULT NULL;
     DECLARE v_subtotal DECIMAL(18,2) DEFAULT 0;
     DECLARE v_tax_rate DECIMAL(10,4) DEFAULT 0;
-    DECLARE v_tax DECIMAL(18,2) DEFAULT 0;
     DECLARE v_loss_rate DECIMAL(10,6) DEFAULT 0;
+    DECLARE v_existing_tax DECIMAL(18,2) DEFAULT 0;
+    DECLARE v_existing_loss DECIMAL(18,2) DEFAULT 0;
+    DECLARE v_import_tax_text TEXT DEFAULT NULL;
+    DECLARE v_tax DECIMAL(18,2) DEFAULT 0;
     DECLARE v_loss DECIMAL(18,2) DEFAULT 0;
     DECLARE v_total DECIMAL(18,2) DEFAULT 0;
     DECLARE v_route_value DECIMAL(18,2) DEFAULT 0;
@@ -545,47 +561,56 @@ BEGIN
     WHERE `代理路线ID` = p_agent_route_id
     LIMIT 1;
 
-    IF v_route_id IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '找不到对应的route_agents记录';
-    END IF;
+    -- 用 IF 包住所有逻辑，v_route_id 为 NULL 时直接跳过，不用 LEAVE
+    IF v_route_id IS NOT NULL THEN
 
-    SELECT IFNULL(`货值`,0) INTO v_route_value
-    FROM routes
-    WHERE `路线ID` = v_route_id
-    LIMIT 1;
+        SELECT IFNULL(`货值`, 0) INTO v_route_value
+        FROM routes
+        WHERE `路线ID` = v_route_id
+        LIMIT 1;
 
-    SELECT 
-        IFNULL(SUM(`人民币金额`),0)
-    INTO v_subtotal
-    FROM (
-        SELECT `人民币金额` FROM fee_items WHERE `代理路线ID` = p_agent_route_id
-        UNION ALL
-        SELECT `人民币金额` FROM fee_total WHERE `代理路线ID` = p_agent_route_id
-    ) combined_fees;
+        SELECT IFNULL(SUM(`人民币金额`), 0) INTO v_subtotal
+        FROM (
+            SELECT `人民币金额` FROM fee_items WHERE `代理路线ID` = p_agent_route_id
+            UNION ALL
+            SELECT `人民币金额` FROM fee_total  WHERE `代理路线ID` = p_agent_route_id
+        ) combined_fees;
 
-    SELECT 
-        IFNULL(`税率`,0), 
-        IFNULL(`汇损率`,0)
-    INTO v_tax_rate, v_loss_rate
-    FROM summary
-    WHERE `代理路线ID` = p_agent_route_id
-    LIMIT 1;
+        SELECT
+            IFNULL(`税率`, 0),
+            IFNULL(`汇损率`, 0),
+            `进口税率原文`,
+            IFNULL(`税金`, 0),
+            IFNULL(`汇损`, 0)
+        INTO v_tax_rate, v_loss_rate, v_import_tax_text, v_existing_tax, v_existing_loss
+        FROM summary
+        WHERE `代理路线ID` = p_agent_route_id
+        LIMIT 1;
 
-    SET v_tax = (v_subtotal + v_route_value) * (v_tax_rate / 100);
-    SET v_loss = (v_subtotal + v_route_value) * (v_loss_rate / 100);
-    SET v_total = v_subtotal + v_route_value + v_tax + v_loss;
+        -- 多档税率：保留前端已写入的税金/汇损，只更新小计
+        -- 单一税率：按正确公式重算（税金=货值×税率，汇损=税金×汇损率）
+        IF v_import_tax_text IS NOT NULL AND v_import_tax_text != '' THEN
+            SET v_tax  = v_existing_tax;
+            SET v_loss = v_existing_loss;
+        ELSE
+            SET v_tax  = v_route_value * v_tax_rate;
+            SET v_loss = v_tax * v_loss_rate;
+        END IF;
 
-    IF EXISTS(SELECT 1 FROM summary WHERE `代理路线ID` = p_agent_route_id) THEN
-        UPDATE summary
-        SET 
-            `小计` = v_subtotal,
-            `税金` = v_tax,
-            `汇损` = v_loss,
-            `总计` = v_total
-        WHERE `代理路线ID` = p_agent_route_id;
-    ELSE
-        INSERT INTO summary(`代理路线ID`, `小计`, `税率`, `税金`, `汇损率`, `汇损`, `总计`)
-        VALUES (p_agent_route_id, v_subtotal, v_tax_rate, v_tax, v_loss_rate, v_loss, v_total);
+        SET v_total = v_subtotal + v_tax + v_loss;
+
+        IF EXISTS(SELECT 1 FROM summary WHERE `代理路线ID` = p_agent_route_id) THEN
+            UPDATE summary
+            SET `小计` = v_subtotal,
+                `税金` = v_tax,
+                `汇损` = v_loss,
+                `总计` = v_total
+            WHERE `代理路线ID` = p_agent_route_id;
+        ELSE
+            INSERT INTO summary(`代理路线ID`, `小计`, `税率`, `税金`, `汇损率`, `汇损`, `总计`)
+            VALUES (p_agent_route_id, v_subtotal, v_tax_rate, v_tax, v_loss_rate, v_loss, v_total);
+        END IF;
+
     END IF;
 END
 ;;
@@ -1400,26 +1425,29 @@ delimiter ;;
 CREATE TRIGGER `trg_summary_before_insert` BEFORE INSERT ON `summary` FOR EACH ROW BEGIN
     DECLARE total_fee DECIMAL(18,2);
     DECLARE route_value DECIMAL(18,2);
-    
-    -- 1. 计算小计（所有费用的人民币总和）
+
     SELECT COALESCE(SUM(人民币金额), 0) + COALESCE(
         (SELECT SUM(人民币金额) FROM fee_total WHERE 代理路线ID = NEW.代理路线ID), 0
     )
     INTO total_fee
     FROM fee_items
     WHERE 代理路线ID = NEW.代理路线ID;
-    
-    -- 2. 获取该代理路线对应的routes.货值
+
     SELECT r.货值
     INTO route_value
     FROM routes r
     INNER JOIN route_agents ra ON r.路线ID = ra.路线ID
     WHERE ra.代理路线ID = NEW.代理路线ID;
-    
-    -- 3. 设置计算结果
+
     SET NEW.小计 = total_fee;
-    SET NEW.税金 = COALESCE(route_value, 0) * COALESCE(NEW.税率, 0);  -- ✅ 修复：使用货值
-    SET NEW.汇损 = COALESCE(route_value, 0) * COALESCE(NEW.汇损率, 0);  -- ✅ 修复：使用货值
+
+    -- 多档税率：进口税率原文非空，保留前端已计算好的税金/汇损，不覆盖
+    -- 单一税率：用正确公式计算（汇损 = 税金 × 汇损率，不是 货值 × 汇损率）
+    IF NEW.进口税率原文 IS NULL OR NEW.进口税率原文 = '' THEN
+        SET NEW.税金 = COALESCE(route_value, 0) * COALESCE(NEW.税率, 0);
+        SET NEW.汇损 = NEW.税金 * COALESCE(NEW.汇损率, 0);
+    END IF;
+
     SET NEW.总计 = NEW.小计 + NEW.税金 + NEW.汇损;
 END
 ;;
@@ -1433,26 +1461,29 @@ delimiter ;;
 CREATE TRIGGER `trg_summary_before_update` BEFORE UPDATE ON `summary` FOR EACH ROW BEGIN
     DECLARE total_fee DECIMAL(18,2);
     DECLARE route_value DECIMAL(18,2);
-    
-    -- 1. 计算小计（所有费用的人民币总和）
+
     SELECT COALESCE(SUM(人民币金额), 0) + COALESCE(
         (SELECT SUM(人民币金额) FROM fee_total WHERE 代理路线ID = NEW.代理路线ID), 0
     )
     INTO total_fee
     FROM fee_items
     WHERE 代理路线ID = NEW.代理路线ID;
-    
-    -- 2. 获取该代理路线对应的routes.货值
+
     SELECT r.货值
     INTO route_value
     FROM routes r
     INNER JOIN route_agents ra ON r.路线ID = ra.路线ID
     WHERE ra.代理路线ID = NEW.代理路线ID;
-    
-    -- 3. 设置计算结果
+
     SET NEW.小计 = total_fee;
-    SET NEW.税金 = COALESCE(route_value, 0) * COALESCE(NEW.税率, 0);  -- ✅ 修复：使用货值
-    SET NEW.汇损 = COALESCE(route_value, 0) * COALESCE(NEW.汇损率, 0);  -- ✅ 修复：使用货值
+
+    -- 多档税率：进口税率原文非空，保留前端已计算好的税金/汇损，不覆盖
+    -- 单一税率：用正确公式计算（汇损 = 税金 × 汇损率，不是 货值 × 汇损率）
+    IF NEW.进口税率原文 IS NULL OR NEW.进口税率原文 = '' THEN
+        SET NEW.税金 = COALESCE(route_value, 0) * COALESCE(NEW.税率, 0);
+        SET NEW.汇损 = NEW.税金 * COALESCE(NEW.汇损率, 0);
+    END IF;
+
     SET NEW.总计 = NEW.小计 + NEW.税金 + NEW.汇损;
 END
 ;;
