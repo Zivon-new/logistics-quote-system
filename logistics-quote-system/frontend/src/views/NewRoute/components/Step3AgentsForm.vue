@@ -1280,6 +1280,11 @@ const routeValueRMB = () => {
 
 // 税金/汇损原币金额（换汇前，用于展示原币部分）
 const calculateTaxOriginal = (agent) => {
+  // 多税率模式：原币税金 = CNY税金 ÷ 汇率（避免读旧的 summary.税率）
+  if (agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length) {
+    const rate = exchangeRates[props.routeValueCurrency || 'RMB'] || 1
+    return rate > 0 ? calcMultiTaxTotal(agent) / rate : 0
+  }
   return (parseFloat(props.routeValue) || 0) * (parseFloat(agent.summary.税率) || 0)
 }
 const calculateLossOriginal = (agent) => {
