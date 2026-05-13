@@ -286,11 +286,15 @@ class AgentExtractorV2(BaseExtractor):
                 '方案', '过港', '双清', '包税', '缴税', '核算', '预估', '询价', '正清',
             ])
             is_pure_num = name_part.replace('.', '').replace(',', '').isdigit()
-            if has_chinese and not is_price and not is_desc and not is_pure_num and 2 <= len(name_part) <= 30:
-                agent_name = name_part
-                remark = remark_part or None
-                if self.logger:
-                    self.logger.debug(f"        列{col_idx}: 锚点模式接受代理商名'{name_part}' 备注='{remark}'")
+            from ...data.agent_whitelist import KNOWN_CITIES
+            is_city = name_part in KNOWN_CITIES
+            if has_chinese and not is_price and not is_desc and not is_pure_num and not is_city and 2 <= len(name_part) <= 30:
+                # 最终门卫：复用 is_valid_agent_name 的全部规则（城市名、符号、空格等）
+                if is_valid_agent_name(name_part):
+                    agent_name = name_part
+                    remark = remark_part or None
+                    if self.logger:
+                        self.logger.debug(f"        列{col_idx}: 锚点模式接受代理商名'{name_part}' 备注='{remark}'")
 
         # 方法4: 标准启发式兜底（非锚点，保持原逻辑）
         if not anchor_derived and (not agent_name or not is_valid_agent_name(agent_name)):

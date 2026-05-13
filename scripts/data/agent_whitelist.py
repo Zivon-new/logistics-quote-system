@@ -74,7 +74,8 @@ AGENT_WHITELIST = {
     "海南航空", "海航货运",
     "国泰", "国泰航空", "Cathay Pacific",
     "新加坡航空", "Singapore Airlines",
-    "阿联酋航空", "Emirates", "EK",
+    "阿联酋航空", "Emirates",
+    # 注：EK 是航司代码（不是代理商名），出现在 "BY HK EK Q45..." 等航班代码中，不纳入白名单
     "汉莎", "汉莎航空", "Lufthansa",
     "法航", "法国航空", "Air France",
     
@@ -113,7 +114,10 @@ AGENT_WHITELIST = {
 INVALID_AGENT_KEYWORDS = {
     # 纯方案类（没有代理商名）
     "双清方案", "包税方案", "贸代方案", "一般贸易过港",
-    
+
+    # 服务类型描述（不是公司名）
+    "空运专线", "海运专线", "空派专线",
+
     # 说明类
     "询价", "预估", "待定", "确认",
     
@@ -128,51 +132,102 @@ INVALID_AGENT_KEYWORDS = {
     "如果", "需要", "可以",
 }
 
+# 常见城市名 — 这些是地名而非代理商名，直接拒绝
+KNOWN_CITIES = {
+    '深圳', '北京', '上海', '广州', '香港', '天津', '成都', '武汉', '杭州', '南京',
+    '青岛', '大连', '宁波', '厦门', '苏州', '重庆', '西安', '昆明', '郑州', '福州',
+    '澳门', '台北', '台湾', '新加坡', '曼谷', '马尼拉', '雅加达', '吉隆坡', '河内',
+    '仁川', '东京', '大阪', '法兰克福', '鹿特丹', '安特卫普', '阿姆斯特丹', '达拉斯',
+    '洛杉矶', '纽约', '芝加哥', '多伦多', '悉尼', '墨尔本', '迪拜', '开罗',
+}
+
+
 def is_valid_agent_name(name: str) -> bool:
     """
     判断是否是有效的代理商名称
-    
-    Args:
-        name: 代理商名称
-    
+
     Returns:
-        True/False
+        True = 可能是代理商名；False = 明确不是代理商名
     """
     if not name or not isinstance(name, str):
         return False
-    
+
     name = name.strip()
-    
+
     # 长度检查
     if len(name) < 2 or len(name) > 50:
         return False
-    
+
     # 纯数字
     if name.isdigit():
         return False
-    
-    # 先检查是否在白名单中
+
+    # 先检查白名单（高优先级，直接返回 True）
     for agent in AGENT_WHITELIST:
         if name == agent or name.startswith(agent):
             return True
-    
-    # 如果不在白名单中，检查是否是纯无效关键词
+
+    # 已知城市名 — 地名不是代理商
+    if name in KNOWN_CITIES:
+        return False
+
+    # 精确无效关键词
     for keyword in INVALID_AGENT_KEYWORDS:
-        if name == keyword:  # 完全匹配才过滤
+        if name == keyword:
             return False
-    
-    # 不在白名单中：只有含中文字符的才作为兜底接受（纯英文可能是港口代码/路线名）
+
+    # 含空格的多词短语通常是句子片段
+    # - 双空格：明确的格式问题
+    # - 中文名称含空格：中文公司名不用空格分词（英文名如"Air China"已在白名单）
+    if '  ' in name:
+        return False
+    import re as _re
+    if ' ' in name and bool(_re.search(r'[一-鿿]', name)):
+        return False
+
+    # 算术/数量表达式：含 '+' 且有数字 → 货物规格描述（如"2pa防火墙+5交换机+模块"）
+    if '+' in name and bool(_re.search(r'\d', name)):
+        return False
+
     import re
     has_chinese = bool(re.search(r'[一-鿿]', name))
-    is_price = bool(re.search(r'\d+\s*(USD|RMB|CNY|EUR|GBP|SGD|/kg|/cbm)', name, re.IGNORECASE))
-    # 扩展：捕获更多备注/说明性文本被误识别为代理名的情况
+    # 价格检测：支持 "USD100/票" 和 "100USD" 两种顺序
+    is_price = bool(re.search(
+        r'(USD|RMB|CNY|EUR|GBP|SGD)\s*\d+|\d+\s*(USD|RMB|CNY|EUR|GBP|SGD|/kg|/cbm|/票)',
+        name, re.IGNORECASE
+    ))
+
+    # 描述性关键词：包含这些关键词的文本不是代理商名
     is_description = any(kw in name for kw in [
-        '方案', '询价', '预估', '待定', '过港', '包税', '双清', '含税',
-        '正清', '贸代', '代理方式', '纯正清',  # 贸易模式
-        '缴税', '核算', '货值', '税率',         # 财务说明
-        '仅合作', '未合作', '暂无', '暂未',      # 合作状态备注
-        '展会新加', '新代理',                    # 代理备注
+        # 贸易模式
+        '方案', '询价', '预估', '待定', '过港', '包税', '双清', '含税', '正清', '贸代', '纯正清',
+        # 财务说明
+        '缴税', '核算', '货值', '税率',
+        # 状态备注
+        '仅合作', '未合作', '暂无', '暂未',
+        # 代理备注
+        '展会新加', '新代理',
+        # 有效期 / 时间性描述（本周有效、本月有效等）
+        '有效',
+        # 标签/标题
+        '货物信息', '物流指定', '运输信息',
+        # 服务类型描述（非公司名）
+        '贸易代理',  # "空运贸易代理" 是描述，不是公司名
+        # 建议/说明类
+        '不建议', '建议使用', '更新',
     ])
+
+    # 注释类开头词（如果、如确认、不建议、已含等）
+    note_starters = ('已', '不', '如', '可', '请', '需', '按', '约', '待', '此')
+    if name[:1] in note_starters:
+        # 短文本（≤6字）：明显的注释词
+        # 长文本（>6字）：几乎不可能是公司名
+        if len(name) <= 6 or len(name) >= 8:
+            return False
+
+    # 尾缀"有效" — 几乎不出现在公司名中
+    if name.endswith('有效'):
+        return False
 
     if has_chinese and not is_price and not is_description:
         if 2 <= len(name) <= 20:
