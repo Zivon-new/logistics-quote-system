@@ -39,6 +39,7 @@
           :route-value="debugRouteValue"
           :route-value-currency="formData.route.货值币种 || 'RMB'"
           :goods-list="formData.goodsTotal"
+          :saved-route-id="savedRouteId"
         />
 
         <!-- Step 4: 预览确认 -->
@@ -70,15 +71,15 @@
       </div>
     </el-card>
 
-    <!-- 附件上传区（编辑模式始终显示；新建模式提交成功后显示） -->
-    <el-card v-if="savedRouteId" class="attachment-card">
+    <!-- 新建路线提交成功后的完成提示 -->
+    <el-card v-if="attachmentDone" class="attachment-card">
       <template #header>
-        <span>附件管理</span>
+        <span>路线已保存</span>
       </template>
-      <AttachmentPanel :route-id="savedRouteId" />
-      <div v-if="attachmentDone" class="attachment-done">
-        <el-button type="primary" @click="$emit('success')">完成</el-button>
-      </div>
+      <p style="color:#595959;margin:0 0 12px;">
+        路线已成功保存。如需上传附件，请返回「代理商及费用」步骤，在对应代理商卡片中上传。
+      </p>
+      <el-button type="primary" @click="$emit('success')">完成</el-button>
     </el-card>
   </div>
 </template>
@@ -91,7 +92,6 @@ import Step1RouteInfo from './components/Step1RouteInfo.vue'
 import Step2GoodsInfo from './components/Step2GoodsInfo.vue'
 import Step3AgentsForm from './components/Step3AgentsForm.vue'
 import Step4Preview from './components/Step4Preview.vue'
-import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
 const props = defineProps({
   isEdit: {
@@ -152,6 +152,7 @@ const formData = reactive({
       fee_total: [],
       summary: {
         税率: 0,
+        税率Display: 0,
         汇损率: 0,
         备注: ''
       }
@@ -247,8 +248,9 @@ const loadEditData = async (routeId) => {
       summary: a.summary ? {
         ...a.summary,
         税率明细: (() => { try { return JSON.parse(a.summary.进口税率原文 || '[]') } catch { return [] } })(),
-        税率模式: a.summary.进口税率原文 ? 'multi' : 'simple'
-      } : { 税率: 0, 汇损率: 0, 备注: '', 税率明细: [], 税率模式: 'simple' }
+        税率模式: a.summary.进口税率原文 ? 'multi' : 'simple',
+        税率Display: (parseFloat(a.summary.税率) || 0) * 100
+      } : { 税率: 0, 税率Display: 0, 汇损率: 0, 备注: '', 税率明细: [], 税率模式: 'simple' }
     }))
 
     await nextTick()
@@ -339,6 +341,7 @@ onMounted(async () => {
         fee_total: (a.fee_total || []).map(ft => ({ ...ft })),
         summary: a.summary ? {
           税率: parseFloat(a.summary.税率) || 0,
+          税率Display: (parseFloat(a.summary.税率) || 0) * 100,
           汇损率: parseFloat(a.summary.汇损率) || 0,
           备注: a.summary.备注 || '',
           进口税率原文: a.summary.进口税率原文 || '',
@@ -346,6 +349,7 @@ onMounted(async () => {
           税率模式: a.summary.进口税率原文 ? 'multi' : 'simple'
         } : {
           税率: 0,
+          税率Display: 0,
           汇损率: 0,
           备注: '',
           税率明细: [],

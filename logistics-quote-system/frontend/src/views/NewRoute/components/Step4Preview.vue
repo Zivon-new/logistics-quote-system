@@ -404,6 +404,7 @@ const getQuoteSingleCurrency = (agent) => {
 
 // 计算小计，跳过分组标题行
 const calculateSubtotal = (agent) => {
+  if (agent.summary?.小计手动) return agent.summary.小计 || 0
   let total = 0
 
   if (agent.fee_items) {
@@ -441,6 +442,7 @@ const calcMultiTaxTotal = (agent) => {
 
 // 计算税金 - 支持单一税率和多货物税率模式
 const calculateTax = (agent) => {
+  if (agent.summary?.税金手动) return agent.summary.税金 || 0
   if (agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length) {
     return calcMultiTaxTotal(agent)
   }
@@ -449,6 +451,7 @@ const calculateTax = (agent) => {
 
 // 计算汇损 = 税金 × 汇损率
 const calculateLoss = (agent) => {
+  if (agent.summary?.汇损手动) return agent.summary.汇损 || 0
   return calculateTax(agent) * (agent.summary?.汇损率 || 0)
 }
 

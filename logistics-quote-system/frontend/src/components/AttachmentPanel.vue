@@ -98,6 +98,7 @@ import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   routeId: { type: Number, required: true },
+  agentIndex: { type: Number, default: null },
   readonly: { type: Boolean, default: false }
 })
 
@@ -154,7 +155,7 @@ const loadList = async () => {
   if (!props.routeId) return
   loading.value = true
   try {
-    attachments.value = await listAttachments(props.routeId)
+    attachments.value = await listAttachments(props.routeId, props.agentIndex)
     attachments.value
       .filter(a => a.file_type === 'image')
       .forEach(async (a) => {
@@ -175,7 +176,7 @@ watch(() => props.routeId, loadList, { immediate: true })
 const handleBeforeUpload = async (file) => {
   uploading.value = true
   try {
-    await uploadAttachment(props.routeId, file)
+    await uploadAttachment(props.routeId, file, props.agentIndex)
     ElMessage.success(`${file.name} 上传成功`)
     await loadList()
   } catch (e) {

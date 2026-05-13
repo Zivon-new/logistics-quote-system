@@ -105,11 +105,12 @@
         <el-col :span="12">
           <el-form-item label="货值" prop="货值">
             <el-input
-              v-model="formData.货值"
-              type="number"
+              :model-value="货值Raw"
+              type="text"
               placeholder="0.00"
               clearable
-              @input="handleNumberInput('货值', $event)"
+              @input="on货值Input"
+              @clear="() => { 货值Raw = ''; formData.货值 = 0; handleInput() }"
               style="width: calc(100% - 90px);"
             />
             <el-select v-model="formData.货值币种" style="width: 88px; margin-left: 2px;">
@@ -172,6 +173,9 @@ const formData = reactive({
   货值币种: props.modelValue.货值币种 || 'RMB'
 })
 
+// 货值字符串状态（type="text" 保留小数点中间状态）
+const 货值Raw = ref(formData.货值 > 0 ? String(formData.货值) : '')
+
 // ✅ 调试信息
 const debugInfo = computed(() => {
   return {
@@ -204,6 +208,18 @@ const rules = {
       }
     }
   ]
+}
+
+// 货值专用：type="text" 保留中间状态（如 500.0），仅过滤非法字符
+const on货值Input = (val) => {
+  let filtered = val.replace(/[^\d.]/g, '')
+  const firstDot = filtered.indexOf('.')
+  if (firstDot !== -1) {
+    filtered = filtered.slice(0, firstDot + 1) + filtered.slice(firstDot + 1).replace(/\./g, '')
+  }
+  货值Raw.value = filtered
+  formData.货值 = parseFloat(filtered) || 0
+  handleInput()
 }
 
 // ✅ 新增：手动处理数字输入
@@ -283,6 +299,7 @@ const populate = (data) => {
   formData.计费重量 = parseFloat(data.计费重量) || 0
   formData.总体积   = parseFloat(data.总体积)   || 0
   formData.货值     = parseFloat(data.货值)     || 0
+  货值Raw.value     = data.货值 > 0 ? String(data.货值) : ''
   formData.货值币种 = data.货值币种 || 'RMB'
   
   if (data.交易开始日期 && data.交易结束日期) {

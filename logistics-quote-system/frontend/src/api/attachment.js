@@ -1,19 +1,20 @@
 // frontend/src/api/attachment.js
 import request from '@/utils/request'
 
-export function uploadAttachment(routeId, file) {
+export function uploadAttachment(routeId, file, agentIndex = null) {
   const form = new FormData()
   form.append('file', file)
-  return request({
-    url: `/v1/attachments/upload/${routeId}`,
-    method: 'post',
-    data: form,
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  const url = agentIndex !== null
+    ? `/v1/attachments/upload/${routeId}?agent_index=${agentIndex}`
+    : `/v1/attachments/upload/${routeId}`
+  return request({ url, method: 'post', data: form, headers: { 'Content-Type': 'multipart/form-data' } })
 }
 
-export function listAttachments(routeId) {
-  return request({ url: `/v1/attachments/route/${routeId}`, method: 'get' })
+export function listAttachments(routeId, agentIndex = null) {
+  const url = agentIndex !== null
+    ? `/v1/attachments/route/${routeId}?agent_index=${agentIndex}`
+    : `/v1/attachments/route/${routeId}`
+  return request({ url, method: 'get' })
 }
 
 export function deleteAttachment(attachmentId) {

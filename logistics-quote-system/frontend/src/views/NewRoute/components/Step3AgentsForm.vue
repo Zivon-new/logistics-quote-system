@@ -584,16 +584,17 @@
             <el-row v-if="!agent.summary.税率模式 || agent.summary.税率模式 === 'simple'" :gutter="16">
               <el-col :span="12">
                 <el-form-item label="税率">
-                  <el-input-number :controls="false"
-                    v-model="agent.summary.税率"
-                    :precision="3"
-                    :min="0"
-                    :max="1"
-                    controls-position="right"
-                    style="width: 100%;"
-                    @change="updateSummary(agent)"
-                  />
-                  <span class="unit-label">（如0.09表示9%）</span>
+                  <div style="display:flex;align-items:center;gap:4px;width:100%;">
+                    <el-input-number :controls="false"
+                      v-model="agent.summary.税率Display"
+                      :precision="4"
+                      :min="0"
+                      style="flex:1;"
+                      @change="v => { agent.summary.税率 = (v || 0) / 100; updateSummary(agent) }"
+                    />
+                    <span style="color:#606266;font-size:14px;white-space:nowrap;">%</span>
+                  </div>
+                  <span class="unit-label">（如 9 表示 9%，支持小数如 9.15）</span>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -796,6 +797,18 @@
             </el-row>
           </el-form>
         </div>
+
+        <!-- 代理商附件（路线保存后可上传） -->
+        <template v-if="savedRouteId">
+          <el-divider />
+          <div class="section">
+            <h4 class="section-title">附件</h4>
+            <AttachmentPanel :route-id="savedRouteId" :agent-index="agentIndex" />
+          </div>
+        </template>
+        <div v-else class="section attachment-placeholder">
+          <span>提交路线后可在此上传代理商附件</span>
+        </div>
       </el-card>
     </div>
 
@@ -819,6 +832,7 @@ import { ref, reactive, watch, onBeforeUnmount, nextTick } from 'vue'
 import { Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Sortable from 'sortablejs'
+import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
 const props = defineProps({
   modelValue: {
@@ -844,6 +858,10 @@ const props = defineProps({
   goodsList: {
     type: Array,
     default: () => []
+  },
+  savedRouteId: {
+    type: Number,
+    default: null
   }
 })
 
@@ -1019,6 +1037,7 @@ const addAgent = () => {
       小计手动: false,
       小计: 0,
       税率: 0,
+      税率Display: 0,
       税金手动: false,
       税金: 0,
       汇损率: 0,
@@ -1446,6 +1465,10 @@ const focusCell = (rows, rowIdx, colIdx) => {
   if (inp) { inp.focus(); inp.select() }
 }
 
+// 税率 显示/存储 转换（存储为小数 0.09，显示为百分比 9）
+const taxRateToDisplay = (v) => +((parseFloat(v) || 0) * 100).toFixed(4)
+const taxRateFromDisplay = (v) => +((parseFloat(v) || 0) / 100).toFixed(8)
+
 // 验证
 const validate = () => {
   // 检查每个代理商是否有代理商名称和运输方式
@@ -1729,5 +1752,11 @@ defineExpose({
   color: #f5222d;
   font-weight: 700;
   font-size: 16px;
+}
+
+.attachment-placeholder {
+  padding: 12px 0 4px;
+  color: #bfbfbf;
+  font-size: 13px;
 }
 </style>

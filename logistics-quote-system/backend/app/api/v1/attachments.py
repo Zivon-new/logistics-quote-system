@@ -7,7 +7,7 @@ import os
 import uuid
 from pathlib import Path
 from urllib.parse import quote
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -39,6 +39,7 @@ def _get_upload_dir(route_id: int) -> Path:
 async def upload_attachment(
     route_id: int,
     file: UploadFile = File(...),
+    agent_index: int = Query(None, description="代理商序号（0起始），不传表示路线级附件"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -55,8 +56,8 @@ async def upload_attachment(
     save_path.write_bytes(content)
 
     db.execute(text("""
-        INSERT INTO route_attachments (route_id, original_name, stored_name, file_size, file_type, uploader)
-        VALUES (:route_id, :original_name, :stored_name, :file_size, :file_type, :uploader)
+        INSERT INTO route_attachments (route_id, original_name, stored_name, file_size, file_type, uploader, agent_index)
+        VALUES (:route_id, :original_name, :stored_name, :file_size, :file_type, :uploader, :agent_index)
     """), {
         "route_id": route_id,
         "original_name": file.filename,
@@ -64,6 +65,7 @@ async def upload_attachment(
         "file_size": len(content),
         "file_type": ALLOWED_EXTENSIONS[ext],
         "uploader": current_user.username,
+        "agent_index": agent_index,
     })
     db.commit()
 
@@ -83,15 +85,24 @@ async def upload_attachment(
 @router.get("/route/{route_id}", summary="获取路线附件列表")
 async def list_attachments(
     route_id: int,
+    agent_index: int = Query(None, description="代理商序号（0起始），不传返回全部附件"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    rows = db.execute(text("""
-        SELECT attachment_id, original_name, file_size, file_type, upload_time, uploader
-        FROM route_attachments
-        WHERE route_id = :route_id
-        ORDER BY upload_time DESC
-    """), {"route_id": route_id}).fetchall()
+    if agent_index is not None:
+        rows = db.execute(text("""
+            SELECT attachment_id, original_name, file_size, file_type, upload_time, uploader
+            FROM route_attachments
+            WHERE route_id = :route_id AND agent_index = :agent_index
+            ORDER BY upload_time DESC
+        """), {"route_id": route_id, "agent_index": agent_index}).fetchall()
+    else:
+        rows = db.execute(text("""
+            SELECT attachment_id, original_name, file_size, file_type, upload_time, uploader
+            FROM route_attachments
+            WHERE route_id = :route_id
+            ORDER BY upload_time DESC
+        """), {"route_id": route_id}).fetchall()
 
     return [
         {
