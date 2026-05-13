@@ -165,7 +165,14 @@ def is_valid_agent_name(name: str) -> bool:
     import re
     has_chinese = bool(re.search(r'[一-鿿]', name))
     is_price = bool(re.search(r'\d+\s*(USD|RMB|CNY|EUR|GBP|SGD|/kg|/cbm)', name, re.IGNORECASE))
-    is_description = any(kw in name for kw in ['方案', '询价', '预估', '待定', '过港', '包税', '双清', '含税'])
+    # 扩展：捕获更多备注/说明性文本被误识别为代理名的情况
+    is_description = any(kw in name for kw in [
+        '方案', '询价', '预估', '待定', '过港', '包税', '双清', '含税',
+        '正清', '贸代', '代理方式', '纯正清',  # 贸易模式
+        '缴税', '核算', '货值', '税率',         # 财务说明
+        '仅合作', '未合作', '暂无', '暂未',      # 合作状态备注
+        '展会新加', '新代理',                    # 代理备注
+    ])
 
     if has_chinese and not is_price and not is_description:
         if 2 <= len(name) <= 20:

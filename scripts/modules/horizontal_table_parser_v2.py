@@ -432,6 +432,10 @@ class HorizontalTableParserV2:
                         sheet_data['route'] = route
                     elif step_name == 'Agents':
                         agents = step_func()
+                        # v2.4: 锚点 fallback — 常规提取失败时尝试锚点模式
+                        if not agents:
+                            self.logger.debug("  代理行检测失败，尝试锚点 fallback")
+                            agents = self.agent_extractor.extract_from_anchors(sheet)
                         sheet_data['agents'] = agents
                     elif step_name == 'Goods':
                         goods_result = step_func()
@@ -464,26 +468,27 @@ class HorizontalTableParserV2:
         return sheet_data
     
     def _extract_fees_for_agents(self, sheet, agents: List) -> List[Dict]:
-        """为所有agents提取费用"""
+        """为所有agents提取费用（v2.4：使用 agent._column 而非顺序索引）"""
         fees_list = []
-        
+
         if not agents:
             return fees_list
-        
+
         for agent_idx, agent in enumerate(agents):
-            agent_col_idx = agent_idx + 2
-            
+            # 优先使用 agent 记录的实际列号，fallback 到顺序推算
+            agent_col_idx = get_agent_attr(agent, '_column') or (agent_idx + 2)
+
             try:
                 fees_result = self.fee_extractor.extract(
-                    sheet, 
+                    sheet,
                     agent_col_idx=agent_col_idx
                 )
                 fees_list.append(fees_result)
-            
+
             except Exception as e:
                 self.logger.error(f"    ❌ Agent {agent_idx+1} 费用提取失败: {e}")
                 fees_list.append({'fee_items': [], 'fee_totals': []})
-        
+
         return fees_list
     
     def _extract_summaries_for_agents(self, sheet, agents: List) -> List:

@@ -1,12 +1,13 @@
 # scripts/modules/extractors/agent_extractor_v2.py
 """
-代理提取器 v2.3（优化版）
+代理提取器 v2.4（锚点引导版）
 
-【v2.3 更新内容】
-1. 优化时效备注提取 - 剔除"不含"相关内容
-2. 增强"不含"字段提取 - 支持多种格式
-3. 增强赔付信息提取 - 识别更多关键词
-4. 优化字段提取逻辑 - 避免重复和冗余
+【v2.4 更新内容】
+1. 新增费用锚点倒推机制 - 当"代理"关键词行缺失时，通过小计/合计/海运费行逆向定位代理行
+2. _find_agent_rows_extended 返回 (row, source) 元组，source='keyword'|'anchor'
+3. _parse_agent_column 新增 anchor_derived 参数，锚点来源时放松白名单验证
+4. 新增 extract_from_anchors() 公开方法，供 parser fallback 调用
+5. 修复"乱提取"：加强 is_description 关键词过滤
 """
 
 import sys
@@ -20,6 +21,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 # 导入BaseExtractor
 from .base_extractor import BaseExtractor
+
+# 费用锚点关键词：比"代理"行更稳定，出现率更高
+# 同时被 FeeExtractor._detect_fee_column_from_anchors 使用，两处必须一致
+FEE_ANCHORS = ['小计', '合计', '总计', '海运费', '费用明细', '运费']
 
 AIRLINE_CODES = {
     # 主要航空公司
@@ -81,46 +86,46 @@ class AgentExtractorV2(BaseExtractor):
         ]
     
     def _extract_with_rules(self, sheet, **kwargs) -> List[Agent]:
-        """使用规则提取代理商"""
+        """使用规则提取代理商（v2.4：支持锚点来源标记）"""
         agents = []
-        
-        # 查找所有可能的代理行
+
+        # _find_agent_rows_extended 返回 List[Tuple[int, str]]
         agent_rows = self._find_agent_rows_extended(sheet)
-        
+
         if not agent_rows:
             if self.logger:
                 self.logger.debug("      未找到代理行")
             return []
-        
+
         if self.logger:
-            self.logger.debug(f"      找到{len(agent_rows)}个可能的代理行: {agent_rows}")
-        
-        # 遍历每个代理行的每一列
-        for agent_row_idx in agent_rows:
+            self.logger.debug(f"      找到{len(agent_rows)}个代理行: {[(r, s) for r, s in agent_rows]}")
+
+        for agent_row_idx, source in agent_rows:
+            anchor_derived = (source == 'anchor')
             for col_idx in range(2, sheet.max_column + 1):
-                agent = self._parse_agent_column(sheet, agent_row_idx, col_idx)
-                
+                agent = self._parse_agent_column(
+                    sheet, agent_row_idx, col_idx,
+                    anchor_derived=anchor_derived
+                )
+
                 if agent and agent.代理商:
-                    # 检查去重
                     is_duplicate = any(
-                        a.代理商 == agent.代理商 and 
-                        a._column == agent._column
+                        a.代理商 == agent.代理商 and a._column == agent._column
                         for a in agents
                     )
-                    
+
                     if not is_duplicate:
                         agents.append(agent)
                     else:
-                        # 更新备注
                         for existing in agents:
                             if existing.代理商 == agent.代理商 and existing._column == agent._column:
                                 if agent.代理备注 and not existing.代理备注:
                                     existing.代理备注 = agent.代理备注
                                 break
-        
+
         if self.logger:
             self.logger.debug(f"      提取到{len(agents)}个代理商")
-        
+
         return agents
     
     def _find_agent_row(self, sheet) -> Optional[int]:
@@ -138,49 +143,111 @@ class AgentExtractorV2(BaseExtractor):
         
         return None
     
-    def _find_agent_rows_extended(self, sheet) -> List[int]:
-        """扩展的代理行查找"""
-        agent_rows = []
-        
+    def _find_agent_rows_extended(self, sheet) -> List[tuple]:
+        """
+        扩展的代理行查找（v2.4）
+        返回 List[Tuple[int, str]]：(row_idx, source)
+        source: 'keyword'（关键词匹配）| 'anchor'（锚点倒推）
+        """
+        results = []
+        seen = set()
+
+        # 原有：关键词匹配（标准行，source='keyword'）
         standard_row = self._find_agent_row(sheet)
         if standard_row:
-            agent_rows.append(standard_row)
-        
+            results.append((standard_row, 'keyword'))
+            seen.add(standard_row)
+
+        # 新增：锚点倒推（source='anchor'）
+        for anchor_row, anchor_col in self._find_agent_rows_from_fee_anchors(sheet):
+            if anchor_row not in seen:
+                results.append((anchor_row, 'anchor'))
+                seen.add(anchor_row)
+
+        # 原有：白名单全表扫描（source='keyword'）
         from ...data.agent_whitelist import AGENT_WHITELIST
-        
         for row_idx in range(1, min(40, sheet.max_row + 1)):
             for col_idx in range(1, min(10, sheet.max_column + 1)):
                 cell = sheet.cell(row=row_idx, column=col_idx)
                 if not cell.value:
                     continue
-                
                 cell_text = str(cell.value).strip()
-                
                 if '方案' in cell_text or '代理' in cell_text:
                     for agent in AGENT_WHITELIST:
                         if agent in cell_text:
-                            if row_idx not in agent_rows:
-                                agent_rows.append(row_idx)
+                            if row_idx not in seen:
+                                results.append((row_idx, 'keyword'))
+                                seen.add(row_idx)
                             break
-        
-        return agent_rows
-    
-    def _parse_agent_column(self, sheet, agent_row_idx: int, col_idx: int) -> Optional[Agent]:
+
+        return results
+
+    def _find_agent_rows_from_fee_anchors(self, sheet) -> List[tuple]:
         """
-        解析一列的代理信息（优化版）
-        
-        【v2.3 改进】
-        1. 时效备注清理 - 剔除"不含"内容
-        2. 不含字段增强 - 支持多种格式
-        3. 赔付信息增强 - 识别更多关键词
+        锚点倒推：找费用锚点行，向上搜索代理名所在 (row, col)。
+        返回 List[Tuple[int, int]]：(agent_row, agent_col)
+        适用于代理行标签为"/"或数字等非标准格式。
+        """
+        # Step 1: 找费用锚点行（col 1 包含 FEE_ANCHORS 关键词）
+        anchor_rows = []
+        for row_idx in range(3, min(40, sheet.max_row + 1)):
+            cell = sheet.cell(row=row_idx, column=1)
+            if cell.value and any(a in str(cell.value) for a in FEE_ANCHORS):
+                anchor_rows.append(row_idx)
+
+        results = []
+        seen_rows = set()
+
+        for anchor_row in anchor_rows:
+            for offset in range(1, 16):
+                target_row = anchor_row - offset
+                if target_row < 1:
+                    break
+
+                # 停止：遇到另一个锚点行（防止跨区块污染）
+                label = str(sheet.cell(row=target_row, column=1).value or '').strip()
+                if any(a in label for a in FEE_ANCHORS):
+                    break
+
+                # 停止：整行全空
+                row_vals = [
+                    sheet.cell(row=target_row, column=c).value
+                    for c in range(1, min(sheet.max_column + 1, 10))
+                ]
+                if all(v is None or str(v).strip() == '' for v in row_vals):
+                    break
+
+                # 找该行中第一个非空、非纯数字的列
+                for col_idx in range(2, min(sheet.max_column + 1, 10)):
+                    val = sheet.cell(row=target_row, column=col_idx).value
+                    if val:
+                        s = str(val).strip()
+                        if s and not s.replace('.', '').replace(',', '').isdigit():
+                            if target_row not in seen_rows:
+                                results.append((target_row, col_idx))
+                                seen_rows.add(target_row)
+                            break  # 找到一列即可，跳到下一个锚点
+                if target_row in seen_rows:
+                    break  # 已找到，不需要继续向上
+
+        return results
+    
+    def _parse_agent_column(self, sheet, agent_row_idx: int, col_idx: int,
+                            anchor_derived: bool = False) -> Optional[Agent]:
+        """
+        解析一列的代理信息（v2.4：新增 anchor_derived 参数）
+
+        anchor_derived=True 时，放松白名单验证：
+          - 结构位置已确认为代理行，直接接受合理长度的非数字文本
+          - 仍过滤明显的方案描述和价格信息
         """
         agent = Agent(_column=col_idx)
-        
+
         # ========== 提取代理商名 ==========
         agent_cell = sheet.cell(row=agent_row_idx, column=col_idx)
         if not agent_cell.value:
             return None
-        
+
         agent_text = str(agent_cell.value).strip()
 
         from ...data.agent_whitelist import extract_agent_name_and_remark, is_valid_agent_name, AGENT_WHITELIST
@@ -198,18 +265,39 @@ class AgentExtractorV2(BaseExtractor):
                     remark = remark.lstrip('-—－:：').strip()
                     found = True
                     break
-            
+
             if not found:
                 agent_name = None
                 remark = None
 
-        # 方法3: 检查是否是纯方案描述或无效内容
-        if not agent_name or not is_valid_agent_name(agent_name):
+        # 方法3: 锚点来源时放松验证（结构位置优先）
+        if (not agent_name or not is_valid_agent_name(agent_name)) and anchor_derived:
+            s = agent_text.strip()
+            # 先尝试分割：取分隔符前的部分作为代理名，后面作为备注
+            sep_match = re.search(r'[-—－]{1,2}', s)
+            name_part = s[:sep_match.start()].strip() if sep_match else s
+            remark_part = s[sep_match.end():].strip() if sep_match else None
+
+            # 必须含中文字符（排除"2hr"、"LAX"、"BY HK"等非中文代码）
+            has_chinese = bool(re.search(r'[一-鿿]', name_part))
+            # 仅对 name_part 做描述性内容过滤（不对备注部分过滤，避免误杀复合名称）
+            is_price = bool(re.search(r'\d+\s*(USD|RMB|CNY|EUR|/kg|/cbm)', name_part, re.IGNORECASE))
+            is_desc = any(kw in name_part for kw in [
+                '方案', '过港', '双清', '包税', '缴税', '核算', '预估', '询价', '正清',
+            ])
+            is_pure_num = name_part.replace('.', '').replace(',', '').isdigit()
+            if has_chinese and not is_price and not is_desc and not is_pure_num and 2 <= len(name_part) <= 30:
+                agent_name = name_part
+                remark = remark_part or None
+                if self.logger:
+                    self.logger.debug(f"        列{col_idx}: 锚点模式接受代理商名'{name_part}' 备注='{remark}'")
+
+        # 方法4: 标准启发式兜底（非锚点，保持原逻辑）
+        if not anchor_derived and (not agent_name or not is_valid_agent_name(agent_name)):
             if any(kw in agent_text for kw in ['方案', '过港', '双清', '包税']):
                 if self.logger:
                     self.logger.debug(f"        列{col_idx}: '{agent_text}' 是方案描述，非代理商")
                 return None
-            # 启发式兜底：如果当前行是代理行，且文本2-20字符、含中文或字母、不是纯数字/符号，直接使用原文
             if is_valid_agent_name(agent_text):
                 agent_name = agent_text
                 remark = None
@@ -220,8 +308,11 @@ class AgentExtractorV2(BaseExtractor):
                     self.logger.debug(f"        列{col_idx}: 无效的代理商名'{agent_text}'")
                 return None
 
-        # 验证代理商名
-        if not is_valid_agent_name(agent_name):
+        if not agent_name:
+            return None
+
+        # 最终验证（锚点来源已通过放松验证，此处不再重复过滤）
+        if not anchor_derived and not is_valid_agent_name(agent_name):
             if self.logger:
                 self.logger.debug(f"        列{col_idx}: 无效的代理商名'{agent_name}'")
             return None
@@ -742,7 +833,29 @@ class AgentExtractorV2(BaseExtractor):
     def _to_dict(self, result: List[Agent]) -> List[Dict[str, Any]]:
         """将Agent对象列表转换为字典列表"""
         return [asdict(agent) for agent in result]
-    
+
+    def extract_from_anchors(self, sheet) -> List[Dict[str, Any]]:
+        """
+        仅用锚点倒推模式提取代理（v2.4 新增，供 parser fallback 调用）。
+        常规 extract() 失败（agents 为空）时调用。
+        返回与 extract() 相同格式的 dict 列表。
+        """
+        anchor_positions = self._find_agent_rows_from_fee_anchors(sheet)
+        agents = []
+        seen = set()
+
+        for agent_row, agent_col in anchor_positions:
+            agent_obj = self._parse_agent_column(
+                sheet, agent_row, agent_col, anchor_derived=True
+            )
+            if agent_obj and agent_obj.代理商:
+                key = (agent_obj.代理商, agent_obj._column)
+                if key not in seen:
+                    agents.append(agent_obj)
+                    seen.add(key)
+
+        return self._to_dict(agents)
+
     # ========== v2.0 新增：质量驱动架构方法 ==========
     
     def _evaluate_quality(self, result: List[Agent], sheet, **kwargs) -> float:
