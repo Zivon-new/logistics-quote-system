@@ -180,6 +180,30 @@ class AgentExtractorV2(BaseExtractor):
                                 seen.add(row_idx)
                             break
 
+        # v2.5 新增：数据列直接匹配白名单（适用于首列为"/"等非标准标签的格式）
+        # 扫描列 2-6，若某单元格的值直接是白名单代理名（或以代理名开头），
+        # 认为该行是代理行，不要求首列有"代理"关键词
+        from ...data.agent_whitelist import AGENT_WHITELIST as _WL
+        for row_idx in range(1, min(20, sheet.max_row + 1)):
+            if row_idx in seen:
+                continue
+            match_count = 0
+            for col_idx in range(2, min(sheet.max_column + 1, 8)):
+                cell = sheet.cell(row=row_idx, column=col_idx)
+                if not cell.value:
+                    continue
+                cell_text = str(cell.value).strip()
+                for agent in sorted(_WL, key=len, reverse=True):
+                    if cell_text == agent or cell_text.startswith(agent + '-') or cell_text.startswith(agent + '—'):
+                        match_count += 1
+                        break
+            # 至少 1 列直接匹配白名单代理名，且首列是 "/" 或空，才认定为代理行
+            col1_val = str(sheet.cell(row=row_idx, column=1).value or '').strip()
+            col1_is_separator = col1_val in ('/', '-', '—', '', '|')
+            if match_count >= 1 and col1_is_separator:
+                results.append((row_idx, 'keyword'))
+                seen.add(row_idx)
+
         return results
 
     def _find_agent_rows_from_fee_anchors(self, sheet) -> List[tuple]:
