@@ -105,9 +105,9 @@
               {{ scope.row.实际重量 || 0 }} kg
             </template>
           </el-table-column>
-          <el-table-column label="货值" width="110" align="right">
+          <el-table-column label="货值" width="130" align="right">
             <template #default="scope">
-              ¥{{ (scope.row.货值 || 0)?.toFixed(2) }}
+              {{ scope.row.货值币种 || 'RMB' }} {{ (scope.row.货值 || 0)?.toFixed(2) }}
             </template>
           </el-table-column>
           <el-table-column label="总体积" width="110" align="right">
@@ -315,10 +315,14 @@ const props = defineProps({
 const exchangeRates = reactive({
   'RMB': 1.0,
   'USD': 7.2,
-  'SGD': 5.3,
   'EUR': 7.8,
+  'GBP': 9.2,
+  'AUD': 4.7,
+  'CAD': 5.3,
+  'SGD': 5.3,
+  'HKD': 0.93,
   'JPY': 0.05,
-  'MYR': 1.6
+  'MYR': 1.6,
 })
 
 onMounted(async () => {

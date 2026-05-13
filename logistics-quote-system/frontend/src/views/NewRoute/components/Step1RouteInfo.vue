@@ -113,12 +113,17 @@
               @clear="() => { 货值Raw = ''; formData.货值 = 0; handleInput() }"
               style="width: calc(100% - 90px);"
             />
-            <el-select v-model="formData.货值币种" style="width: 88px; margin-left: 2px;">
+            <el-select v-model="formData.货值币种" style="width: 100px; margin-left: 2px;">
               <el-option label="RMB" value="RMB" />
-              <el-option label="USD" value="USD" />
-              <el-option label="EUR" value="EUR" />
-              <el-option label="SGD" value="SGD" />
-              <el-option label="GBP" value="GBP" />
+              <el-option label="USD 美元" value="USD" />
+              <el-option label="EUR 欧元" value="EUR" />
+              <el-option label="GBP 英镑" value="GBP" />
+              <el-option label="AUD 澳元" value="AUD" />
+              <el-option label="CAD 加元" value="CAD" />
+              <el-option label="SGD 新加坡元" value="SGD" />
+              <el-option label="HKD 港元" value="HKD" />
+              <el-option label="JPY 日元" value="JPY" />
+              <el-option label="MYR 林吉特" value="MYR" />
             </el-select>
           </el-form-item>
         </el-col>

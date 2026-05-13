@@ -302,12 +302,15 @@
                   @change="updateFeeRMB(scope.row)"
                 >
                   <el-option label="RMB" value="RMB" />
-                  <el-option label="USD" value="USD" />
-                  <el-option label="SGD" value="SGD" />
-                  <el-option label="EUR" value="EUR" />
-                  <el-option label="JPY" value="JPY" />
-                  <el-option label="MYR" value="MYR" />
-                  <el-option label="HKD" value="HKD" />
+                  <el-option label="USD 美元" value="USD" />
+                  <el-option label="EUR 欧元" value="EUR" />
+                  <el-option label="GBP 英镑" value="GBP" />
+                  <el-option label="AUD 澳元" value="AUD" />
+                  <el-option label="CAD 加元" value="CAD" />
+                  <el-option label="SGD 新加坡元" value="SGD" />
+                  <el-option label="HKD 港元" value="HKD" />
+                  <el-option label="JPY 日元" value="JPY" />
+                  <el-option label="MYR 林吉特" value="MYR" />
                 </el-select>
               </template>
             </el-table-column>
@@ -468,10 +471,15 @@
                   @change="updateFeeTotalRMB(scope.row)"
                 >
                   <el-option label="RMB" value="RMB" />
-                  <el-option label="USD" value="USD" />
-                  <el-option label="SGD" value="SGD" />
-                  <el-option label="EUR" value="EUR" />
-                  <el-option label="HKD" value="HKD" />
+                  <el-option label="USD 美元" value="USD" />
+                  <el-option label="EUR 欧元" value="EUR" />
+                  <el-option label="GBP 英镑" value="GBP" />
+                  <el-option label="AUD 澳元" value="AUD" />
+                  <el-option label="CAD 加元" value="CAD" />
+                  <el-option label="SGD 新加坡元" value="SGD" />
+                  <el-option label="HKD 港元" value="HKD" />
+                  <el-option label="JPY 日元" value="JPY" />
+                  <el-option label="MYR 林吉特" value="MYR" />
                 </el-select>
               </template>
             </el-table-column>
@@ -635,9 +643,15 @@
                   <template #default="scope">
                     <el-select v-model="scope.row.货值币种" size="small" @change="updateSummary(agent)">
                       <el-option label="RMB" value="RMB" />
-                      <el-option label="USD" value="USD" />
-                      <el-option label="EUR" value="EUR" />
-                      <el-option label="SGD" value="SGD" />
+                      <el-option label="USD 美元" value="USD" />
+                      <el-option label="EUR 欧元" value="EUR" />
+                      <el-option label="GBP 英镑" value="GBP" />
+                      <el-option label="AUD 澳元" value="AUD" />
+                      <el-option label="CAD 加元" value="CAD" />
+                      <el-option label="SGD 新加坡元" value="SGD" />
+                      <el-option label="HKD 港元" value="HKD" />
+                      <el-option label="JPY 日元" value="JPY" />
+                      <el-option label="MYR 林吉特" value="MYR" />
                     </el-select>
                   </template>
                 </el-table-column>
@@ -882,11 +896,14 @@ const getRowKey = (row) => {
 const exchangeRates = reactive({
   'RMB': 1.0,
   'USD': 7.2,
-  'SGD': 5.3,
   'EUR': 7.8,
+  'GBP': 9.2,
+  'AUD': 4.7,
+  'CAD': 5.3,
+  'SGD': 5.3,
+  'HKD': 0.93,
   'JPY': 0.05,
   'MYR': 1.6,
-  'HKD': 0.93
 })
 const forexReferenceDate = ref('')  // 汇率参考日期
 

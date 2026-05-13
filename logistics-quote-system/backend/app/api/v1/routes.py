@@ -128,11 +128,14 @@ async def get_forex_rates(
     default_rates = {
         'RMB': 1.0,
         'USD': 7.2,
-        'SGD': 5.3,
         'EUR': 7.8,
+        'GBP': 9.2,
+        'AUD': 4.7,
+        'CAD': 5.3,
+        'SGD': 5.3,
+        'HKD': 0.93,
         'JPY': 0.05,
         'MYR': 1.6,
-        'HKD': 0.93
     }
     
     reference_date = None

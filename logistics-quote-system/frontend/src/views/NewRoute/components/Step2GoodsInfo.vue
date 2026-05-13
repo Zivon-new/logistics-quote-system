@@ -48,9 +48,14 @@
           <template #default="scope">
             <el-select v-model="scope.row.币种" size="small" style="width: 100%;">
               <el-option label="RMB" value="RMB" />
-              <el-option label="USD" value="USD" />
-              <el-option label="SGD" value="SGD" />
-              <el-option label="EUR" value="EUR" />
+              <el-option label="USD 美元" value="USD" />
+              <el-option label="EUR 欧元" value="EUR" />
+              <el-option label="GBP 英镑" value="GBP" />
+              <el-option label="AUD 澳元" value="AUD" />
+              <el-option label="CAD 加元" value="CAD" />
+              <el-option label="SGD 新加坡元" value="SGD" />
+              <el-option label="HKD 港元" value="HKD" />
+              <el-option label="JPY 日元" value="JPY" />
             </el-select>
           </template>
         </el-table-column>
@@ -118,12 +123,17 @@
               <el-col :span="12">
                 <el-form-item label="货值">
                   <el-input-number :controls="false" v-model="item.货值" :precision="2" :min="0" style="width: 70%;" />
-                  <el-select v-model="item.货值币种" size="default" style="width: 28%; margin-left: 2%;">
+                  <el-select v-model="item.货值币种" size="default" style="width: 32%; margin-left: 2%;">
                     <el-option label="RMB" value="RMB" />
-                    <el-option label="USD" value="USD" />
-                    <el-option label="EUR" value="EUR" />
-                    <el-option label="SGD" value="SGD" />
-                    <el-option label="GBP" value="GBP" />
+                    <el-option label="USD 美元" value="USD" />
+                    <el-option label="EUR 欧元" value="EUR" />
+                    <el-option label="GBP 英镑" value="GBP" />
+                    <el-option label="AUD 澳元" value="AUD" />
+                    <el-option label="CAD 加元" value="CAD" />
+                    <el-option label="SGD 新加坡元" value="SGD" />
+                    <el-option label="HKD 港元" value="HKD" />
+                    <el-option label="JPY 日元" value="JPY" />
+                    <el-option label="MYR 林吉特" value="MYR" />
                   </el-select>
                 </el-form-item>
               </el-col>
