@@ -52,6 +52,7 @@ class Summary(Base):
     汇总ID = Column("汇总ID", Integer, primary_key=True, index=True, autoincrement=True)
     代理路线ID = Column("代理路线ID", Integer, ForeignKey("route_agents.代理路线ID"), nullable=False, unique=True)
     小计 = Column("小计", DECIMAL(18, 2), default=0.00)
+    手动小计 = Column("手动小计", Integer, default=0)
     运费小计 = Column("运费小计", DECIMAL(18, 2), nullable=True)
     税率 = Column("税率", DECIMAL(10, 4), default=0.0000)
     进口税率原文 = Column("进口税率原文", Text, nullable=True)

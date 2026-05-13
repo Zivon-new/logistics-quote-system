@@ -402,15 +402,16 @@ async def create_full_route(
                     db.flush()
                     upsert_sql = text("""
                         INSERT INTO summary (
-                            `代理路线ID`, `小计`, `运费小计`, `税率`, `进口税率原文`,
+                            `代理路线ID`, `小计`, `手动小计`, `运费小计`, `税率`, `进口税率原文`,
                             `税金`, `税金金额`, `汇损率`, `汇损`, `总计`, `总计金额`, `备注`
                         )
                         VALUES (
-                            :agent_id, :小计, :运费小计, :税率, :进口税率原文,
+                            :agent_id, :小计, :手动小计, :运费小计, :税率, :进口税率原文,
                             :税金, :税金金额, :汇损率, :汇损, :总计, :总计金额, :备注
                         )
                         ON DUPLICATE KEY UPDATE
                             `小计`        = VALUES(`小计`),
+                            `手动小计`    = VALUES(`手动小计`),
                             `运费小计`    = VALUES(`运费小计`),
                             `税率`        = VALUES(`税率`),
                             `进口税率原文`= VALUES(`进口税率原文`),
@@ -425,6 +426,7 @@ async def create_full_route(
                     db.execute(upsert_sql, {
                         'agent_id':    agent_id,
                         '小计':        _sf(summary_data.get('运费小计') or summary_data.get('小计')),
+                        '手动小计':    1 if summary_data.get('手动小计') else 0,
                         '运费小计':    summary_data.get('运费小计'),
                         '税率':        _sf(summary_data.get('税率')),
                         '进口税率原文': summary_data.get('进口税率原文'),
@@ -436,7 +438,7 @@ async def create_full_route(
                         '总计金额':    summary_data.get('总计金额'),
                         '备注':        summary_data.get('备注') or '',
                     })
-            
+
             logger.debug(f"  ✅ 已创建 {len(agent_map)} 个代理商")
         
         # 第三步：创建货物明细
@@ -654,15 +656,16 @@ async def update_route(
                     db.flush()
                     upsert_sql = text("""
                         INSERT INTO summary (
-                            `代理路线ID`, `小计`, `运费小计`, `税率`, `进口税率原文`,
+                            `代理路线ID`, `小计`, `手动小计`, `运费小计`, `税率`, `进口税率原文`,
                             `税金`, `税金金额`, `汇损率`, `汇损`, `总计`, `总计金额`, `备注`
                         )
                         VALUES (
-                            :agent_id, :小计, :运费小计, :税率, :进口税率原文,
+                            :agent_id, :小计, :手动小计, :运费小计, :税率, :进口税率原文,
                             :税金, :税金金额, :汇损率, :汇损, :总计, :总计金额, :备注
                         )
                         ON DUPLICATE KEY UPDATE
                             `小计`        = VALUES(`小计`),
+                            `手动小计`    = VALUES(`手动小计`),
                             `运费小计`    = VALUES(`运费小计`),
                             `税率`        = VALUES(`税率`),
                             `进口税率原文`= VALUES(`进口税率原文`),
@@ -677,6 +680,7 @@ async def update_route(
                     db.execute(upsert_sql, {
                         'agent_id':    agent_id,
                         '小计':        _sf(summary_data.get('运费小计') or summary_data.get('小计')),
+                        '手动小计':    1 if summary_data.get('手动小计') else 0,
                         '运费小计':    summary_data.get('运费小计'),
                         '税率':        _sf(summary_data.get('税率')),
                         '进口税率原文': summary_data.get('进口税率原文'),

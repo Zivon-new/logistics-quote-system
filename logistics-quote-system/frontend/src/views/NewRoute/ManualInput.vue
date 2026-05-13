@@ -566,6 +566,7 @@ const handleSubmit = async () => {
         // agent.summary 已由 refreshSummariesWithValue 更新为最新值，直接读取
         cleanAgent.summary = {
           小计: Number(agent.summary.小计) || 0,
+          手动小计: agent.summary.小计手动 ? 1 : 0,
           税率: Number(agent.summary.税率) || 0,
           税金: Number(agent.summary.税金) || 0,
           汇损率: Number(agent.summary.汇损率) || 0,
