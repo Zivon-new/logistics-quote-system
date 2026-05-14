@@ -20,5 +20,18 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-echarts': ['echarts', 'vue-echarts'],
+          'vendor-xlsx': ['xlsx'],
+          'vendor-mammoth': ['mammoth'],
+          'vendor-element': ['element-plus', '@element-plus/icons-vue'],
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+        }
+      }
+    }
   }
 })
