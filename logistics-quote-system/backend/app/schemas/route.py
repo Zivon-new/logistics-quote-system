@@ -45,7 +45,7 @@ class RouteResponse(RouteBase):
     """路线响应Schema"""
     路线ID: int
     创建时间: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -75,7 +75,7 @@ class AgentResponse(AgentBase):
     """代理商响应Schema"""
     代理路线ID: int
     创建时间: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -99,7 +99,7 @@ class FeeItemResponse(FeeItemBase):
     """费用明细响应Schema"""
     费用ID: int
     创建时间: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -109,6 +109,6 @@ class FeeItemResponse(FeeItemBase):
 class RouteDetailResponse(RouteResponse):
     """路线详情响应（含代理商信息）"""
     agents: List[AgentResponse] = []
-    
+
     class Config:
         from_attributes = True

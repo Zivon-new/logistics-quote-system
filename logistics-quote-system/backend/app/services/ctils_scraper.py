@@ -69,8 +69,10 @@ COUNTRY_MAP = {
 HIGH_KWORDS = ["封锁", "禁运", "禁止进口", "贸易禁令", "战争", "武装冲突",
                "港口封闭", "严重拥堵", "紧急措施", "出口管制升级"]
 # 等级2（中）：已生效的贸易限制措施，影响明确
-MED_KWORDS  = ["反倾销税", "反补贴税", "反规避", "制裁", "关税加征",
-               "贸易摩擦", "清关延误", "罢工", "港口拥堵", "临时关税"]
+MED_KWORDS = [
+    "反倾销税", "反补贴税", "反规避", "制裁", "关税加征",
+    "贸易摩擦", "清关延误", "罢工", "港口拥堵", "临时关税"
+]
 
 # 各大章节标题（用于文本分段，需要三章都识别才能正确切边界）
 # SKIP_SECTIONS 中的章节只用来定位边界，不爬取内容
@@ -210,7 +212,7 @@ def _parse_items(section_text: str, section_name: str, bulletin_title: str,
         full_item_title = f"{bulletin_title} - {item_title}"[:100]
 
         code, country, keyword = _extract_country(item_text)
-        risk_type  = _detect_risk_type(section_name, item_text)
+        risk_type = _detect_risk_type(section_name, item_text)
         risk_level = _detect_risk_level(item_text)
 
         items.append({
@@ -268,7 +270,7 @@ def run_scrape(db: Session, max_articles: int = 10) -> dict:
         if processed_articles >= max_articles:
             break
 
-        title   = (art.get("title") or "").strip()
+        title = (art.get("title") or "").strip()
         pdf_url = art.get("linkFormatUrl") or ""
         date_str = art.get("createDate") or ""
 

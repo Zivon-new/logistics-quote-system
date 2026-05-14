@@ -10,7 +10,7 @@ from ..database import Base
 class FeeItem(Base):
     """费用明细表模型"""
     __tablename__ = "fee_items"
-    
+
     费用ID = Column("费用ID", Integer, primary_key=True, index=True, autoincrement=True)
     代理路线ID = Column("代理路线ID", Integer, ForeignKey("route_agents.代理路线ID"), nullable=False)  # ✅ 添加ForeignKey
     费用类型 = Column("费用类型", String(200), nullable=True)
@@ -23,7 +23,7 @@ class FeeItem(Base):
     人民币金额 = Column("人民币金额", DECIMAL(18, 2), default=0.00)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
-    
+
     # 关系
     agent = relationship("RouteAgent", back_populates="fee_items")
 
@@ -31,7 +31,7 @@ class FeeItem(Base):
 class FeeTotal(Base):
     """整单费用表模型"""
     __tablename__ = "fee_total"
-    
+
     整单费用ID = Column("整单费用ID", Integer, primary_key=True, index=True, autoincrement=True)
     代理路线ID = Column("代理路线ID", Integer, ForeignKey("route_agents.代理路线ID"), nullable=False)  # ✅ 添加ForeignKey
     费用名称 = Column("费用名称", String(200), nullable=True)
@@ -40,7 +40,7 @@ class FeeTotal(Base):
     人民币金额 = Column("人民币金额", DECIMAL(18, 2), default=0.00)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
-    
+
     # 关系
     agent = relationship("RouteAgent", back_populates="fee_total")
 
@@ -64,6 +64,6 @@ class Summary(Base):
     总计金额 = Column("总计金额", DECIMAL(18, 2), nullable=True)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
-    
+
     # 关系
     agent = relationship("RouteAgent", back_populates="summary")

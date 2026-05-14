@@ -16,7 +16,6 @@ from ...services.recommend_service import (
     _get_lpi_map, _match_country, _normalize_inverse, _lpi_to_score
 )
 from .warnings import get_warnings_for_destinations
-from sqlalchemy import and_, or_
 
 
 def _add_scores(db: Session, results: List[Dict]) -> Dict[str, dict]:
@@ -104,6 +103,7 @@ def _add_scores(db: Session, results: List[Dict]) -> Dict[str, dict]:
 
     return score_map, dest_lpi_info
 
+
 router = APIRouter(prefix="/quotes", tags=["报价查询"])
 
 
@@ -122,7 +122,7 @@ async def search_quotes(
 ):
     """
     报价查询接口 - 支持关键词模糊搜索
-    
+
     所有文本字段都支持模糊匹配：
     - 起始地、目的地：模糊匹配
     - 货物名称：模糊匹配（如输入"服务器"可匹配"服务器、网卡、显示器"）
@@ -130,9 +130,9 @@ async def search_quotes(
     - 时间范围：精确匹配
     """
     from sqlalchemy.orm import joinedload
-    
+
     skip = (page - 1) * page_size
-    
+
     # 构建查询（fee_items和fee_total使用joinedload，summary单独查以避免多条记录问题）
     query = db.query(Route).options(
         joinedload(Route.agents).joinedload(RouteAgent.fee_items),
@@ -140,19 +140,19 @@ async def search_quotes(
         joinedload(Route.goods_details),
         joinedload(Route.goods_total)
     )
-    
+
     # 起始地和目的地（可选，模糊搜索）
     if 起始地:
         query = query.filter(Route.起始地.like(f"%{起始地}%"))
     if 目的地:
         query = query.filter(Route.目的地.like(f"%{目的地}%"))
-    
+
     # 日期范围筛选
     if 交易开始日期:
         query = query.filter(Route.交易开始日期 >= 交易开始日期)
     if 交易结束日期:
         query = query.filter(Route.交易结束日期 <= 交易结束日期)
-    
+
     # 货物名称模糊查询（关键词搜索）
     if 货物名称:
         # 在货物明细表中搜索
@@ -160,17 +160,17 @@ async def search_quotes(
             GoodsDetail.货物名称.like(f"%{货物名称}%")
         ).distinct()
         query = query.filter(Route.路线ID.in_(goods_subquery))
-    
+
     # 代理商筛选（模糊搜索）
     if 代理商:
         query = query.join(RouteAgent).filter(RouteAgent.代理商.like(f"%{代理商}%"))
-    
+
     # 获取总数
     total = query.count()
-    
+
     # ✅ 修改：按交易开始日期倒序（最新的交易在前）
     results = query.order_by(Route.交易开始日期.desc()).offset(skip).limit(page_size).all()
-    
+
     # 批量预加载所有 Summary，避免循环内 N+1 查询
     all_agent_ids = [agent.代理路线ID for route in results for agent in route.agents]
     summary_map: Dict[int, Summary] = {}
@@ -203,7 +203,7 @@ async def search_quotes(
             "goods_details": [],
             "goods_total": []
         }
-        
+
         # 处理每个代理商的费用
         for agent in route.agents:
             agent_dict = {
@@ -224,7 +224,7 @@ async def search_quotes(
                 "summary": None,
                 "总费用": 0.00
             }
-            
+
             # 添加费用明细
             total_fee = 0.00
             for fee in agent.fee_items:
@@ -248,7 +248,7 @@ async def search_quotes(
                 }
                 agent_dict["fee_items"].append(fee_dict)
                 total_fee += float(fee.人民币金额) if fee.人民币金额 else 0.00
-            
+
             # 添加整单费用
             for fee_total_item in agent.fee_total:
                 fee_total_dict = {
@@ -263,9 +263,9 @@ async def search_quotes(
                 }
                 agent_dict["fee_total"].append(fee_total_dict)
                 total_fee += float(fee_total_item.人民币金额) if fee_total_item.人民币金额 else 0.00
-            
+
             best_summary = summary_map.get(agent.代理路线ID)
-            
+
             if best_summary:
                 agent_dict["summary"] = {
                     "汇总ID": best_summary.汇总ID,
@@ -278,10 +278,10 @@ async def search_quotes(
                     "备注": best_summary.备注,
                     "进口税率原文": best_summary.进口税率原文
                 }
-            
+
             agent_dict["总费用"] = total_fee
             route_dict["agents"].append(agent_dict)
-        
+
         # 添加货物明细
         for goods in route.goods_details:
             goods_dict = {
@@ -298,7 +298,7 @@ async def search_quotes(
                 "备注": goods.备注
             }
             route_dict["goods_details"].append(goods_dict)
-        
+
         # 添加整单货物
         for goods_total in route.goods_total:
             goods_total_dict = {
@@ -310,7 +310,7 @@ async def search_quotes(
                 "备注": goods_total.备注  # ✅ 新增：返回备注
             }
             route_dict["goods_total"].append(goods_total_dict)
-        
+
         quote_results.append(route_dict)
 
     # 补充智能评分

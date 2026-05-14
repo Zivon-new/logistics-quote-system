@@ -4,15 +4,16 @@
 处理路线相关的业务逻辑
 """
 
+import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
-from typing import Optional, Dict, List, Any
-from datetime import datetime
-
+from sqlalchemy import and_
+from typing import Optional, Dict
 from ..models import (
-    Route, GoodsDetail, GoodsTotal, RouteAgent, 
+    Route, GoodsDetail, GoodsTotal, RouteAgent,
     FeeItem, FeeTotal, Summary
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -30,20 +31,20 @@ def get_routes_list(
     获取路线列表（带分页和筛选）
     """
     query = db.query(Route)
-    
+
     # 筛选条件
     if origin:
         query = query.filter(Route.起始地.like(f"%{origin}%"))
     if destination:
         query = query.filter(Route.目的地.like(f"%{destination}%"))
-    
+
     # 总数
     total = query.count()
-    
+
     # 分页
     offset = (page - 1) * page_size
     routes = query.offset(offset).limit(page_size).all()
-    
+
     return {
         "total": total,
         "results": [route_to_dict(route) for route in routes]
@@ -57,12 +58,12 @@ def get_route_detail(db: Session, route_id: int):
     route = db.query(Route).filter(Route.路线ID == route_id).first()
     if not route:
         return None
-    
+
     # 获取关联数据
     goods_details = db.query(GoodsDetail).filter(GoodsDetail.路线ID == route_id).all()
     goods_total = db.query(GoodsTotal).filter(GoodsTotal.路线ID == route_id).all()
     agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
-    
+
     # 组装数据
     agents_data = []
     for agent in agents:
@@ -72,14 +73,14 @@ def get_route_detail(db: Session, route_id: int):
         summary = db.query(Summary).filter(
             Summary.代理路线ID == agent.代理路线ID
         ).order_by(Summary.汇总ID.desc()).first()
-        
+
         agents_data.append({
             **agent_to_dict(agent),
             "fee_items": [fee_item_to_dict(f) for f in fee_items],
             "fee_total": [fee_total_to_dict(f) for f in fee_total],
             "summary": summary_to_dict(summary) if summary else None
         })
-    
+
     return {
         "route": route_to_dict(route),
         "goods_details": [goods_detail_to_dict(g) for g in goods_details],
@@ -103,7 +104,7 @@ def get_route_for_edit(db: Session, route_id: int):
 def create_route_with_all_data(db: Session, route_data: Dict) -> int:
     """
     创建路线及所有关联数据
-    
+
     Args:
         route_data: {
             "route": {...},
@@ -111,21 +112,21 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
             "goods_total": [...],
             "agents": [...]
         }
-    
+
     Returns:
         route_id: 新创建的路线ID
     """
     try:
         # ✅ 调试日志
         agents_input = route_data.get("agents", [])
-        print(f"\n========== 接收创建请求 ==========")
+        print("\n========== 接收创建请求 ==========")
         print(f"📊 agents数量: {len(agents_input)}")
         for i, a in enumerate(agents_input):
             print(f"   Agent {i+1}: {a.get('代理商', '未知')}")
             s = a.get("summary", {})
             print(f"      税率: {s.get('税率', 0)}, 税金: {s.get('税金', 0)}")
             print(f"      汇损率: {s.get('汇损率', 0)}, 汇损: {s.get('汇损', 0)}")
-        print(f"==================================\n")
+        print("==================================\n")
 
         # 1. 创建路线
         route_info = route_data.get("route", {})
@@ -143,9 +144,9 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
         )
         db.add(route)
         db.flush()  # 获取route_id
-        
+
         route_id = route.路线ID
-        
+
         # 2. 创建货物明细
         if route_data.get("goods_details"):
             for goods_data in route_data["goods_details"]:
@@ -161,7 +162,7 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                     备注=goods_data.get("备注")
                 )
                 db.add(goods)
-        
+
         # 3. 创建整单货物
         if route_data.get("goods_total"):
             for goods_data in route_data["goods_total"]:
@@ -174,7 +175,7 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                     备注=goods_data.get("备注")  # ✅ 新增：保存备注
                 )
                 db.add(goods)
-        
+
         # 4. 创建代理商及费用
         if route_data.get("agents"):
             for agent_data in route_data["agents"]:
@@ -193,9 +194,9 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                 )
                 db.add(agent)
                 db.flush()  # 获取agent_id
-                
+
                 agent_id = agent.代理路线ID
-                
+
                 # 创建费用明细
                 if agent_data.get("fee_items"):
                     for fee_data in agent_data["fee_items"]:
@@ -211,7 +212,7 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                             备注=fee_data.get("备注")  # ✅ 新增：保存备注
                         )
                         db.add(fee)
-                
+
                 # 创建整单费用
                 if agent_data.get("fee_total"):
                     for fee_data in agent_data["fee_total"]:
@@ -224,13 +225,13 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                             备注=fee_data.get("备注")  # ✅ 新增：保存备注
                         )
                         db.add(fee)
-                
+
                 # 创建汇总
                 if agent_data.get("summary"):
                     # ✅ 修复：先删除旧的summary（防止重复），再插入新的
                     db.query(Summary).filter(Summary.代理路线ID == agent_id).delete()
                     db.flush()
-                    
+
                     summary_data = agent_data["summary"]
                     summary = Summary(
                         代理路线ID=agent_id,
@@ -244,14 +245,17 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
                         备注=summary_data.get("备注")
                     )
                     db.add(summary)
-                    print(f"✅ 创建Summary: agent_id={agent_id}, 税率={summary_data.get('税率', 0)}, 税金={summary_data.get('税金', 0)}")
-        
+                    logger.debug(
+                        "创建Summary: agent_id=%s, 税率=%s, 税金=%s",
+                        agent_id, summary_data.get('税率', 0), summary_data.get('税金', 0)
+                    )
+
         # 提交事务
         db.commit()
         print(f"✅ 路线创建成功: route_id={route_id}")
-        
+
         return route_id
-        
+
     except Exception as e:
         db.rollback()
         print(f"❌ 创建失败: {e}")
@@ -265,7 +269,7 @@ def create_route_with_all_data(db: Session, route_data: Dict) -> int:
 def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> bool:
     """
     更新路线及所有关联数据
-    
+
     策略：删除旧数据，插入新数据
     """
     try:
@@ -273,17 +277,17 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
         route = db.query(Route).filter(Route.路线ID == route_id).first()
         if not route:
             return False
-        
+
         # 2. 更新路线基本信息
         route_info = route_data.get("route", {})
         for key, value in route_info.items():
             if hasattr(route, key):
                 setattr(route, key, value)
-        
+
         # 3. 删除旧的货物信息
         db.query(GoodsDetail).filter(GoodsDetail.路线ID == route_id).delete()
         db.query(GoodsTotal).filter(GoodsTotal.路线ID == route_id).delete()
-        
+
         # 4. 插入新的货物信息
         if route_data.get("goods_details"):
             for goods_data in route_data["goods_details"]:
@@ -299,7 +303,7 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                     备注=goods_data.get("备注")
                 )
                 db.add(goods)
-        
+
         if route_data.get("goods_total"):
             for goods_data in route_data["goods_total"]:
                 goods = GoodsTotal(
@@ -311,7 +315,7 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                     备注=goods_data.get("备注")  # ✅ 新增：保存备注
                 )
                 db.add(goods)
-        
+
         # 5. 删除旧的代理商及费用
         agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
         for agent in agents:
@@ -319,7 +323,7 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
             db.query(FeeTotal).filter(FeeTotal.代理路线ID == agent.代理路线ID).delete()
             db.query(Summary).filter(Summary.代理路线ID == agent.代理路线ID).delete()
         db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).delete()
-        
+
         # 6. 插入新的代理商及费用
         if route_data.get("agents"):
             for agent_data in route_data["agents"]:
@@ -337,9 +341,9 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                 )
                 db.add(agent)
                 db.flush()
-                
+
                 agent_id = agent.代理路线ID
-                
+
                 # 费用明细
                 if agent_data.get("fee_items"):
                     for fee_data in agent_data["fee_items"]:
@@ -355,7 +359,7 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                             备注=fee_data.get("备注")  # ✅ 新增：保存备注
                         )
                         db.add(fee)
-                
+
                 # 整单费用
                 if agent_data.get("fee_total"):
                     for fee_data in agent_data["fee_total"]:
@@ -368,13 +372,13 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                             备注=fee_data.get("备注")  # ✅ 新增：保存备注
                         )
                         db.add(fee)
-                
+
                 # 汇总
                 if agent_data.get("summary"):
                     # ✅ 修复：先删除旧的summary（防止重复）
                     db.query(Summary).filter(Summary.代理路线ID == agent_id).delete()
                     db.flush()
-                    
+
                     summary_data = agent_data["summary"]
                     summary = Summary(
                         代理路线ID=agent_id,
@@ -388,10 +392,10 @@ def update_route_with_all_data(db: Session, route_id: int, route_data: Dict) -> 
                         备注=summary_data.get("备注")
                     )
                     db.add(summary)
-        
+
         db.commit()
         return True
-        
+
     except Exception as e:
         db.rollback()
         raise e
@@ -409,11 +413,11 @@ def delete_route(db: Session, route_id: int) -> bool:
         route = db.query(Route).filter(Route.路线ID == route_id).first()
         if not route:
             return False
-        
+
         # 删除货物
         db.query(GoodsDetail).filter(GoodsDetail.路线ID == route_id).delete()
         db.query(GoodsTotal).filter(GoodsTotal.路线ID == route_id).delete()
-        
+
         # 删除代理商及费用
         agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
         for agent in agents:
@@ -421,13 +425,13 @@ def delete_route(db: Session, route_id: int) -> bool:
             db.query(FeeTotal).filter(FeeTotal.代理路线ID == agent.代理路线ID).delete()
             db.query(Summary).filter(Summary.代理路线ID == agent.代理路线ID).delete()
         db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).delete()
-        
+
         # 删除路线
         db.delete(route)
         db.commit()
-        
+
         return True
-        
+
     except Exception as e:
         db.rollback()
         raise e
@@ -456,15 +460,15 @@ def add_agent_to_route(db: Session, route_id: int, agent_data: Dict) -> int:
         )
         db.add(agent)
         db.flush()
-        
+
         agent_id = agent.代理路线ID
-        
+
         # 添加费用等（如果有）
         # ...
-        
+
         db.commit()
         return agent_id
-        
+
     except Exception as e:
         db.rollback()
         raise e
@@ -481,21 +485,21 @@ def delete_agent(db: Session, route_id: int, agent_id: int) -> bool:
                 RouteAgent.路线ID == route_id
             )
         ).first()
-        
+
         if not agent:
             return False
-        
+
         # 删除费用
         db.query(FeeItem).filter(FeeItem.代理路线ID == agent_id).delete()
         db.query(FeeTotal).filter(FeeTotal.代理路线ID == agent_id).delete()
         db.query(Summary).filter(Summary.代理路线ID == agent_id).delete()
-        
+
         # 删除代理商
         db.delete(agent)
         db.commit()
-        
+
         return True
-        
+
     except Exception as e:
         db.rollback()
         raise e

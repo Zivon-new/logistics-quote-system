@@ -33,22 +33,22 @@ async def get_current_user(
         detail="认证失败，请重新登录",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception
-    
+
     username: Optional[str] = payload.get("sub")
     if username is None:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.username == username).first()
     if user is None:
         raise credentials_exception
-    
+
     if not user.is_active:
         raise HTTPException(status_code=400, detail="用户已被禁用")
-    
+
     return user
 
 

@@ -6,7 +6,7 @@
 列：date, open, high, low, close, volume, hold, settle
 """
 import logging
-from datetime import date, timedelta
+from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 

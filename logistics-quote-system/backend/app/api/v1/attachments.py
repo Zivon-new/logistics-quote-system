@@ -3,7 +3,6 @@
 路线附件管理（上传/列表/下载/删除）
 支持：图片(jpg/png/gif/webp)、PDF、Word(doc/docx)、Excel(xls/xlsx)
 """
-import os
 import uuid
 from pathlib import Path
 from urllib.parse import quote
@@ -56,8 +55,10 @@ async def upload_attachment(
     save_path.write_bytes(content)
 
     db.execute(text("""
-        INSERT INTO route_attachments (route_id, original_name, stored_name, file_size, file_type, uploader, agent_index)
-        VALUES (:route_id, :original_name, :stored_name, :file_size, :file_type, :uploader, :agent_index)
+        INSERT INTO route_attachments
+            (route_id, original_name, stored_name, file_size, file_type, uploader, agent_index)
+        VALUES
+            (:route_id, :original_name, :stored_name, :file_size, :file_type, :uploader, :agent_index)
     """), {
         "route_id": route_id,
         "original_name": file.filename,

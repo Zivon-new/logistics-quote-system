@@ -2,7 +2,7 @@
 """
 货物相关模型
 """
-from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, Boolean, func, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DECIMAL, DateTime, Boolean, func, ForeignKey
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -28,7 +28,7 @@ class GoodsDetail(Base):
     总价 = Column("总价", DECIMAL(18, 2), default=0.00)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
-    
+
     # 关系
     route = relationship("Route", back_populates="goods_details")
 
@@ -36,7 +36,7 @@ class GoodsDetail(Base):
 class GoodsTotal(Base):
     """整单货物表模型"""
     __tablename__ = "goods_total"
-    
+
     整单货物ID = Column("整单货物ID", Integer, primary_key=True, index=True, autoincrement=True)
     路线ID = Column("路线ID", Integer, ForeignKey("routes.路线ID"), nullable=False)  # ✅ 添加ForeignKey
     货物名称 = Column("货物名称", String(255), nullable=True)
@@ -46,6 +46,6 @@ class GoodsTotal(Base):
     总体积 = Column("总体积(/cbm)", DECIMAL(18, 3), default=0.000)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
-    
+
     # 关系
     route = relationship("Route", back_populates="goods_total")

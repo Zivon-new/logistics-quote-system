@@ -6,16 +6,16 @@
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from sqlalchemy import func
+from datetime import datetime
+from typing import Optional
 import os
 import sys
-import json
 from pathlib import Path
 
 from ..database import get_db
 from ..services import route_service
 from ..schemas import route as route_schema
-from ..api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/routes", tags=["routes"])
 
@@ -86,7 +86,7 @@ async def create_route(
 ):
     """
     创建新路线（手动录入）
-    
+
     请求数据结构：
     {
         "route": {...},           # 路线基本信息
@@ -169,7 +169,7 @@ async def upload_and_extract_excel(
 ):
     """
     上传Excel文件并提取数据
-    
+
     Returns:
         {
             "routes": [...],
@@ -184,7 +184,7 @@ async def upload_and_extract_excel(
     # 验证文件类型
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 格式的文件")
-    
+
     # 保存上传的文件
     file_path = UPLOAD_DIR / file.filename
     try:
@@ -193,17 +193,17 @@ async def upload_and_extract_excel(
             f.write(content)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"文件保存失败: {str(e)}")
-    
+
     # 调用Python提取代码
     try:
         # 动态导入你的提取代码
         scripts_path = Path(__file__).parent.parent.parent.parent / "scripts"
         sys.path.insert(0, str(scripts_path))
-        
+
         from scripts.modules.horizontal_table_parser_v2 import HorizontalTableParserV2
         from scripts.modules.llm_enhancer import LLMEnhancer
         from scripts.config import Config
-        
+
         # 初始化LLM客户端（如果启用）
         llm_client = None
         if enable_llm and hasattr(Config, 'ENABLE_LLM_ENHANCE') and Config.ENABLE_LLM_ENHANCE:
@@ -213,22 +213,22 @@ async def upload_and_extract_excel(
             except Exception as e:
                 print(f"LLM初始化失败: {e}")
                 enable_llm = False
-        
+
         # 创建解析器
         parser = HorizontalTableParserV2(
             enable_llm=enable_llm,
             llm_client=llm_client,
             output_dir=str(UPLOAD_DIR / "output")
         )
-        
+
         # 解析Excel
         result = parser.parse_excel(str(file_path))
-        
+
         # 清理临时文件
         # os.remove(file_path)  # 可选：是否立即删除
-        
+
         return result
-        
+
     except Exception as e:
         # 清理临时文件
         if file_path.exists():
@@ -243,13 +243,13 @@ async def save_imported_data(
 ):
     """
     保存Excel导入的数据
-    
+
     数据结构与手动录入相同，但可能包含多条路线
     """
     try:
         # 如果有多条路线，循环创建
         route_ids = []
-        
+
         # 这里简化处理，假设只有一条路线
         # 如果需要支持批量导入，可以修改这里的逻辑
         route_data = {
@@ -258,7 +258,7 @@ async def save_imported_data(
             "goods_total": import_data.goods_total or [],
             "agents": []
         }
-        
+
         # 组装agents数据（将route_agents、fee_items、fee_total、summary组合）
         if import_data.route_agents:
             for agent in import_data.route_agents:
@@ -268,42 +268,42 @@ async def save_imported_data(
                     "fee_total": [],
                     "summary": {}
                 }
-                
+
                 # 查找对应的fee_items
                 if import_data.fee_items:
                     agent_data["fee_items"] = [
-                        f for f in import_data.fee_items 
+                        f for f in import_data.fee_items
                         if f.get("代理路线ID") == agent.get("代理路线ID")
                     ]
-                
+
                 # 查找对应的fee_total
                 if import_data.fee_total:
                     agent_data["fee_total"] = [
-                        f for f in import_data.fee_total 
+                        f for f in import_data.fee_total
                         if f.get("代理路线ID") == agent.get("代理路线ID")
                     ]
-                
+
                 # 查找对应的summary
                 if import_data.summary:
                     summary_list = [
-                        s for s in import_data.summary 
+                        s for s in import_data.summary
                         if s.get("代理路线ID") == agent.get("代理路线ID")
                     ]
                     if summary_list:
                         agent_data["summary"] = summary_list[0]
-                
+
                 route_data["agents"].append(agent_data)
-        
+
         # 创建路线
         route_id = route_service.create_route_with_all_data(db, route_data)
         route_ids.append(route_id)
-        
+
         return {
             "success": True,
             "route_ids": route_ids,
             "message": f"成功导入 {len(route_ids)} 条路线"
         }
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"保存失败: {str(e)}")
@@ -351,23 +351,21 @@ async def delete_agent(
         "message": "代理商删除成功"
     }
 
-from sqlalchemy import func
-from datetime import datetime
 
 @router.get("/stats")
 async def get_stats(db: Session = Depends(get_db)):
     """获取统计数据"""
     from ..models import Route, RouteAgent
-    
+
     total_routes = db.query(func.count(Route.路线ID)).scalar()
     total_agents = db.query(func.count(func.distinct(RouteAgent.代理商))).scalar()
-    
+
     today = datetime.now()
     first_day_of_month = today.replace(day=1)
     this_month_routes = db.query(func.count(Route.路线ID)).filter(
         Route.交易开始日期 >= first_day_of_month
     ).scalar()
-    
+
     return {
         "totalRoutes": total_routes or 0,
         "totalAgents": total_agents or 0,

@@ -45,16 +45,16 @@ def update_user(db: Session, user_id: int, user: UserUpdate) -> Optional[User]:
     db_user = get_user(db, user_id)
     if not db_user:
         return None
-    
+
     update_data = user.dict(exclude_unset=True)
-    
+
     # 如果更新密码，需要加密
     if "password" in update_data:
         update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
-    
+
     for field, value in update_data.items():
         setattr(db_user, field, value)
-    
+
     db.commit()
     db.refresh(db_user)
     return db_user
@@ -65,7 +65,7 @@ def delete_user(db: Session, user_id: int) -> bool:
     db_user = get_user(db, user_id)
     if not db_user:
         return False
-    
+
     db.delete(db_user)
     db.commit()
     return True

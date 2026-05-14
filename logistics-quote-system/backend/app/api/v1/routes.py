@@ -11,13 +11,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, text
 from typing import Optional
 from datetime import datetime
-from ...core.deps import get_db, get_current_user, get_current_admin_user
+from ...core.deps import get_db, get_current_user
 from ...crud import route as crud_route
-from ...schemas.route import RouteCreate, RouteUpdate, RouteResponse, RouteDetailResponse
 from ...models.user import User
 from ...models.route import Route, RouteAgent
 from pathlib import Path
-import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,7 +34,7 @@ async def get_routes(
 ):
     """获取路线列表（分页）"""
     skip = (page - 1) * page_size
-    
+
     routes = crud_route.get_routes(
         db=db,
         skip=skip,
@@ -44,13 +42,13 @@ async def get_routes(
         起始地=起始地,
         目的地=目的地
     )
-    
+
     total = crud_route.get_routes_count(
         db=db,
         起始地=起始地,
         目的地=目的地
     )
-    
+
     # 批量加载所有路线的代理商，避免 N+1 查询
     route_ids = [r.路线ID for r in routes]
     all_agents = db.query(RouteAgent).filter(RouteAgent.路线ID.in_(route_ids)).all() if route_ids else []
@@ -82,7 +80,7 @@ async def get_routes(
                 "运输方式": agent.运输方式
             })
         results.append(route_dict)
-    
+
     return {
         "success": True,
         "data": {
@@ -101,17 +99,17 @@ async def get_route_stats(
 ):
     """获取路线统计数据"""
     total_routes = db.query(Route).count()
-    
+
     total_agents = db.query(func.count(func.distinct(RouteAgent.代理商))).scalar()
-    
+
     current_year = datetime.now().year
     current_month = datetime.now().month
-    
+
     month_routes = db.query(Route).filter(
         extract('year', Route.交易开始日期) == current_year,
         extract('month', Route.交易开始日期) == current_month
     ).count()
-    
+
     return {
         "success": True,
         "data": {
@@ -140,7 +138,7 @@ async def get_forex_rates(
         'JPY': 0.05,
         'MYR': 1.6,
     }
-    
+
     reference_date = None
     try:
         result = db.execute(text("SELECT `币种`, `汇率`, `参考日期` FROM forex_rate")).fetchall()
@@ -183,11 +181,11 @@ async def get_route_detail(
     """获取路线完整详情（包含代理商、费用、货物）"""
     from ...models.fee import FeeItem, FeeTotal, Summary
     from ...models.goods import GoodsDetail, GoodsTotal
-    
+
     route = db.query(Route).filter(Route.路线ID == route_id).first()
     if not route:
         raise HTTPException(status_code=404, detail="路线不存在")
-    
+
     route_data = {
         "路线ID": route.路线ID,
         "起始地": route.起始地,
@@ -208,14 +206,14 @@ async def get_route_detail(
         "goods_details": [],
         "goods_total": []
     }
-    
+
     # 获取代理商及其费用
     agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
     for agent in agents:
         fee_items = db.query(FeeItem).filter(FeeItem.代理路线ID == agent.代理路线ID).all()
         fee_total = db.query(FeeTotal).filter(FeeTotal.代理路线ID == agent.代理路线ID).all()
         summary = db.query(Summary).filter(Summary.代理路线ID == agent.代理路线ID).first()
-        
+
         agent_dict = {
             "代理路线ID": agent.代理路线ID,
             "代理商": agent.代理商,
@@ -265,7 +263,7 @@ async def get_route_detail(
             } if summary else {}
         }
         route_data["agents"].append(agent_dict)
-    
+
     # 获取货物明细
     goods_details = db.query(GoodsDetail).filter(GoodsDetail.路线ID == route_id).all()
     route_data["goods_details"] = [
@@ -285,7 +283,7 @@ async def get_route_detail(
         }
         for g in goods_details
     ]
-    
+
     # 获取整单货物
     goods_total = db.query(GoodsTotal).filter(GoodsTotal.路线ID == route_id).all()
     route_data["goods_total"] = [
@@ -300,7 +298,7 @@ async def get_route_detail(
         }
         for g in goods_total
     ]
-    
+
     return {
         "success": True,
         "data": route_data
@@ -324,36 +322,34 @@ async def create_full_route(
         "goods_total": [...]
     }
     """
-    import traceback
-    
     try:
         logger.debug(f"\n{'='*80}")
-        logger.debug(f"🆕 create_full_route 开始执行")
+        logger.debug("🆕 create_full_route 开始执行")
         logger.debug(f"时间: {datetime.now()}")
         logger.debug(f"接收到的数据keys: {list(data.keys())}")
-        
+
         # 第一步：创建路线
         route_data = data.get('route', {})
-        logger.debug(f"\n【第一步】创建路线基本信息...")
+        logger.debug("\n【第一步】创建路线基本信息...")
         logger.debug(f"  route_data: {route_data}")
-        
+
         # 清理不需要的字段
         for bad_key in ['路线ID', '创建时间']:
             route_data.pop(bad_key, None)
-        
+
         new_route = Route(**route_data)
         db.add(new_route)
         db.flush()
         route_id = new_route.路线ID
         logger.debug(f"  ✅ 路线已创建，ID={route_id}")
-        
+
         # 第二步：创建代理商
-        from ...models.fee import FeeItem, FeeTotal, Summary
-        
+        from ...models.fee import FeeItem, FeeTotal
+
         if 'agents' in data:
-            logger.debug(f"\n【第二步】创建代理商...")
+            logger.debug("\n【第二步】创建代理商...")
             agents = data['agents']
-            
+
             # 去重代理商
             agent_map = {}
             for a in agents:
@@ -366,33 +362,33 @@ async def create_full_route(
                         has_fee = a.get('fee_items') or a.get('fee_total') or a.get('summary')
                         if has_fee:
                             agent_map[name] = a
-            
+
             for agent_data in agent_map.values():
                 fee_items_data = agent_data.pop('fee_items', [])
                 fee_total_data = agent_data.pop('fee_total', [])
                 summary_data = agent_data.pop('summary', {})
-                
+
                 # 清理旧ID字段
                 for bad_key in ['代理路线ID', '路线ID', '创建时间']:
                     agent_data.pop(bad_key, None)
-                
+
                 agent = RouteAgent(路线ID=route_id, **agent_data)
                 db.add(agent)
                 db.flush()
                 agent_id = agent.代理路线ID
-                
+
                 # 插入费用明细
                 for fee_item in fee_items_data:
                     for bad_key in ['费用ID', '代理路线ID', '创建时间']:
                         fee_item.pop(bad_key, None)
                     db.add(FeeItem(代理路线ID=agent_id, **fee_item))
-                
+
                 # 插入整单费用
                 for fee_total in fee_total_data:
                     for bad_key in ['整单费用ID', '代理路线ID', '创建时间']:
                         fee_total.pop(bad_key, None)
                     db.add(FeeTotal(代理路线ID=agent_id, **fee_total))
-                
+
                 # 插入汇总
                 for bad_key in ['汇总ID', '代理路线ID', '创建时间']:
                     summary_data.pop(bad_key, None)
@@ -446,29 +442,29 @@ async def create_full_route(
                     })
 
             logger.debug(f"  ✅ 已创建 {len(agent_map)} 个代理商")
-        
+
         # 第三步：创建货物明细
         from ...models.goods import GoodsDetail, GoodsTotal
-        
+
         if 'goods_details' in data:
-            logger.debug(f"\n【第三步】创建货物明细...")
+            logger.debug("\n【第三步】创建货物明细...")
             for goods in data['goods_details']:
                 for bad_key in ['货物ID', '路线ID', '创建时间']:
                     goods.pop(bad_key, None)
                 db.add(GoodsDetail(路线ID=route_id, **goods))
             logger.debug(f"  ✅ 已创建 {len(data['goods_details'])} 个货物明细")
-        
+
         if 'goods_total' in data:
-            logger.debug(f"\n【第四步】创建整单货物...")
+            logger.debug("\n【第四步】创建整单货物...")
             for goods in data['goods_total']:
                 for bad_key in ['整单货物ID', '路线ID', '创建时间']:
                     goods.pop(bad_key, None)
                 db.add(GoodsTotal(路线ID=route_id, **goods))
             logger.debug(f"  ✅ 已创建 {len(data['goods_total'])} 个整单货物")
-        
+
         db.commit()
         logger.debug(f"\n✅ 路线创建成功！route_id={route_id}")
-        
+
         # 保护性写回（防止触发器覆盖手动值）
         route_data = data.get('route', {})
         protect_fields = {
@@ -485,25 +481,25 @@ async def create_full_route(
                 param = f"protect_{key}"
                 protect_params[param] = val
                 protect_clauses.append(f"`{db_col}` = :{param}")
-        
+
         if protect_clauses:
-            protect_sql = text(f"""
-                UPDATE routes 
+            protect_sql = text("""
+                UPDATE routes
                 SET {', '.join(protect_clauses)}
                 WHERE `路线ID` = :route_id
             """)
             db.execute(protect_sql, protect_params)
             db.commit()
-            logger.debug(f"  保护性写回完成")
-        
+            logger.debug("  保护性写回完成")
+
         logger.debug(f"{'='*80}\n")
-        
+
         return {
             "success": True,
             "message": "创建成功",
             "route_id": route_id
         }
-        
+
     except Exception as e:
         db.rollback()
         logger.error(f"create_full_route 失败: {str(e)}", exc_info=True)
@@ -520,31 +516,28 @@ async def update_route(
 ):
     """
     🔧 终极修复版 - 优化货物更新顺序避免触发器冲突
-    策略: 
+    策略:
     1. 先commit路线更新
     2. 先INSERT新货物，再DELETE旧货物（避免触发器在空表时把routes改成0）
     """
-    import json
-    import traceback
-    
     try:
         logger.debug(f"\n{'='*80}")
-        logger.debug(f"🔧 update_route 开始执行")
+        logger.debug("🔧 update_route 开始执行")
         logger.debug(f"时间: {datetime.now()}")
         logger.debug(f"路线ID: {route_id}")
-        
+
         # ============================================================
         # 第一阶段：更新路线基本信息（独立事务）
         # ============================================================
-        logger.debug(f"\n【第一阶段】更新路线基本信息...")
-        
+        logger.debug("\n【第一阶段】更新路线基本信息...")
+
         check_sql = text("SELECT COUNT(*) FROM routes WHERE `路线ID` = :route_id")
         result = db.execute(check_sql, {"route_id": route_id})
         count = result.scalar()
-        
+
         if count == 0:
             raise HTTPException(status_code=404, detail="路线不存在")
-        
+
         # 查询更新前的数据
         before_sql = text("""
             SELECT `路线ID`, `实际重量(/kg)`, `计费重量(/kg)`, `总体积(/cbm)`, `货值`
@@ -552,7 +545,7 @@ async def update_route(
         """)
         before_data = db.execute(before_sql, {"route_id": route_id}).fetchone()
         logger.debug(f"  更新前: 实际重量={before_data[1]}, 计费重量={before_data[2]}, 总体积={before_data[3]}, 货值={before_data[4]}")
-        
+
         # 构建UPDATE语句
         # 注意：交易年份和交易月份是GENERATED列，不能UPDATE
         field_mapping = {
@@ -570,36 +563,39 @@ async def update_route(
             "货值币种": "货值币种",
             "货物名称": "货物名称"
         }
-        
+
         route_data = data.get('route', {})
         update_params = {"route_id": route_id}
         set_clauses = []
-        
+
         for key, db_column in field_mapping.items():
             if key in route_data:
                 value = route_data[key]
                 param_name = f"param_{key}"
                 update_params[param_name] = value
                 set_clauses.append(f"`{db_column}` = :{param_name}")
-        
+
         if set_clauses:
-            update_sql = text(f"""
-                UPDATE routes 
+            update_sql = text("""
+                UPDATE routes
                 SET {', '.join(set_clauses)}
                 WHERE `路线ID` = :route_id
             """)
             db.execute(update_sql, update_params)
             db.commit()  # ✅ 立即commit
-            logger.debug(f"  ✅ 路线基本信息已更新并COMMIT")
-            
+            logger.debug("  ✅ 路线基本信息已更新并COMMIT")
+
             verify_data = db.execute(before_sql, {"route_id": route_id}).fetchone()
-            logger.debug(f"  更新后: 实际重量={verify_data[1]}, 计费重量={verify_data[2]}, 总体积={verify_data[3]}, 货值={verify_data[4]}")
-        
+            logger.debug(
+                "  更新后: 实际重量=%s, 计费重量=%s, 总体积=%s, 货值=%s",
+                verify_data[1], verify_data[2], verify_data[3], verify_data[4]
+            )
+
         # ============================================================
         # 第二阶段：更新代理商
         # ============================================================
         from ...models.fee import FeeItem, FeeTotal, Summary
-        
+
         def _sf(val, default=0.0):
             try:
                 return float(val) if val is not None else default
@@ -610,7 +606,7 @@ async def update_route(
         _agent_summaries = []
 
         if 'agents' in data:
-            logger.debug(f"\n【第二阶段】更新代理商...")
+            logger.debug("\n【第二阶段】更新代理商...")
 
             old_agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
             for old_agent in old_agents:
@@ -704,15 +700,15 @@ async def update_route(
                 _agent_summaries.append((agent_id, dict(summary_data)))
 
             logger.debug(f"  ✅ 已更新 {len(agent_map)} 个代理商")
-        
+
         # ============================================================
         # 第三阶段：更新货物（关键优化：先INSERT后DELETE）
         # ============================================================
         from ...models.goods import GoodsDetail, GoodsTotal
-        
+
         if 'goods_details' in data:
-            logger.debug(f"\n【第三阶段】更新货物明细（先INSERT后DELETE）...")
-            
+            logger.debug("\n【第三阶段】更新货物明细（先INSERT后DELETE）...")
+
             # ✅ 关键修复：先INSERT新数据
             new_goods_list = []
             for goods in data['goods_details']:
@@ -721,20 +717,20 @@ async def update_route(
                 new_goods = GoodsDetail(路线ID=route_id, **goods)
                 new_goods_list.append(new_goods)
                 db.add(new_goods)
-            
+
             db.flush()  # flush让INSERT生效
             logger.debug(f"  ✅ 已INSERT {len(new_goods_list)} 个新货物明细")
-            
+
             # ✅ 再DELETE旧数据（此时goods表不为空，触发器不会把routes改成0）
             db.query(GoodsDetail).filter(
                 GoodsDetail.路线ID == route_id,
                 ~GoodsDetail.货物ID.in_([g.货物ID for g in new_goods_list])
             ).delete(synchronize_session=False)
-            logger.debug(f"  ✅ 已DELETE旧货物明细")
-        
+            logger.debug("  ✅ 已DELETE旧货物明细")
+
         if 'goods_total' in data:
-            logger.debug(f"\n【第四阶段】更新整单货物（先INSERT后DELETE）...")
-            
+            logger.debug("\n【第四阶段】更新整单货物（先INSERT后DELETE）...")
+
             # ✅ 关键修复：先INSERT新数据
             new_goods_list = []
             for goods in data['goods_total']:
@@ -743,20 +739,20 @@ async def update_route(
                 new_goods = GoodsTotal(路线ID=route_id, **goods)
                 new_goods_list.append(new_goods)
                 db.add(new_goods)
-            
+
             db.flush()
             logger.debug(f"  ✅ 已INSERT {len(new_goods_list)} 个新整单货物")
-            
+
             # ✅ 再DELETE旧数据
             db.query(GoodsTotal).filter(
                 GoodsTotal.路线ID == route_id,
                 ~GoodsTotal.整单货物ID.in_([g.整单货物ID for g in new_goods_list])
             ).delete(synchronize_session=False)
-            logger.debug(f"  ✅ 已DELETE旧整单货物")
-        
+            logger.debug("  ✅ 已DELETE旧整单货物")
+
         db.commit()
-        logger.debug(f"\n✅ 主事务已COMMIT")
-        
+        logger.debug("\n✅ 主事务已COMMIT")
+
         # ============================================================
         # 第五阶段：保护性写回（独立事务，在所有触发器执行完毕后）
         # 触发器recompute_route可能已经把手动值清零了，这里强制恢复
@@ -776,9 +772,9 @@ async def update_route(
                 param = f"protect_{key}"
                 protect_params[param] = val
                 protect_clauses.append(f"`{db_col}` = :{param}")
-        
+
         if protect_clauses:
-            protect_sql = text(f"""
+            protect_sql = text("""
                 UPDATE routes
                 SET {', '.join(protect_clauses)}
                 WHERE `路线ID` = :route_id
@@ -816,7 +812,7 @@ async def update_route(
             db.commit()
             logger.debug(f"【第六阶段】summary 最终写回完成，共 {len(_agent_summaries)} 条")
 
-        logger.debug(f"\n✅ 所有更新已完成并COMMIT")
+        logger.debug("\n✅ 所有更新已完成并COMMIT")
         logger.debug(f"{'='*80}\n")
 
         return {
@@ -824,7 +820,7 @@ async def update_route(
             "message": "更新成功",
             "route_id": route_id
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -843,11 +839,11 @@ async def delete_route(
     """删除路线及其所有关联数据"""
     from ...models.fee import FeeItem, FeeTotal, Summary
     from ...models.goods import GoodsDetail, GoodsTotal
-    
+
     route = db.query(Route).filter(Route.路线ID == route_id).first()
     if not route:
         raise HTTPException(status_code=404, detail="路线不存在")
-    
+
     # 删除代理商及其关联数据
     agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).all()
     for agent in agents:
@@ -855,15 +851,15 @@ async def delete_route(
         db.query(FeeTotal).filter(FeeTotal.代理路线ID == agent.代理路线ID).delete()
         db.query(Summary).filter(Summary.代理路线ID == agent.代理路线ID).delete()
     db.query(RouteAgent).filter(RouteAgent.路线ID == route_id).delete()
-    
+
     # 删除货物
     db.query(GoodsDetail).filter(GoodsDetail.路线ID == route_id).delete()
     db.query(GoodsTotal).filter(GoodsTotal.路线ID == route_id).delete()
-    
+
     # 删除路线
     db.delete(route)
     db.commit()
-    
+
     return {
         "success": True,
         "message": "删除成功"
@@ -935,44 +931,44 @@ async def save_imported_data(
     try:
         routes_data = data.get('routes', [])
         saved_count = 0
-        
+
         for route_data in routes_data:
             route_info = route_data.get('route', {})
             new_route = Route(**route_info)
             db.add(new_route)
             db.flush()
-            
+
             route_id = new_route.路线ID
-            
+
             # 创建代理商
             agents = route_data.get('agents', [])
             for agent_data in agents:
                 agent = RouteAgent(路线ID=route_id, **agent_data)
                 db.add(agent)
-            
+
             # 创建货物
             from ...models.goods import GoodsDetail, GoodsTotal
-            
+
             goods_details = route_data.get('goods_details', [])
             for goods in goods_details:
                 goods_detail = GoodsDetail(路线ID=route_id, **goods)
                 db.add(goods_detail)
-            
+
             goods_total = route_data.get('goods_total', [])
             for goods in goods_total:
                 goods_t = GoodsTotal(路线ID=route_id, **goods)
                 db.add(goods_t)
-            
+
             saved_count += 1
-        
+
         db.commit()
-        
+
         return {
             "success": True,
             "message": f"成功保存 {saved_count} 条路线",
             "count": saved_count
         }
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"保存失败: {str(e)}")
