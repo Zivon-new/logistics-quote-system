@@ -31,6 +31,8 @@ def _scheduled_scrape():
     try:
         result = run_scrape(db, max_articles=20)
         logger.info("定时预警同步完成: %s", result)
+    except Exception as e:
+        logger.error("预警同步失败: %s", e)
     finally:
         db.close()
 

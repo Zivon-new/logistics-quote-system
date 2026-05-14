@@ -153,8 +153,8 @@
         <el-descriptions-item label="时效备注" :span="2">{{ agent.时效备注 || '-' }}</el-descriptions-item>
         <el-descriptions-item label="不含" :span="3">{{ agent.不含 || '-' }}</el-descriptions-item>
         <el-descriptions-item label="是否赔付">
-          <el-tag :type="agent.是否赔付 === '1' ? 'success' : 'info'" size="small">
-            {{ agent.是否赔付 === '1' ? '是' : '否' }}
+          <el-tag :type="isCompensation(agent.是否赔付) ? 'success' : 'info'" size="small">
+            {{ isCompensation(agent.是否赔付) ? '是' : '否' }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="赔付内容" :span="2">
@@ -310,6 +310,8 @@ const props = defineProps({
     required: true
   }
 })
+
+const isCompensation = (v) => v === 1 || v === '1' || v === true
 
 // 汇率表（从后端获取，带默认兜底值）
 const exchangeRates = reactive({

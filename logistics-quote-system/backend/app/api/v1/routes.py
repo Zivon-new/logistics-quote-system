@@ -51,6 +51,13 @@ async def get_routes(
         目的地=目的地
     )
     
+    # 批量加载所有路线的代理商，避免 N+1 查询
+    route_ids = [r.路线ID for r in routes]
+    all_agents = db.query(RouteAgent).filter(RouteAgent.路线ID.in_(route_ids)).all() if route_ids else []
+    agents_by_route: dict = {}
+    for agent in all_agents:
+        agents_by_route.setdefault(agent.路线ID, []).append(agent)
+
     # 手动转换为字典 - ✅ 使用正确的属性名
     results = []
     for route in routes:
@@ -69,15 +76,11 @@ async def get_routes(
             "创建时间": str(route.创建时间) if route.创建时间 else None,
             "agents": []
         }
-        
-        # 获取代理商信息
-        agents = db.query(RouteAgent).filter(RouteAgent.路线ID == route.路线ID).all()
-        for agent in agents:
+        for agent in agents_by_route.get(route.路线ID, []):
             route_dict["agents"].append({
                 "代理商": agent.代理商,
                 "运输方式": agent.运输方式
             })
-        
         results.append(route_dict)
     
     return {
@@ -564,6 +567,7 @@ async def update_route(
             "计费重量": "计费重量(/kg)",
             "总体积": "总体积(/cbm)",
             "货值": "货值",
+            "货值币种": "货值币种",
             "货物名称": "货物名称"
         }
         
@@ -869,44 +873,56 @@ async def delete_route(
 @router.post("/import/upload", summary="上传Excel并提取数据")
 async def upload_and_extract_excel(
     file: UploadFile = File(...),
-    enable_llm: bool = Form(False)
+    enable_llm: bool = Form(False),
+    current_user: User = Depends(get_current_user)
 ):
     """上传Excel文件并提取数据"""
+    import uuid
+    file_path = None
     try:
         if not file.filename.endswith(('.xlsx', '.xls')):
             raise HTTPException(status_code=400, detail="仅支持 .xlsx 或 .xls 格式")
-        
+
         upload_dir = Path("temp/uploads")
         upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        file_path = upload_dir / file.filename
+
+        # 使用 UUID 避免文件名冲突和路径穿越
+        safe_name = f"{uuid.uuid4().hex}_{Path(file.filename).name}"
+        file_path = upload_dir / safe_name
         with open(file_path, "wb") as f:
             content = await file.read()
             f.write(content)
-        
+
         from ...services.excel_import_service import get_excel_import_service
-        
+
         excel_service = get_excel_import_service(enable_llm=enable_llm)
         result = excel_service.extract_from_file(str(file_path))
-        
+
         if not result.get('success'):
             raise HTTPException(status_code=500, detail=result.get('message'))
-        
+
         validation = excel_service.validate_extracted_data(result['data'])
-        
+
         return {
             "success": True,
             "message": "提取成功",
             "data": result['data'],
             "validation": validation
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
+    finally:
+        # 临时文件用完即删，避免磁盘积累
+        if file_path and file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception:
+                pass
 
 
 @router.post("/import/save", summary="保存Excel导入的数据")

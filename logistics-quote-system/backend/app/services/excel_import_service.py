@@ -17,50 +17,47 @@ for path in possible_scripts_dirs:
         print(f"[DEBUG] ✓ Found SCRIPTS_DIR: {SCRIPTS_DIR}")
         break
 
+import logging as _logging
+_svc_logger = _logging.getLogger(__name__)
+
 if SCRIPTS_DIR is None:
     raise RuntimeError("Cannot find scripts directory!")
 
 SCRIPTS_PARENT = SCRIPTS_DIR.parent
-print(f"[DEBUG] Adding to sys.path: {SCRIPTS_PARENT}")
+_svc_logger.debug("Adding to sys.path: %s", SCRIPTS_PARENT)
 sys.path.insert(0, str(SCRIPTS_PARENT))
 
 # 导入HorizontalTableParserV2
 try:
     from scripts.modules.horizontal_table_parser_v2 import HorizontalTableParserV2
-    print("[DEBUG] ✓ HorizontalTableParserV2 imported")
+    _svc_logger.debug("HorizontalTableParserV2 imported")
 except ImportError as e:
-    print(f"[ERROR] Failed to import HorizontalTableParserV2: {e}")
+    _svc_logger.error("Failed to import HorizontalTableParserV2: %s", e)
     raise
 
 # 导入logger
 try:
     from scripts.logger_config import get_logger
-    print("[DEBUG] ✓ Logger imported")
 except ImportError:
-    import logging
     def get_logger(name):
-        return logging.getLogger(name)
+        return _logging.getLogger(name)
 
 
 class ExcelImportService:
     """Excel导入服务 - 使用HorizontalTableParserV2"""
     
     def __init__(self, enable_llm: bool = False):
-        print(f"[DEBUG] Initializing ExcelImportService, enable_llm={enable_llm}")
         self.enable_llm = enable_llm
-        
         try:
             self.logger = get_logger(__name__)
-        except:
-            import logging
-            self.logger = logging.getLogger(__name__)
-        
-        print("[DEBUG] ✓ ExcelImportService initialized")
+        except Exception:
+            self.logger = _logging.getLogger(__name__)
+        self.logger.debug("ExcelImportService initialized, enable_llm=%s", enable_llm)
     
     def extract_from_file(self, file_path: str) -> Dict[str, Any]:
         """从Excel文件提取数据 - 使用HorizontalTableParserV2"""
-        print(f"[DEBUG] Extracting from: {file_path}")
-        
+        self.logger.debug("Extracting from: %s", file_path)
+
         try:
             if not Path(file_path).exists():
                 return {
@@ -68,11 +65,11 @@ class ExcelImportService:
                     "message": f"文件不存在: {file_path}",
                     "data": None
                 }
-            
+
             # 创建临时输出目录
             temp_output_dir = Path(file_path).parent / "temp_output"
             temp_output_dir.mkdir(exist_ok=True)
-            
+
             # 使用HorizontalTableParserV2解析
             parser = HorizontalTableParserV2(
                 enable_llm=self.enable_llm,
@@ -81,13 +78,10 @@ class ExcelImportService:
                 output_dir=str(temp_output_dir),
                 excel_filename=file_path
             )
-            
-            print("[DEBUG] ✓ HorizontalTableParserV2 created")
-            
+
             # 解析Excel
             result = parser.parse_excel(file_path)
-            print("[DEBUG] ✓ parse_excel completed")
-            
+
             # 获取数据
             routes = result.get('routes', [])
             route_agents = result.get('route_agents', [])
@@ -97,7 +91,10 @@ class ExcelImportService:
             fee_totals = result.get('fee_totals', [])
             summaries = result.get('summary', [])
 
-            print(f"[DEBUG] Extracted: {len(routes)} routes, {len(route_agents)} agents, {len(fee_items)} fee_items, {len(fee_totals)} fee_totals, {len(summaries)} summaries")
+            self.logger.debug(
+                "Extracted: %d routes, %d agents, %d fee_items, %d fee_totals, %d summaries",
+                len(routes), len(route_agents), len(fee_items), len(fee_totals), len(summaries)
+            )
             
             # ========== 转换数据格式为前端期望的格式 ==========
             # 前端期望：data.routes（数组）、data.goods_details、data.agents
@@ -166,13 +163,10 @@ class ExcelImportService:
                             goods['路线索引'] = idx
                             break
             
-            print(f"\n[DEBUG] 数据转换完成:")
-            print(f"  routes: {len(routes)} 条（已添加索引）")
-            print(f"  agents: {len(route_agents)} 个（已添加路线索引+费用数据）")
-            print(f"  goods_details: {len(goods_details)} 个")
-            print(f"  goods_total: {len(goods_total)} 个")
-            print(f"  fee_items: {len(fee_items)} 个（已附加到agents）")
-            print(f"  fee_totals: {len(fee_totals)} 个（已附加到agents）\n")
+            self.logger.debug(
+                "数据转换完成: routes=%d, agents=%d, goods_details=%d, goods_total=%d",
+                len(routes), len(route_agents), len(goods_details), len(goods_total)
+            )
             
             # ✅ 返回前端期望的格式
             return {
@@ -187,10 +181,7 @@ class ExcelImportService:
             }
             
         except Exception as e:
-            print(f"[ERROR] Extraction failed: {e}")
-            import traceback
-            traceback.print_exc()
-            
+            self.logger.error("Extraction failed: %s", e, exc_info=True)
             return {
                 "success": False,
                 "message": f"提取失败: {str(e)}",
@@ -237,10 +228,5 @@ class ExcelImportService:
         }
 
 
-_excel_import_service = None
-
-def get_excel_import_service(enable_llm: bool = False):
-    global _excel_import_service
-    if _excel_import_service is None:
-        _excel_import_service = ExcelImportService(enable_llm=enable_llm)
-    return _excel_import_service
+def get_excel_import_service(enable_llm: bool = False) -> ExcelImportService:
+    return ExcelImportService(enable_llm=enable_llm)

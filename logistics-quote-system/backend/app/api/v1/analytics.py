@@ -11,6 +11,8 @@ from ...models.user import User
 
 router = APIRouter(prefix="/analytics", tags=["价格分析"])
 
+VALID_CURRENCIES = {'USD', 'EUR', 'GBP', 'AUD', 'CAD', 'SGD', 'HKD', 'JPY', 'MYR'}
+
 
 @router.get("/overview")
 async def get_overview(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -182,8 +184,10 @@ async def get_forex_history(
     current_user: User = Depends(get_current_user)
 ):
     """汇率历史走势：返回各货币近N天对人民币汇率"""
-    currency_list = [c.strip() for c in currencies.split(",") if c.strip()]
+    currency_list = [c.strip() for c in currencies.split(",") if c.strip() in VALID_CURRENCIES]
     result = {c: [] for c in currency_list}
+    if not currency_list:
+        return {"success": True, "data": result, "days": days}
     try:
         placeholders = ",".join(f"'{c}'" for c in currency_list)
         rows = db.execute(text(f"""

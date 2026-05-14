@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
-TARGET_CURRENCIES = ['USD', 'EUR', 'SGD', 'JPY', 'MYR', 'HKD']
+TARGET_CURRENCIES = ['USD', 'EUR', 'GBP', 'AUD', 'CAD', 'SGD', 'JPY', 'MYR', 'HKD']
 FOREX_API_URL = "https://open.er-api.com/v6/latest/CNY"
 REQUEST_TIMEOUT = 15
 

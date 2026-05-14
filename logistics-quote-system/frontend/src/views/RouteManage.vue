@@ -57,9 +57,9 @@
             {{ scope.row['总体积(/cbm)'] || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="货值" label="货值" width="120" align="right">
+        <el-table-column prop="货值" label="货值" width="130" align="right">
           <template #default="scope">
-            ¥{{ scope.row.货值 }}
+            {{ scope.row.货值币种 || 'RMB' }} {{ scope.row.货值 }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" align="center" fixed="right">

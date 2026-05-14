@@ -105,7 +105,7 @@
             <el-radio-button value="date">最新日期</el-radio-button>
           </el-radio-group>
         </div>
-        <el-button type="success" :icon="Download" size="small">导出Excel</el-button>
+        <el-button type="success" :icon="Download" size="small" @click="handleExport">导出Excel</el-button>
         <el-badge :value="selectedAgents.length" :hidden="selectedAgents.length < 2" type="primary">
           <el-button
             type="warning"
@@ -847,6 +847,39 @@ const handleSearch = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleExport = () => {
+  if (!quoteResults.value.length) {
+    ElMessage.warning('没有可导出的数据，请先查询')
+    return
+  }
+  const rows = []
+  rows.push(['路线', '代理商', '运输方式', '贸易类型', '时效(天)', '小计(CNY)', '总计(CNY)', '综合评分', '是否赔付'])
+  for (const route of quoteResults.value) {
+    for (const agent of route.agents || []) {
+      rows.push([
+        `${route.起始地}→${route.目的地}`,
+        agent.代理商 || '',
+        agent.运输方式 || '',
+        agent.贸易类型 || '',
+        agent.时效天数 ?? '',
+        agent.总费用 > 0 ? agent.总费用.toFixed(2) : '',
+        agent.summary?.总计 > 0 ? agent.summary.总计.toFixed(2) : '',
+        agent.综合评分 ?? '',
+        (agent.是否赔付 === 1 || agent.是否赔付 === '1') ? '是' : '否',
+      ])
+    }
+  }
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const bom = '﻿'
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `报价查询_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 const handleReset = () => {
