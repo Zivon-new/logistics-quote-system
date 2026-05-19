@@ -233,18 +233,20 @@ async def search_quotes(
                 # 应用最低收费：取 max(原币金额, 最低收费)
                 实际原币金额 = max(原币金额, 最低收费) if 最低收费 else 原币金额
                 fee_dict = {
-                    "费用ID": fee.费用ID,
-                    "代理路线ID": fee.代理路线ID,
-                    "费用类型": fee.费用类型,
-                    "单价": float(fee.单价) if fee.单价 else 0.00,
-                    "单位": fee.单位,
-                    "数量": float(fee.数量) if fee.数量 else 0,
-                    "最低收费": 最低收费,
-                    "币种": fee.币种,
-                    "原币金额": 实际原币金额,
-                    "人民币金额": float(fee.人民币金额) if fee.人民币金额 else 0.00,
-                    "备注": fee.备注,
-                    "创建时间": fee.创建时间.isoformat() if fee.创建时间 else None
+                    "费用ID":       fee.费用ID,
+                    "代理路线ID":   fee.代理路线ID,
+                    "费用类型":     fee.费用类型,
+                    "单价":         float(fee.单价) if fee.单价 else 0.00,
+                    "单位":         fee.单位,
+                    "数量":         float(fee.数量) if fee.数量 else 0,
+                    "最低收费":     最低收费,
+                    "最低收费币种": fee.最低收费币种,
+                    "币种":         fee.币种,
+                    "原币金额":     实际原币金额,
+                    "人民币金额":   float(fee.人民币金额) if fee.人民币金额 else 0.00,
+                    "备注":         fee.备注,
+                    "参与核算":     fee.参与核算 if fee.参与核算 is not None else 1,
+                    "创建时间":     fee.创建时间.isoformat() if fee.创建时间 else None
                 }
                 agent_dict["fee_items"].append(fee_dict)
                 total_fee += float(fee.人民币金额) if fee.人民币金额 else 0.00
@@ -254,12 +256,13 @@ async def search_quotes(
                 fee_total_dict = {
                     "整单费用ID": fee_total_item.整单费用ID,
                     "代理路线ID": fee_total_item.代理路线ID,
-                    "费用名称": fee_total_item.费用名称,
-                    "原币金额": float(fee_total_item.原币金额) if fee_total_item.原币金额 else 0.00,
-                    "币种": fee_total_item.币种,
+                    "费用名称":   fee_total_item.费用名称,
+                    "原币金额":   float(fee_total_item.原币金额) if fee_total_item.原币金额 else 0.00,
+                    "币种":       fee_total_item.币种,
                     "人民币金额": float(fee_total_item.人民币金额) if fee_total_item.人民币金额 else 0.00,
-                    "备注": fee_total_item.备注,
-                    "创建时间": fee_total_item.创建时间.isoformat() if fee_total_item.创建时间 else None
+                    "备注":       fee_total_item.备注,
+                    "参与核算":   fee_total_item.参与核算 if fee_total_item.参与核算 is not None else 1,
+                    "创建时间":   fee_total_item.创建时间.isoformat() if fee_total_item.创建时间 else None
                 }
                 agent_dict["fee_total"].append(fee_total_dict)
                 total_fee += float(fee_total_item.人民币金额) if fee_total_item.人民币金额 else 0.00

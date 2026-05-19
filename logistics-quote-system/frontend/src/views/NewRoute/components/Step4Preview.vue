@@ -357,7 +357,7 @@ const calculateRMB = (feeItem) => {
   return originalAmount * rate
 }
 
-// 按币种统计原币小计（用于展示），跳过分组标题行
+// 按币种统计原币小计（用于展示），跳过分组标题行和已排除行
 const calculateSubtotalByCurrency = (agent) => {
   const byCurrency = {}
   const add = (currency, amount) => {
@@ -367,15 +367,16 @@ const calculateSubtotalByCurrency = (agent) => {
   }
   if (agent.fee_items) {
     agent.fee_items
-      .filter(item => item.备注 !== '__GROUP_HEADER__')
+      .filter(item => item.备注 !== '__GROUP_HEADER__' && item.参与核算 !== false)
       .forEach(item => {
-        // 用 原币金额（含最低收费结果），而非裸的单价×数量
         const amount = item.原币金额 != null ? item.原币金额 : (item.单价 || 0) * (item.数量 || 0)
         add(item.币种, amount)
       })
   }
   if (agent.fee_total) {
-    agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
+    agent.fee_total
+      .filter(item => item.备注 !== '__GROUP_HEADER__' && item.参与核算 !== false)
+      .forEach(item => add(item.币种, item.原币金额 || 0))
   }
   return byCurrency
 }
@@ -412,19 +413,21 @@ const getQuoteSingleCurrency = (agent) => {
   return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
 }
 
-// 计算小计，跳过分组标题行
+// 计算小计，跳过分组标题行和已排除行
 const calculateSubtotal = (agent) => {
   if (agent.summary?.小计手动) return agent.summary.小计 || 0
   let total = 0
 
   if (agent.fee_items) {
     total += agent.fee_items
-      .filter(item => item.备注 !== '__GROUP_HEADER__')
+      .filter(item => item.备注 !== '__GROUP_HEADER__' && item.参与核算 !== false)
       .reduce((sum, item) => sum + calculateRMB(item), 0)
   }
 
   if (agent.fee_total) {
-    total += agent.fee_total.reduce((sum, item) => sum + calculateRMB(item), 0)
+    total += agent.fee_total
+      .filter(item => item.备注 !== '__GROUP_HEADER__' && item.参与核算 !== false)
+      .reduce((sum, item) => sum + calculateRMB(item), 0)
   }
 
   return total
@@ -452,7 +455,10 @@ const calcMultiTaxTotal = (agent) => {
 
 // 计算税金 - 支持单一税率和多货物税率模式
 const calculateTax = (agent) => {
-  if (agent.summary?.税金手动) return agent.summary.税金 || 0
+  if (agent.summary?.税金手动) {
+    const taxCur = agent.summary.税金币种 || 'RMB'
+    return (agent.summary.税金 || 0) * (exchangeRates[taxCur] || 1)
+  }
   if (agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length) {
     return calcMultiTaxTotal(agent)
   }

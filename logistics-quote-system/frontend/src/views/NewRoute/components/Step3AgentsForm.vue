@@ -180,7 +180,7 @@
             size="small"
             class="fee-table"
             :span-method="feeItemSpanMethod"
-            :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
+            :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : (row.参与核算 === false ? 'excluded-row' : '')"
           >
             <el-table-column width="32" align="center">
               <template #default>
@@ -252,73 +252,80 @@
               </template>
             </el-table-column>
 
-            <el-table-column label="数量" width="100">
+            <el-table-column label="数量" width="120">
               <template #default="scope">
-                <el-tooltip
-                  v-if="isAutoQuantity(scope.row.单位)"
-                  content="已按计费重量/体积自动填入，可手动修改"
-                  placement="top"
-                >
-                  <el-input-number :controls="false"
+                <div v-if="scope.row._formula_数量 !== undefined" class="formula-wrap">
+                  <el-input
+                    v-model="scope.row._formula_数量"
+                    size="small"
+                    placeholder="如 462*3"
+                    @blur="applyFormula(scope.row, '数量')"
+                    @keydown.enter.prevent="applyFormula(scope.row, '数量')"
+                  >
+                    <template #prefix><span class="formula-prefix">f</span></template>
+                  </el-input>
+                  <el-button link size="small" class="formula-clear" @click="clearFormula(scope.row, '数量')">×</el-button>
+                </div>
+                <div v-else class="price-wrap">
+                  <el-tooltip
+                    v-if="isAutoQuantity(scope.row.单位)"
+                    content="已按计费重量/体积自动填入，可手动修改"
+                    placement="top"
+                  >
+                    <el-input-number :controls="false"
+                      v-model="scope.row.数量"
+                      :precision="2"
+                      :min="0"
+                      size="small"
+                      @change="updateFeeAmount(scope.row)"
+                    />
+                  </el-tooltip>
+                  <el-input-number v-else :controls="false"
                     v-model="scope.row.数量"
                     :precision="2"
                     :min="0"
                     size="small"
-                    controls-position="right"
                     @change="updateFeeAmount(scope.row)"
                   />
-                </el-tooltip>
-                <el-input-number :controls="false"
-                  v-else
-                  v-model="scope.row.数量"
-                  :precision="2"
-                  :min="0"
-                  size="small"
-                  controls-position="right"
-                  @change="updateFeeAmount(scope.row)"
-                />
+                  <el-tooltip content="输入表达式（如 462*3）" placement="top">
+                    <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '数量')">=</el-button>
+                  </el-tooltip>
+                </div>
               </template>
             </el-table-column>
 
-            <el-table-column label="最低收费" width="110">
+            <el-table-column label="最低收费" width="185">
               <template #default="scope">
-                <el-input-number :controls="false"
-                  v-if="scope.row.备注 !== '__GROUP_HEADER__'"
-                  v-model="scope.row.最低收费"
-                  :precision="2"
-                  :min="0"
-                  placeholder="选填"
-                  size="small"
-                  @change="updateFeeAmount(scope.row)"
-                />
+                <div v-if="scope.row.备注 !== '__GROUP_HEADER__'" class="min-fee-wrap">
+                  <el-input-number :controls="false"
+                    v-model="scope.row.最低收费"
+                    :precision="2"
+                    :min="0"
+                    placeholder="选填"
+                    size="small"
+                    style="width:105px"
+                    @change="updateFeeAmount(scope.row)"
+                  />
+                  <CurrencySelect
+                    v-model="scope.row.最低收费币种"
+                    size="small"
+                    style="width:75px"
+                    @change="updateFeeAmount(scope.row)"
+                  />
+                </div>
               </template>
             </el-table-column>
 
             <el-table-column label="币种" width="90">
               <template #default="scope">
-                <el-select
-                  v-model="scope.row.币种"
-                  size="small"
-                  @change="updateFeeRMB(scope.row)"
-                >
-                  <el-option label="RMB" value="RMB" />
-                  <el-option label="USD 美元" value="USD" />
-                  <el-option label="EUR 欧元" value="EUR" />
-                  <el-option label="GBP 英镑" value="GBP" />
-                  <el-option label="AUD 澳元" value="AUD" />
-                  <el-option label="CAD 加元" value="CAD" />
-                  <el-option label="SGD 新加坡元" value="SGD" />
-                  <el-option label="HKD 港元" value="HKD" />
-                  <el-option label="JPY 日元" value="JPY" />
-                  <el-option label="MYR 林吉特" value="MYR" />
-                </el-select>
+                <CurrencySelect v-model="scope.row.币种" size="small" @change="updateFeeRMB(scope.row)" />
               </template>
             </el-table-column>
 
             <el-table-column label="原币金额" width="110">
               <template #default="scope">
                 <el-tooltip
-                  v-if="scope.row.最低收费 > 0 && (scope.row.单价 * scope.row.数量) < scope.row.最低收费"
+                  v-if="scope.row.最低收费 > 0 && calcOriginalAmount(scope.row) > (scope.row.单价 * scope.row.数量)"
                   content="已应用最低收费"
                   placement="top"
                 >
@@ -341,9 +348,25 @@
               </template>
             </el-table-column>
 
+            <el-table-column label="核算" width="58" align="center">
+              <template #default="scope">
+                <el-tooltip
+                  v-if="scope.row.备注 !== '__GROUP_HEADER__'"
+                  :content="scope.row.参与核算 !== false ? '参与核算（点击排除）' : '已排除（点击恢复）'"
+                  placement="top"
+                >
+                  <el-switch
+                    :model-value="scope.row.参与核算 !== false"
+                    size="small"
+                    @change="val => { scope.row.参与核算 = val; updateFeeAmount(scope.row) }"
+                  />
+                </el-tooltip>
+              </template>
+            </el-table-column>
+
             <el-table-column label="备注" min-width="120">
               <template #default="scope">
-                <el-input 
+                <el-input
                   v-model="scope.row.备注"
                   placeholder="可选"
                   size="small"
@@ -406,7 +429,7 @@
             size="small"
             class="fee-table"
             :span-method="feeTotalSpanMethod"
-            :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : ''"
+            :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'group-header-row' : (row.参与核算 === false ? 'excluded-row' : '')"
           >
             <el-table-column width="32" align="center">
               <template #default>
@@ -465,22 +488,7 @@
 
             <el-table-column label="币种" width="100">
               <template #default="scope">
-                <el-select 
-                  v-model="scope.row.币种"
-                  size="small"
-                  @change="updateFeeTotalRMB(scope.row)"
-                >
-                  <el-option label="RMB" value="RMB" />
-                  <el-option label="USD 美元" value="USD" />
-                  <el-option label="EUR 欧元" value="EUR" />
-                  <el-option label="GBP 英镑" value="GBP" />
-                  <el-option label="AUD 澳元" value="AUD" />
-                  <el-option label="CAD 加元" value="CAD" />
-                  <el-option label="SGD 新加坡元" value="SGD" />
-                  <el-option label="HKD 港元" value="HKD" />
-                  <el-option label="JPY 日元" value="JPY" />
-                  <el-option label="MYR 林吉特" value="MYR" />
-                </el-select>
+                <CurrencySelect v-model="scope.row.币种" size="small" @change="updateFeeTotalRMB(scope.row)" />
               </template>
             </el-table-column>
 
@@ -492,9 +500,25 @@
               </template>
             </el-table-column>
 
+            <el-table-column label="核算" width="58" align="center">
+              <template #default="scope">
+                <el-tooltip
+                  v-if="scope.row.备注 !== '__GROUP_HEADER__'"
+                  :content="scope.row.参与核算 !== false ? '参与核算（点击排除）' : '已排除（点击恢复）'"
+                  placement="top"
+                >
+                  <el-switch
+                    :model-value="scope.row.参与核算 !== false"
+                    size="small"
+                    @change="val => { scope.row.参与核算 = val; updateSummary(props.modelValue[agentIndex]) }"
+                  />
+                </el-tooltip>
+              </template>
+            </el-table-column>
+
             <el-table-column label="备注" min-width="120">
               <template #default="scope">
-                <el-input 
+                <el-input
                   v-model="scope.row.备注"
                   placeholder="可选"
                   size="small"
@@ -504,8 +528,8 @@
 
             <el-table-column label="操作" width="80" align="center">
               <template #default="scope">
-                <el-button 
-                  type="danger" 
+                <el-button
+                  type="danger"
                   size="small"
                   link
                   @click="removeFeeTotal(agentIndex, scope.$index)"
@@ -641,18 +665,7 @@
                 </el-table-column>
                 <el-table-column label="币种" width="80">
                   <template #default="scope">
-                    <el-select v-model="scope.row.货值币种" size="small" @change="updateSummary(agent)">
-                      <el-option label="RMB" value="RMB" />
-                      <el-option label="USD 美元" value="USD" />
-                      <el-option label="EUR 欧元" value="EUR" />
-                      <el-option label="GBP 英镑" value="GBP" />
-                      <el-option label="AUD 澳元" value="AUD" />
-                      <el-option label="CAD 加元" value="CAD" />
-                      <el-option label="SGD 新加坡元" value="SGD" />
-                      <el-option label="HKD 港元" value="HKD" />
-                      <el-option label="JPY 日元" value="JPY" />
-                      <el-option label="MYR 林吉特" value="MYR" />
-                    </el-select>
+                    <CurrencySelect v-model="scope.row.货值币种" size="small" @change="updateSummary(agent)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="HS编码" width="120">
@@ -714,15 +727,22 @@
                         @change="updateSummary(agent)"
                       />
                     </el-tooltip>
-                    <el-input-number
-                      v-if="agent.summary.税金手动"
-                      :controls="false"
-                      v-model="agent.summary.税金"
-                      :precision="2"
-                      :min="0"
-                      style="width:120px"
-                      @change="updateSummary(agent)"
-                    />
+                    <template v-if="agent.summary.税金手动">
+                      <el-input-number
+                        :controls="false"
+                        v-model="agent.summary.税金"
+                        :precision="2"
+                        :min="0"
+                        style="width:90px"
+                        @change="updateSummary(agent)"
+                      />
+                      <CurrencySelect
+                        v-model="agent.summary.税金币种"
+                        size="small"
+                        style="width:85px;margin-left:4px"
+                        @change="updateSummary(agent)"
+                      />
+                    </template>
                     <div v-else class="amount-display">
                       <span v-if="getCargoCurrency()" class="original-amount">
                         {{ getCargoCurrency() }} {{ calculateTaxOriginal(agent).toFixed(2) }} →
@@ -842,11 +862,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import { Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Sortable from 'sortablejs'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
+import CurrencySelect from '@/components/CurrencySelect.vue'
+import { useFeeCalculation } from '@/composables/useFeeCalculation'
 
 const props = defineProps({
   modelValue: {
@@ -881,6 +903,24 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+// ── Fee calculation composable ─────────────────────────────
+const {
+  exchangeRates, forexReferenceDate, forexRefreshing,
+  loadExchangeRates, handleRefreshForex,
+  calcOriginalAmount, updateFeeAmount, updateFeeRMB, updateFeeTotalRMB, calculateRMB,
+  calculateSubtotalByCurrency, getFeesCurrency, getCargoCurrency,
+  getQuoteSingleCurrency, calculateSubtotal,
+  calcTaxDetailRowCNY, calcMultiTaxTotal,
+  calculateTaxOriginal, calculateLossOriginal,
+  calculateTax, calculateLoss, calculateTotal, updateSummary,
+  addTaxDetail, removeTaxDetail, importTaxFromGoods,
+  activateFormula, clearFormula, applyFormula,
+  taxRateToDisplay, taxRateFromDisplay,
+  refreshSummariesWithValue,
+} = useFeeCalculation(props)
+
+loadExchangeRates()
+
 // ── 行唯一 key（row-key 必须，否则 Vue 用位置 diff 会和 Sortable 的 DOM 移动冲突）
 let _idCnt = 0
 const _genId = () => `_r${++_idCnt}_${Date.now()}`
@@ -892,20 +932,7 @@ const getRowKey = (row) => {
   return _rowKeyMap.get(row)
 }
 
-// 汇率表（从后端获取，带默认兜底值）
-const exchangeRates = reactive({
-  'RMB': 1.0,
-  'USD': 7.2,
-  'EUR': 7.8,
-  'GBP': 9.2,
-  'AUD': 4.7,
-  'CAD': 5.3,
-  'SGD': 5.3,
-  'HKD': 0.93,
-  'JPY': 0.05,
-  'MYR': 1.6,
-})
-const forexReferenceDate = ref('')  // 汇率参考日期
+// exchangeRates / forexReferenceDate / forexRefreshing — from useFeeCalculation composable
 
 // ── 拖拽排序 ──────────────────────────────────────────────
 const sortableMap = new Map() // key: 'fi-{agentIndex}' | 'ft-{agentIndex}'
@@ -962,46 +989,16 @@ onBeforeUnmount(() => {
   sortableMap.clear()
 })
 
-// 整单费用 span-method（7列，含拖拽列，分组标题行横跨列1-5）
+// 整单费用 span-method（8列，含拖拽列，分组标题行横跨列1-6）
 const feeTotalSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {
-    if (columnIndex === 1) return [1, 5]
-    if (columnIndex > 1 && columnIndex < 6) return [0, 0]
+    if (columnIndex === 1) return [1, 6]
+    if (columnIndex > 1 && columnIndex < 7) return [0, 0]
   }
   return [1, 1]
 }
 
-// 页面加载时从后端获取最新汇率
-import { getExchangeRates, refreshForexRates } from '@/api/route'
-const loadExchangeRates = async () => {
-  try {
-    const res = await getExchangeRates()
-    if (res.success && res.data) {
-      Object.assign(exchangeRates, res.data)
-      if (res.reference_date) forexReferenceDate.value = res.reference_date
-    }
-  } catch (e) {
-    console.warn('⚠️ 获取汇率失败，使用默认值')
-  }
-}
-loadExchangeRates()
-
-const forexRefreshing = ref(false)
-const handleRefreshForex = async () => {
-  forexRefreshing.value = true
-  try {
-    const res = await refreshForexRates()
-    if (res.success && res.data) {
-      Object.assign(exchangeRates, res.data)
-      forexReferenceDate.value = new Date().toISOString().slice(0, 10)
-      ElMessage.success(`汇率已更新，共同步 ${Object.keys(res.data).length} 种货币`)
-    }
-  } catch (e) {
-    ElMessage.error('汇率同步失败，请检查网络或联系管理员')
-  } finally {
-    forexRefreshing.value = false
-  }
-}
+// loadExchangeRates / handleRefreshForex — from useFeeCalculation composable
 
 // 计费重量变化时，同步所有 /kg 行的数量
 watch(() => props.routeWeight, (newWeight) => {
@@ -1057,6 +1054,7 @@ const addAgent = () => {
       税率Display: 0,
       税金手动: false,
       税金: 0,
+      税金币种: 'RMB',
       汇损率: 0,
       汇损手动: false,
       汇损: 0,
@@ -1076,11 +1074,11 @@ const removeAgent = (index) => {
   props.modelValue.splice(index, 1)
 }
 
-// 费用明细表格 span-method：11列，含拖拽列，分组标题行横跨列1-9
+// 费用明细表格 span-method：13列（含拖拽列），分组标题行横跨列1-11
 const feeItemSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {
-    if (columnIndex === 1) return [1, 9]
-    if (columnIndex > 1 && columnIndex < 10) return [0, 0]
+    if (columnIndex === 1) return [1, 11]
+    if (columnIndex > 1 && columnIndex < 12) return [0, 0]
   }
   return [1, 1]
 }
@@ -1097,6 +1095,7 @@ const addGroupHeader = (agentIndex) => {
     单位: '',
     数量: 0,
     最低收费: null,
+    最低收费币种: 'RMB',
     币种: 'RMB',
     原币金额: 0,
     人民币金额: 0,
@@ -1117,10 +1116,12 @@ const addFeeItem = (agentIndex) => {
     单位: '/kg',
     数量: props.routeWeight || 0,
     最低收费: null,
+    最低收费币种: 'RMB',
     币种: 'RMB',
     原币金额: 0,
     人民币金额: 0,
-    备注: ''
+    备注: '',
+    参与核算: true,
   })
 }
 
@@ -1156,7 +1157,8 @@ const addFeeTotal = (agentIndex) => {
     原币金额: 0,
     币种: 'RMB',
     人民币金额: 0,
-    备注: ''
+    备注: '',
+    参与核算: true,
   })
 }
 
@@ -1195,243 +1197,7 @@ const handleUnitChange = (feeItem) => {
   updateFeeAmount(feeItem)
 }
 
-// 计算实际原币金额（应用最低收费）
-const calcOriginalAmount = (feeItem) => {
-  const calculated = (feeItem.单价 || 0) * (feeItem.数量 || 0)
-  const minFee = feeItem.最低收费 || 0
-  return minFee > 0 ? Math.max(calculated, minFee) : calculated
-}
-
-// 更新费用原币金额
-const updateFeeAmount = (feeItem) => {
-  feeItem.原币金额 = calcOriginalAmount(feeItem)
-  updateFeeRMB(feeItem)
-}
-
-// 更新费用人民币金额
-const updateFeeRMB = (feeItem) => {
-  const rate = exchangeRates[feeItem.币种] || 1
-  feeItem.人民币金额 = feeItem.原币金额 * rate
-}
-
-// 更新整单费用人民币金额
-const updateFeeTotalRMB = (feeItem) => {
-  const rate = exchangeRates[feeItem.币种] || 1
-  feeItem.人民币金额 = feeItem.原币金额 * rate
-}
-
-// 计算人民币金额（含最低收费逻辑）
-const calculateRMB = (feeItem) => {
-  const rate = exchangeRates[feeItem.币种] || 1
-  const originalAmount = feeItem.原币金额 || calcOriginalAmount(feeItem)
-  return originalAmount * rate
-}
-
-// 按币种统计原币小计（用于展示），跳过分组标题行
-const calculateSubtotalByCurrency = (agent) => {
-  const byCurrency = {}
-  const add = (currency, amount) => {
-    if (!amount) return
-    currency = currency || 'RMB'
-    byCurrency[currency] = (byCurrency[currency] || 0) + amount
-  }
-  if (agent.fee_items) {
-    agent.fee_items
-      .filter(item => item.备注 !== '__GROUP_HEADER__')
-      .forEach(item => {
-        // 必须用 calcOriginalAmount（含最低收费），而非裸的单价×数量
-        const amount = item.原币金额 != null ? item.原币金额 : calcOriginalAmount(item)
-        add(item.币种, amount)
-      })
-  }
-  if (agent.fee_total) {
-    agent.fee_total.forEach(item => add(item.币种, item.原币金额 || 0))
-  }
-  return byCurrency
-}
-
-// 仅看费用（fee_items + fee_total）的单一外币，用于「小计」行显示
-const getFeesCurrency = (agent) => {
-  const byCurrency = calculateSubtotalByCurrency(agent)
-  const arr = Object.keys(byCurrency).filter(c => byCurrency[c] > 0)
-  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
-}
-
-// 货值的外币，用于「税金/汇损」行显示
-const getCargoCurrency = () => {
-  const currency = props.routeValueCurrency || 'RMB'
-  return (parseFloat(props.routeValue) || 0) > 0 && currency !== 'RMB' ? currency : null
-}
-
-// 费用+货值全部是同一外币时返回该币种，用于「总计」行显示
-const getQuoteSingleCurrency = (agent) => {
-  const byCurrency = calculateSubtotalByCurrency(agent)
-  const allCurrencies = new Set(Object.keys(byCurrency).filter(c => byCurrency[c] > 0))
-  const routeCurrency = props.routeValueCurrency || 'RMB'
-  if ((parseFloat(props.routeValue) || 0) > 0) allCurrencies.add(routeCurrency)
-  const arr = Array.from(allCurrencies)
-  return arr.length === 1 && arr[0] !== 'RMB' ? arr[0] : null
-}
-
-// 计算小计（人民币合计），跳过分组标题行；手动模式时直接用 summary.小计
-const calculateSubtotal = (agent) => {
-  if (agent.summary?.小计手动) return agent.summary.小计 || 0
-  let total = 0
-  if (agent.fee_items) {
-    total += agent.fee_items
-      .filter(item => item.备注 !== '__GROUP_HEADER__')
-      .reduce((sum, item) => sum + calculateRMB(item), 0)
-  }
-  if (agent.fee_total) {
-    total += agent.fee_total.reduce((sum, item) => sum + calculateRMB(item), 0)
-  }
-  return total
-}
-
-// 货值换算为人民币
-const routeValueRMB = () => {
-  const value = parseFloat(props.routeValue) || 0
-  const rate = exchangeRates[props.routeValueCurrency] || 1
-  return value * rate
-}
-
-// 税金/汇损原币金额（换汇前，用于展示原币部分）
-const calculateTaxOriginal = (agent) => {
-  // 多税率模式：原币税金 = CNY税金 ÷ 汇率（避免读旧的 summary.税率）
-  if (agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length) {
-    const rate = exchangeRates[props.routeValueCurrency || 'RMB'] || 1
-    return rate > 0 ? calcMultiTaxTotal(agent) / rate : 0
-  }
-  return (parseFloat(props.routeValue) || 0) * (parseFloat(agent.summary.税率) || 0)
-}
-const calculateLossOriginal = (agent) => {
-  // 汇损 = 税金原币 × 汇损率
-  return calculateTaxOriginal(agent) * (parseFloat(agent.summary.汇损率) || 0)
-}
-
-// 计算税金（人民币）
-const calculateTax = (agent) => {
-  if (agent.summary?.税率模式 === 'multi' && agent.summary.税率明细?.length) {
-    return calcMultiTaxTotal(agent)
-  }
-  return routeValueRMB() * (parseFloat(agent.summary.税率) || 0)
-}
-
-// 计算汇损（人民币）= 税金 × 汇损率
-const calculateLoss = (agent) => {
-  return calculateTax(agent) * (parseFloat(agent.summary.汇损率) || 0)
-}
-
-// 计算总计（手动模式时使用 summary 中已存的值）
-const calculateTotal = (agent) => {
-  const tax = agent.summary?.税金手动 ? (agent.summary.税金 || 0) : calculateTax(agent)
-  const loss = agent.summary?.汇损手动 ? (agent.summary.汇损 || 0) : calculateLoss(agent)
-  return calculateSubtotal(agent) + tax + loss
-}
-
-const updateSummary = (agent) => {
-  if (!agent.summary) {
-    agent.summary = { 小计手动: false, 小计: 0, 税率: 0, 税金手动: false, 税金: 0, 汇损率: 0, 汇损手动: false, 汇损: 0, 备注: '', 税率模式: 'simple', 税率明细: [] }
-  }
-  if (!agent.summary.税金手动) {
-    agent.summary.税金 = calculateTax(agent)
-  }
-  if (!agent.summary.汇损手动) {
-    agent.summary.汇损 = calculateLoss(agent)
-  }
-  agent.summary.小计 = calculateSubtotal(agent)
-  agent.summary.总计 = calculateSubtotal(agent) + (agent.summary.税金 || 0) + (agent.summary.汇损 || 0)
-}
-
-// ── 多货物税率明细 ──────────────────────────────────────────
-
-const calcTaxDetailRowCNY = (row) => {
-  const value = parseFloat(row.货值) || 0
-  const rate = exchangeRates[row.货值币种] || 1
-  const taxRate = (parseFloat(row.综合税率) || 0) / 100
-  return value * rate * taxRate
-}
-
-const calcMultiTaxTotal = (agent) => {
-  return (agent.summary.税率明细 || []).reduce((sum, row) => sum + calcTaxDetailRowCNY(row), 0)
-}
-
-const addTaxDetail = (agent) => {
-  if (!agent.summary.税率明细) agent.summary.税率明细 = []
-  agent.summary.税率明细.push({ 货物名称: '', 货值: 0, 货值币种: props.routeValueCurrency || 'RMB', HS编码: '', 原产地: '', 税率说明: '', 综合税率: 10 })
-}
-
-const removeTaxDetail = (agent, index) => {
-  agent.summary.税率明细.splice(index, 1)
-  updateSummary(agent)
-}
-
-const importTaxFromGoods = (agent) => {
-  if (!agent.summary.税率明细) agent.summary.税率明细 = []
-  if (props.goodsList?.length > 0) {
-    props.goodsList.forEach(g => {
-      agent.summary.税率明细.push({
-        货物名称: g.货物名称 || '',
-        货值: parseFloat(g.货值) || 0,
-        货值币种: g.货值币种 || props.routeValueCurrency || 'RMB',
-        HS编码: '',
-        原产地: '',
-        税率说明: '',
-        综合税率: 10
-      })
-    })
-    ElMessage.success(`已导入 ${props.goodsList.length} 条货物信息`)
-  } else if (parseFloat(props.routeValue) > 0) {
-    agent.summary.税率明细.push({
-      货物名称: '全部货物',
-      货值: parseFloat(props.routeValue) || 0,
-      货值币种: props.routeValueCurrency || 'RMB',
-      HS编码: '',
-      原产地: '',
-      税率说明: '',
-      综合税率: 10
-    })
-    ElMessage.success('已按路线总货值导入')
-  } else {
-    ElMessage.warning('暂无货值信息，请先在Step1填写货值，或在Step2填写整单货物')
-  }
-}
-
-// ── 公式求值 ──────────────────────────────────────────────
-
-const evalFormula = (expr) => {
-  let s = expr.startsWith('=') ? expr.slice(1) : expr
-  s = s
-    .replace(/货值/g, String(parseFloat(props.routeValue) || 0))
-    .replace(/重量/g, String(parseFloat(props.routeWeight) || 0))
-    .replace(/体积/g, String(parseFloat(props.routeVolume) || 0))
-  if (!/^[\d\s+\-*/().,]+$/.test(s)) return null
-  try { return Function('"use strict";return(' + s + ')')() } catch { return null }
-}
-
-const activateFormula = (row, field) => {
-  const formulaKey = `_formula_${field}`
-  row[formulaKey] = `=${row[field] || 0}`
-}
-
-const clearFormula = (row, field) => {
-  const formulaKey = `_formula_${field}`
-  delete row[formulaKey]
-}
-
-const applyFormula = (row, field, isTotal = false) => {
-  const formulaKey = `_formula_${field}`
-  const formula = row[formulaKey]
-  if (!formula) return
-  const result = evalFormula(formula)
-  if (result !== null && !isNaN(result)) {
-    row[field] = Math.round(result * 100) / 100
-    if (isTotal) updateFeeTotalRMB(row)
-    else { updateFeeAmount(row) }
-  } else {
-    ElMessage.warning(`公式计算失败：${formula}`)
-  }
-}
+// Calculation functions — from useFeeCalculation composable
 
 // ── 键盘导航 ──────────────────────────────────────────────
 
@@ -1491,9 +1257,7 @@ const focusCell = (rows, rowIdx, colIdx) => {
   if (inp) { inp.focus(); inp.select() }
 }
 
-// 税率 显示/存储 转换（存储为小数 0.09，显示为百分比 9）
-const taxRateToDisplay = (v) => +((parseFloat(v) || 0) * 100).toFixed(4)
-const taxRateFromDisplay = (v) => +((parseFloat(v) || 0) / 100).toFixed(8)
+// taxRateToDisplay / taxRateFromDisplay — from useFeeCalculation composable
 
 // 验证
 const validate = () => {
@@ -1513,33 +1277,9 @@ const validate = () => {
 
 defineExpose({
   validate,
-  refreshSummaries: () => {
-    props.modelValue.forEach(agent => updateSummary(agent))
-  },
-  // 用明确的货值参数刷新所有代理商汇总（绕过 stale props.routeValue，供 handleSubmit 提交前调用）
-  refreshSummariesWithValue: (routeValue, routeValueCurrency) => {
-    const rv = parseFloat(routeValue) || 0
-    const rc = routeValueCurrency || 'RMB'
-    const rvRMB = rv * (exchangeRates[rc] || 1)
-
-    props.modelValue.forEach(agent => {
-      if (!agent.summary) {
-        agent.summary = { 小计手动: false, 小计: 0, 税率: 0, 税金手动: false, 税金: 0, 汇损率: 0, 汇损手动: false, 汇损: 0, 备注: '', 税率模式: 'simple', 税率明细: [] }
-      }
-      if (!agent.summary.税金手动) {
-        agent.summary.税金 = (agent.summary.税率模式 === 'multi' && agent.summary.税率明细?.length)
-          ? calcMultiTaxTotal(agent)
-          : rvRMB * (parseFloat(agent.summary.税率) || 0)
-      }
-      if (!agent.summary.汇损手动) {
-        agent.summary.汇损 = (agent.summary.税金 || 0) * (parseFloat(agent.summary.汇损率) || 0)
-      }
-      if (!agent.summary.小计手动) {
-        agent.summary.小计 = calculateSubtotal(agent)
-      }
-      agent.summary.总计 = (agent.summary.小计 || 0) + (agent.summary.税金 || 0) + (agent.summary.汇损 || 0)
-    })
-  },
+  refreshSummaries: () => props.modelValue.forEach(agent => updateSummary(agent)),
+  refreshSummariesWithValue: (routeValue, routeValueCurrency) =>
+    refreshSummariesWithValue(props.modelValue, routeValue, routeValueCurrency),
 })
 </script>
 
@@ -1611,6 +1351,16 @@ defineExpose({
 
 .fee-table :deep(.group-header-row) td {
   background-color: #f0f5ff !important;
+}
+
+.fee-table :deep(.excluded-row) td {
+  opacity: 0.45;
+}
+
+.min-fee-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .drag-handle {

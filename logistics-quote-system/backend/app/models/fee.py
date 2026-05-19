@@ -18,10 +18,12 @@ class FeeItem(Base):
     单位 = Column("单位", String(50), nullable=True)
     数量 = Column("数量", DECIMAL(18, 3), default=0)
     最低收费 = Column("最低收费", DECIMAL(18, 2), nullable=True)
+    最低收费币种 = Column("最低收费币种", String(20), nullable=True)
     币种 = Column("币种", String(20), default='RMB')
     原币金额 = Column("原币金额", DECIMAL(18, 2), default=0.00)
     人民币金额 = Column("人民币金额", DECIMAL(18, 2), default=0.00)
     备注 = Column("备注", String(255), nullable=True)
+    参与核算 = Column("参与核算", Integer, default=1, nullable=False)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
 
     # 关系
@@ -39,6 +41,7 @@ class FeeTotal(Base):
     币种 = Column("币种", String(20), default='RMB')
     人民币金额 = Column("人民币金额", DECIMAL(18, 2), default=0.00)
     备注 = Column("备注", String(255), nullable=True)
+    参与核算 = Column("参与核算", Integer, default=1, nullable=False)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
 
     # 关系

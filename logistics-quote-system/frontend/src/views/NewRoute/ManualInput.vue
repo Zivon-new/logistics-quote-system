@@ -580,35 +580,27 @@ const handleSubmit = async () => {
       return cleanAgent
     })
     
-    // ✅ 代理商去重
+    // 代理商去重：以(代理商, 运输方式)为复合key，允许同一代理商有多种运输方式的报价
     const agentMap = new Map()
     cleanAgents.forEach(agent => {
-      if (agentMap.has(agent.代理商)) {
-        const existing = agentMap.get(agent.代理商)
-        if (props.localEditMode) {
-          const hasFeeData = (a) => (a.fee_items && a.fee_items.length > 0) ||
-                                    (a.fee_total && a.fee_total.length > 0) ||
-                                    (a.summary && Object.keys(a.summary).length > 0 && a.summary.总计)
-          if (hasFeeData(agent) && !hasFeeData(existing)) {
-            agentMap.set(agent.代理商, agent)
-          } else if (hasFeeData(agent) && hasFeeData(existing)) {
-            const merged = { ...agent }
-            merged.fee_items = [...(existing.fee_items || []), ...(agent.fee_items || [])]
-            merged.fee_total = [...(existing.fee_total || []), ...(agent.fee_total || [])]
-            agentMap.set(agent.代理商, merged)
-          }
-        } else {
-          agentMap.set(agent.代理商, agent)
+      const key = `${agent.代理商}|${agent.运输方式 || ''}`
+      if (agentMap.has(key)) {
+        const existing = agentMap.get(key)
+        const hasFeeData = (a) => (a.fee_items && a.fee_items.length > 0) ||
+                                  (a.fee_total && a.fee_total.length > 0) ||
+                                  (a.summary && Object.keys(a.summary).length > 0 && a.summary.总计)
+        if (hasFeeData(agent) && !hasFeeData(existing)) {
+          agentMap.set(key, agent)
         }
       } else {
-        agentMap.set(agent.代理商, agent)
+        agentMap.set(key, agent)
       }
     })
     const uniqueAgents = Array.from(agentMap.values())
-    
+
     console.log('✅ 去重前agents数量:', cleanAgents.length)
     console.log('✅ 去重后agents数量:', uniqueAgents.length)
-    
+
     cleanAgents = uniqueAgents
     
     if (cleanAgents.length > 1) {
