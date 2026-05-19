@@ -71,9 +71,10 @@
 
         <!-- ✅ 新增：路线卡片列表，更直观 -->
         <div class="routes-list">
-          <el-card 
-            v-for="(route, index) in extractedRoutes" 
+          <el-card
+            v-for="(route, index) in extractedRoutes"
             :key="index"
+            :id="`route-card-${index}`"
             class="route-card"
             :class="{ 'route-card-editing': currentEditIndex === index }"
           >
@@ -149,12 +150,16 @@
 
         <div class="preview-actions">
           <el-button @click="backToUpload">重新上传</el-button>
-          <el-button 
-            type="primary" 
+          <el-button
+            v-if="unsavedCount > 0"
+            type="primary"
             @click="saveAll"
             :loading="saving"
           >
-            保存全部 {{ extractedRoutes.length }} 条路线
+            保存剩余 {{ unsavedCount }} 条路线
+          </el-button>
+          <el-button v-else type="success" disabled>
+            全部路线已保存
           </el-button>
         </div>
       </div>
@@ -185,7 +190,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { uploadAndExtractExcel, createRoute, updateRoute } from '@/api/route'
 import { UploadFilled, Document, Delete, QuestionFilled, Right, ArrowLeft } from '@element-plus/icons-vue'
@@ -206,6 +211,17 @@ const currentEditRoute = ref(null)
 const currentEditIndex = ref(-1)
 const editVersion = ref(0)  // 每次进入编辑时递增，强制ManualInput重新挂载
 const savedRouteIds = ref({})  // index -> routeId (saved routes)
+
+const unsavedCount = computed(() =>
+  extractedRoutes.value.filter((_, i) => !savedRouteIds.value[i]).length
+)
+
+const scrollToRoute = (index) => {
+  nextTick(() => {
+    const el = document.getElementById(`route-card-${index}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
 
 // 文件选择
 const handleFileChange = (file) => {
@@ -302,12 +318,9 @@ const toggleEdit = (index) => {
 
 // ✅ ManualInput 本地保存回调：把数据写回列表，返回步骤2
 const handleLocalSave = (submitData) => {
-  console.log('=== handleLocalSave 收到数据 ===')
-  console.log('submitData.agents:', JSON.stringify(submitData.agents, null, 2))
-  console.log('submitData.goods_details:', JSON.stringify(submitData.goods_details, null, 2))
-  console.log('===============================')
-  const original = extractedRoutes.value[currentEditIndex.value]
-  extractedRoutes.value[currentEditIndex.value] = {
+  const savedIndex = currentEditIndex.value
+  const original = extractedRoutes.value[savedIndex]
+  extractedRoutes.value[savedIndex] = {
     ...original,
     起始地: submitData.route?.起始地 ?? original.起始地,
     途径地: submitData.route?.途径地 ?? original.途径地,
@@ -323,14 +336,15 @@ const handleLocalSave = (submitData) => {
     goods_total: submitData.goods_total || original.goods_total || []
   }
   currentStep.value = 2
-  nextTick(() => window.scrollTo(0, 0))
+  scrollToRoute(savedIndex)
 }
 
 // ✅ 取消编辑，返回列表
 const cancelEdit = () => {
+  const savedIndex = currentEditIndex.value
   currentStep.value = 2
   currentEditRoute.value = null
-  nextTick(() => window.scrollTo(0, 0))
+  scrollToRoute(savedIndex)
 }
 
 // 单独保存一条路线

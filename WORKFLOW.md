@@ -97,56 +97,113 @@ project_root/
 
 ---
 
-## 三、开发任务与 gstack 技能对照
+## 三、开发任务与技能对照
+
+技能分两套，共存互补：
+- **gstack**（`/investigate`、`/qa`、`/ship` 等）— 侧重浏览器测试、PR 流程、代码审查
+- **mattpocock**（`/diagnose`、`/grill-with-docs`、`/improve-codebase-architecture`）— 侧重调试纪律、需求对齐、架构深度
+
+---
 
 ### 修 Bug
 
-遇到报错、页面异常、数据不对时，用 `/investigate`：
+**简单 Bug / 逻辑错误** → 用 `/investigate`（gstack）：
 
 ```
 /investigate  [描述现象，如：货值输入 500.06 时 0 录不进去]
 ```
 
-`/investigate` 会走完「收集症状 → 根因假设 → 验证 → 修复 → 回归测试」完整流程，**不会猜着改**。
+`/investigate` 走完「收集症状 → 根因假设 → 验证 → 修复 → 回归测试」完整流程。
+
+**复杂 Bug / 性能问题** → 用 `/diagnose`（mattpocock）：
+
+```
+/diagnose  [描述现象]
+```
+
+`/diagnose` 的核心理念是**先建可复现的反馈回路**，再假设、验证、修复。流程：
+1. 建反馈回路（失败测试 / curl 脚本 / 浏览器脚本）
+2. 复现确认
+3. 生成 3-5 个可证伪假设
+4. 精准打点验证
+5. 修复 + 回归测试
+6. 清理 + 记录根因到 commit
+
+> **选哪个？** 看 Bug 是否好复现：能快速复现 → `/investigate`；难复现/性能回归/需要最小化场景 → `/diagnose`
+
+---
 
 ### 功能开发
 
-开发新功能前，先用 `/office-hours` 拍板需求，再走规划：
+**第一步：需求拍板**
 
 ```
-/office-hours   [描述你想加的功能]
-/plan-eng-review   [让 AI 做架构评审，锁定实现方案]
+/grill-with-docs  [描述你想加的功能，如：加一个代理商黑名单功能]
 ```
 
-落地实现后用 `/review` 在提交前做一次代码审查：
+mattpocock 的 `/grill-with-docs` 会：
+- 逐一拷问你的方案，暴露模糊点
+- 参照 `CONTEXT.md` 里的领域词汇，纠正术语不一致
+- 把拍板的决定同步写入 `CONTEXT.md` 和 `docs/adr/`
+
+如果需求比较简单，也可以用轻量版：
 
 ```
-/review
+/office-hours  [描述功能]
 ```
+
+**第二步：架构评审**
+
+```
+/plan-eng-review  [让 AI 做架构评审，锁定实现方案]
+```
+
+**第三步：代码审查**
+
+```
+/review  # 提交前的最后一关
+```
+
+---
 
 ### 提交 & PR
 
-写完功能、修完 Bug，用 `/ship` 一键完成：版本号 → CHANGELOG → commit → push → PR：
-
 ```
-/ship
+/ship  # 版本号 → CHANGELOG → commit → push → PR，一键完成
 ```
 
-### UI / 前端调试
+---
 
-需要在真实浏览器里跑通用户流程时：
+### UI / 前端验证
 
 ```
 /qa   [描述要测试的功能，如：测试手动录入路线的 4 步流程]
 ```
 
-`/qa` 会跑完主路径和边界情况，自动修复发现的 bug。只想看报告不改代码用 `/qa-only`。
+`/qa` 跑完主路径和边界情况，自动修复发现的 bug。只看报告不改代码用 `/qa-only`。
+
+---
 
 ### 定期维护
 
+**每周**：
+
 ```
-/retro      # 每周工程复盘：commit 统计、代码质量趋势
+/retro      # 工程复盘：commit 统计、代码质量趋势
 /health     # 代码健康仪表盘：类型检查 + lint + 测试覆盖率
+```
+
+**每隔几周**（代码乱了就跑）：
+
+```
+/improve-codebase-architecture
+```
+
+mattpocock 的架构优化技能，扫描"浅模块"（接口复杂度 ≈ 实现复杂度，没有收益）并提出"深化"方案。做完后产出可以拿去 `/plan-eng-review` 评审。
+
+**安全**（有安全相关改动时）：
+
+```
 /cso        # 安全审计：密钥泄漏、OWASP Top 10、依赖漏洞
 ```
 
@@ -266,16 +323,37 @@ print('done')
 
 ## 八、快速命令参考
 
+### gstack 技能（浏览器测试 / PR 流程 / 审查）
+
 | 任务 | 命令 |
 |---|---|
-| 修 Bug | `/investigate` |
-| 功能规划 | `/office-hours` + `/plan-eng-review` |
+| 修 Bug（逻辑/简单） | `/investigate` |
+| 功能需求（轻量拍板） | `/office-hours` |
+| 架构评审 | `/plan-eng-review` |
 | 代码审查 | `/review` |
 | 提交 PR | `/ship` |
-| 浏览器测试 | `/qa` |
-| 纯报告 | `/qa-only` |
+| 浏览器测试 + 修 bug | `/qa` |
+| 浏览器测试（纯报告） | `/qa-only` |
 | 周复盘 | `/retro` |
 | 代码质量 | `/health` |
 | 安全审计 | `/cso` |
 | 保存进度 | `/context-save` |
 | 恢复进度 | `/context-restore` |
+
+### mattpocock 技能（调试纪律 / 需求对齐 / 架构深度）
+
+| 任务 | 命令 |
+|---|---|
+| 修 Bug（复杂/难复现） | `/diagnose` |
+| 功能需求（深度拍板 + 文档） | `/grill-with-docs` |
+| 架构深化（每隔几周跑一次） | `/improve-codebase-architecture` |
+
+### 选哪个？
+
+| 场景 | 推荐 |
+|---|---|
+| Bug 能快速复现 | `/investigate` |
+| Bug 难复现 / 性能 / 需最小化场景 | `/diagnose` |
+| 快速确认需求 | `/office-hours` |
+| 新功能涉及领域术语/架构决策 | `/grill-with-docs` |
+| 代码跑了几周开始乱 | `/improve-codebase-architecture` |

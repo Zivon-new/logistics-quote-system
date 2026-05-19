@@ -21,10 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 # 导入BaseExtractor
 from .base_extractor import BaseExtractor
-
-# 费用锚点关键词：比"代理"行更稳定，出现率更高
-# 同时被 FeeExtractor._detect_fee_column_from_anchors 使用，两处必须一致
-FEE_ANCHORS = ['小计', '合计', '总计', '海运费', '费用明细', '运费']
+from .shared_constants import FEE_ANCHORS  # noqa: F401 — re-exported for fee_extractor
 
 AIRLINE_CODES = {
     # 主要航空公司

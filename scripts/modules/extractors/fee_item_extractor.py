@@ -19,6 +19,7 @@ from typing import List, Optional
 from dataclasses import dataclass, asdict
 
 from .base_extractor import BaseExtractor
+from .shared_constants import CURRENCY_MAP
 
 
 @dataclass
@@ -43,19 +44,7 @@ class FeeItemExtractor(BaseExtractor):
     def __init__(self, logger=None, llm_client=None, enable_llm=True):
         super().__init__(logger, llm_client, enable_llm)
         
-        # 币种映射
-        self.currency_map = {
-            'CNY': 'RMB', 'RMB': 'RMB', '￥': 'RMB', '¥': 'RMB', '元': 'RMB',
-            'USD': 'USD', '$': 'USD',
-            'EUR': 'EUR', '€': 'EUR',
-            'GBP': 'GBP', '£': 'GBP',
-            'MYR': 'MYR', 'RM': 'MYR',
-            'SGD': 'SGD',  # ✅ 修复问题5：添加新加坡元
-            'HKD': 'HKD',  # 港币
-            'JPY': 'JPY',  # 日元
-            'AUD': 'AUD',  # 澳元
-            'CAD': 'CAD',  # 加元
-        }
+        self.currency_map = CURRENCY_MAP
         
         # 费用类型关键词（向前查找）
         self.fee_type_keywords = [

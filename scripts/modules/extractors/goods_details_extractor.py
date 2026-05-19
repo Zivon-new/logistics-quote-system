@@ -146,13 +146,8 @@ class GoodsDetailsExtractor(BaseExtractor):
             '原产国':    ['原产国', '原产地', '产地', 'country of origin', 'origin'],
         }
 
-        self.currency_map = {
-            '￥': 'RMB', '¥': 'RMB', '元': 'RMB', 'RMB': 'RMB', 'CNY': 'RMB',
-            '$': 'USD', 'USD': 'USD',
-            '€': 'EUR', 'EUR': 'EUR',
-            '£': 'GBP', 'GBP': 'GBP',
-            'SGD': 'SGD', 'MYR': 'MYR', 'HKD': 'HKD', 'JPY': 'JPY',
-        }
+        from .shared_constants import CURRENCY_MAP
+        self.currency_map = CURRENCY_MAP
         # 国家代码→货币（如 Country 列值为 "US" 表示 USD 计价）
         self.country_code_currency = {
             'US': 'USD', 'EU': 'EUR', 'GB': 'GBP', 'UK': 'GBP',
