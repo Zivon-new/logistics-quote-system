@@ -293,8 +293,9 @@
       class="detail-dialog"
     >
       <div v-if="currentAgent && currentRoute" class="detail-container">
-        <el-row :gutter="20">
-          <!-- 左：路线 + 货物 + 智能评分 -->
+
+        <!-- ── 第一行：基本信息（左）+ 代理商信息（右）── -->
+        <el-row :gutter="20" style="margin-bottom:16px">
           <el-col :span="12">
             <div class="detail-section">
               <h3>基本信息</h3>
@@ -309,80 +310,7 @@
                 <el-descriptions-item label="货值">¥{{ currentRoute.货值 }}</el-descriptions-item>
               </el-descriptions>
             </div>
-
-            <div class="detail-section" v-if="currentRoute.goods_details?.length || currentRoute.goods_total?.length">
-              <h3>货物信息</h3>
-              <el-table v-if="currentRoute.goods_details?.length" :data="currentRoute.goods_details" border stripe size="small" style="margin-bottom:12px">
-                <el-table-column prop="货物名称" label="货物名称" min-width="140" />
-                <el-table-column prop="货物种类" label="种类" width="90" />
-                <el-table-column label="新品" width="60" align="center">
-                  <template #default="{ row }">
-                    <el-tag :type="isNewProduct(row.是否新品) ? 'success' : 'info'" size="small">
-                      {{ isNewProduct(row.是否新品) ? '是' : '否' }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="数量" label="数量" width="60" align="right" />
-                <el-table-column label="总重(kg)" width="80" align="right">
-                  <template #default="{ row }">{{ row['总重量(/kg)'] || 0 }}</template>
-                </el-table-column>
-                <el-table-column label="总价" width="90" align="right">
-                  <template #default="{ row }">¥{{ (row.总货值 || row.总价 || 0).toFixed?.(2) }}</template>
-                </el-table-column>
-                <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
-              </el-table>
-              <div v-if="currentRoute.goods_total?.length" class="goods-total-list">
-                <div v-for="g in currentRoute.goods_total" :key="g.整单货物ID" class="goods-total-item">
-                  <span>{{ g.货物名称 || '整单' }}</span>
-                  <span>实重 {{ g['实际重量(/kg)'] }} kg · 货值 ¥{{ g.货值?.toFixed(2) }} · 体积 {{ g['总体积(/cbm)'] }} cbm</span>
-                  <span v-if="g.备注" class="dim">备注：{{ g.备注 }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 智能评分放在左侧底部 -->
-            <div class="detail-section score-section" v-if="currentAgent.综合评分 != null">
-              <h3>智能评分</h3>
-              <div class="score-overview">
-                <div class="score-circle-wrap">
-                  <el-progress
-                    type="circle"
-                    :percentage="currentAgent.综合评分"
-                    :color="scoreColor(currentAgent.综合评分)"
-                    :width="80"
-                    :stroke-width="7"
-                  >
-                    <template #default>
-                      <span class="score-big">{{ currentAgent.综合评分 }}</span>
-                    </template>
-                  </el-progress>
-                  <div class="dim" style="font-size:12px;margin-top:4px">综合评分</div>
-                </div>
-                <div class="score-dims">
-                  <div v-for="dim in [
-                    {label:'时效', val: currentAgent.各项得分?.时效得分, tip:'时效天数越短越高'},
-                    {label:'价格', val: currentAgent.各项得分?.价格得分, tip:'报价越低越高'},
-                    {label:'LPI',  val: currentAgent.各项得分?.LPI得分,  tip:'目的国物流绩效指数'},
-                    {label:'信用', val: currentAgent.各项得分?.信用得分, tip:'代理商信用评分'},
-                  ]" :key="dim.label" class="dim-row">
-                    <el-tooltip :content="`${dim.label}得分（${dim.tip}）`" placement="top">
-                      <span class="dim-label">{{ dim.label }}</span>
-                    </el-tooltip>
-                    <el-progress
-                      :percentage="dim.val ?? 0"
-                      :color="scoreColor(dim.val ?? 0)"
-                      :show-text="false"
-                      :stroke-width="6"
-                      style="flex:1"
-                    />
-                    <span class="dim-val">{{ dim.val ?? '—' }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </el-col>
-
-          <!-- 右：代理商 + 费用明细 + 汇总 -->
           <el-col :span="12">
             <div class="detail-section">
               <h3>代理商信息</h3>
@@ -399,94 +327,168 @@
                   </el-tag>
                 </el-descriptions-item>
                 <el-descriptions-item label="赔付内容">{{ currentAgent.赔付内容 || '—' }}</el-descriptions-item>
-                <el-descriptions-item v-if="currentAgent.代理备注" label="备注" :span="2">
-                  {{ currentAgent.代理备注 }}
-                </el-descriptions-item>
+                <el-descriptions-item v-if="currentAgent.代理备注" label="备注" :span="2">{{ currentAgent.代理备注 }}</el-descriptions-item>
               </el-descriptions>
             </div>
+          </el-col>
+        </el-row>
 
+        <!-- ── 第二行：费用明细（全宽）── -->
+        <div class="detail-section" style="margin-bottom:16px">
+          <h3>费用明细</h3>
+
+          <div v-if="currentAgent.fee_items?.length" style="margin-bottom:16px">
+            <p class="sub-table-title">明细费用（{{ currentAgent.fee_items.filter(i => i.备注 !== '__GROUP_HEADER__').length }}条）</p>
+            <el-table
+              :data="currentAgent.fee_items"
+              border size="small"
+              :span-method="detailFeeItemSpanMethod"
+              :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'detail-group-header-row' : (row.参与核算 === 0 || row.参与核算 === false ? 'excluded-view-row' : '')"
+            >
+              <el-table-column label="费用类型" min-width="140">
+                <template #default="{ row }">
+                  <div v-if="row.备注 === '__GROUP_HEADER__'" class="detail-group-header-cell">
+                    <span class="detail-group-icon">◆</span>
+                    <span>{{ row.费用类型 }}</span>
+                  </div>
+                  <span v-else>{{ row.费用类型 }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="单价" width="130" align="right">
+                <template #default="{ row }">
+                  {{ row.单价 }}{{ row.币种 }}{{ row.单位 ? '/' + row.单位.replace('/','') : '' }}
+                </template>
+              </el-table-column>
+              <el-table-column label="数量" width="70" align="right">
+                <template #default="{ row }">{{ Number(row.数量).toFixed(0) }}</template>
+              </el-table-column>
+              <el-table-column label="最低收费" width="110" align="right">
+                <template #default="{ row }">
+                  <span v-if="row.最低收费" style="color:#8c8c8c;font-size:12px">
+                    min {{ row.最低收费 }} {{ row.最低收费币种 || row.币种 }}
+                  </span>
+                  <span v-else class="dim">—</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="原币金额" width="120" align="right">
+                <template #default="{ row }">
+                  <el-tooltip v-if="row.最低收费 && row.原币金额 >= row.最低收费 && (row.单价 * row.数量) < row.最低收费" content="已应用最低收费" placement="top">
+                    <span style="color:#fa8c16;font-weight:600">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</span>
+                  </el-tooltip>
+                  <span v-else>{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="人民币" width="100" align="right">
+                <template #default="{ row }">
+                  <span class="rmb-amount">¥{{ row.人民币金额?.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="核算" width="70" align="center">
+                <template #default="{ row }">
+                  <el-tag
+                    v-if="row.备注 !== '__GROUP_HEADER__' && (row.参与核算 === 0 || row.参与核算 === false)"
+                    type="info" size="small" effect="plain"
+                  >已排除</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="备注" min-width="200">
+                <template #default="{ row }">
+                  <span v-if="row.备注 && row.备注 !== '__GROUP_HEADER__'" class="remark-text">{{ row.备注 }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div v-if="currentAgent.fee_total?.length">
+            <p class="sub-table-title">整单费用（{{ currentAgent.fee_total.filter(i => i.备注 !== '__GROUP_HEADER__').length }}条）</p>
+            <el-table
+              :data="currentAgent.fee_total"
+              border size="small"
+              :span-method="detailFeeTotalSpanMethod"
+              :row-class-name="({ row }) => row.备注 === '__GROUP_HEADER__' ? 'detail-group-header-row' : (row.参与核算 === 0 || row.参与核算 === false ? 'excluded-view-row' : '')"
+            >
+              <el-table-column label="整单费用" min-width="180">
+                <template #default="{ row }">
+                  <div v-if="row.备注 === '__GROUP_HEADER__'" class="detail-group-header-cell">
+                    <span class="detail-group-icon">◆</span>
+                    <span>{{ row.费用名称 }}</span>
+                  </div>
+                  <span v-else>{{ row.费用名称 }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="原币金额" width="150" align="right">
+                <template #default="{ row }">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</template>
+              </el-table-column>
+              <el-table-column label="人民币" width="110" align="right">
+                <template #default="{ row }">
+                  <span class="rmb-amount">¥{{ row.人民币金额?.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="核算" width="70" align="center">
+                <template #default="{ row }">
+                  <el-tag
+                    v-if="row.备注 !== '__GROUP_HEADER__' && (row.参与核算 === 0 || row.参与核算 === false)"
+                    type="info" size="small" effect="plain"
+                  >已排除</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="备注" min-width="200">
+                <template #default="{ row }">
+                  <span v-if="row.备注 && row.备注 !== '__GROUP_HEADER__'" class="remark-text">{{ row.备注 }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <el-empty v-if="!currentAgent.fee_items?.length && !currentAgent.fee_total?.length"
+            description="暂无费用明细" :image-size="60" />
+        </div>
+
+        <!-- ── 第三行：货物信息（左）+ 费用汇总+智能评分（右）── -->
+        <el-row :gutter="20" style="margin-bottom:16px">
+          <el-col :span="10">
             <div class="detail-section">
-              <h3>费用明细</h3>
-              <el-table
-                v-if="currentAgent.fee_items?.length"
-                :data="currentAgent.fee_items"
-                border stripe size="small"
-                style="margin-bottom:12px"
-                :span-method="detailFeeItemSpanMethod"
-                :row-class-name="detailRowClassName"
-              >
-                <el-table-column label="费用类型" min-width="110">
-                  <template #default="{ row }">
-                    <div v-if="row.备注 === '__GROUP_HEADER__'" class="detail-group-header-cell">
-                      <span class="detail-group-icon">◆</span>
-                      <span>{{ row.费用类型 }}</span>
-                    </div>
-                    <span v-else>{{ row.费用类型 }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="单价" width="120" align="right">
-                  <template #default="{ row }">
-                    {{ row.单价 }}{{ row.币种 }}{{ row.单位 ? '/' + row.单位.replace('/','') : '' }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="数量" width="60" align="right">
-                  <template #default="{ row }">{{ Number(row.数量).toFixed(0) }}</template>
-                </el-table-column>
-                <el-table-column label="最低收费" width="90" align="right">
-                  <template #default="{ row }">
-                    <span v-if="row.最低收费" style="color:#8c8c8c;font-size:12px">
-                      min {{ row.最低收费 }} {{ row.币种 }}
-                    </span>
-                    <span v-else class="dim">—</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="原币金额" width="100" align="right">
-                  <template #default="{ row }">
-                    <el-tooltip v-if="row.最低收费 && row.原币金额 >= row.最低收费 && (row.单价 * row.数量) < row.最低收费" content="已应用最低收费" placement="top">
-                      <span style="color:#fa8c16;font-weight:600">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</span>
-                    </el-tooltip>
-                    <span v-else>{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="人民币" width="90" align="right">
-                  <template #default="{ row }">
-                    <span class="rmb-amount">¥{{ row.人民币金额?.toFixed(2) }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
-              </el-table>
-
-              <el-table
-                v-if="currentAgent.fee_total?.length"
-                :data="currentAgent.fee_total"
-                border stripe size="small"
-                :span-method="detailFeeTotalSpanMethod"
-                :row-class-name="detailRowClassName"
-              >
-                <el-table-column label="整单费用" min-width="130">
-                  <template #default="{ row }">
-                    <div v-if="row.备注 === '__GROUP_HEADER__'" class="detail-group-header-cell">
-                      <span class="detail-group-icon">◆</span>
-                      <span>{{ row.费用名称 }}</span>
-                    </div>
-                    <span v-else>{{ row.费用名称 }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="原币金额" width="120" align="right">
-                  <template #default="{ row }">{{ row.原币金额?.toFixed(2) }} {{ row.币种 }}</template>
-                </el-table-column>
-                <el-table-column label="人民币" width="90" align="right">
-                  <template #default="{ row }">
-                    <span class="rmb-amount">¥{{ row.人民币金额?.toFixed(2) }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
-              </el-table>
-
-              <el-empty v-if="!currentAgent.fee_items?.length && !currentAgent.fee_total?.length"
-                description="暂无费用明细" :image-size="60" />
+              <h3>货物信息</h3>
+              <div v-if="currentRoute.goods_details?.length" style="margin-bottom:12px">
+                <p class="sub-table-title">货物明细</p>
+                <el-table :data="currentRoute.goods_details" border size="small" max-height="300">
+                  <el-table-column prop="货物名称" label="货物名称" min-width="120" />
+                  <el-table-column prop="货物种类" label="种类" width="80" />
+                  <el-table-column label="新品" width="55" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="isNewProduct(row.是否新品) ? 'success' : 'info'" size="small">
+                        {{ isNewProduct(row.是否新品) ? '是' : '否' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="数量" label="数量" width="55" align="right" />
+                  <el-table-column label="总重" width="70" align="right">
+                    <template #default="{ row }">{{ row['总重量(/kg)'] || 0 }}kg</template>
+                  </el-table-column>
+                  <el-table-column label="总价" width="80" align="right">
+                    <template #default="{ row }">¥{{ (row.总货值 || row.总价 || 0).toFixed?.(2) }}</template>
+                  </el-table-column>
+                  <el-table-column label="备注" min-width="90">
+                    <template #default="{ row }">
+                      <span v-if="row.备注" class="remark-text">{{ row.备注 }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+              <div v-if="currentRoute.goods_total?.length" class="goods-total-list">
+                <p class="sub-table-title">整单货物</p>
+                <div v-for="g in currentRoute.goods_total" :key="g.整单货物ID" class="goods-total-item">
+                  <span>{{ g.货物名称 || '整单' }}</span>
+                  <span>实重 {{ g['实际重量(/kg)'] }} kg · 货值 ¥{{ g.货值?.toFixed(2) }} · 体积 {{ g['总体积(/cbm)'] }} cbm</span>
+                  <p v-if="g.备注" class="remark-text" style="margin:2px 0 0">{{ g.备注 }}</p>
+                </div>
+              </div>
+              <el-empty v-if="!currentRoute.goods_details?.length && !currentRoute.goods_total?.length"
+                description="暂无货物信息" :image-size="60" />
             </div>
+          </el-col>
 
+          <el-col :span="14">
             <div v-if="currentAgent.summary" class="detail-section">
               <h3>费用汇总</h3>
               <el-descriptions :column="2" border size="small">
@@ -507,11 +509,42 @@
                 </el-descriptions-item>
               </el-descriptions>
             </div>
+
+            <!-- 智能评分 -->
+            <div class="detail-section score-section" v-if="currentAgent.综合评分 != null">
+              <h3>智能评分</h3>
+              <div class="score-overview">
+                <div class="score-circle-wrap">
+                  <el-progress type="circle" :percentage="currentAgent.综合评分"
+                    :color="scoreColor(currentAgent.综合评分)" :width="80" :stroke-width="7">
+                    <template #default>
+                      <span class="score-big">{{ currentAgent.综合评分 }}</span>
+                    </template>
+                  </el-progress>
+                  <div class="dim" style="font-size:12px;margin-top:4px">综合评分</div>
+                </div>
+                <div class="score-dims">
+                  <div v-for="dim in [
+                    {label:'时效', val: currentAgent.各项得分?.时效得分, tip:'时效天数越短越高'},
+                    {label:'价格', val: currentAgent.各项得分?.价格得分, tip:'报价越低越高'},
+                    {label:'LPI',  val: currentAgent.各项得分?.LPI得分,  tip:'目的国物流绩效指数'},
+                    {label:'信用', val: currentAgent.各项得分?.信用得分, tip:'代理商信用评分'},
+                  ]" :key="dim.label" class="dim-row">
+                    <el-tooltip :content="`${dim.label}得分（${dim.tip}）`" placement="top">
+                      <span class="dim-label">{{ dim.label }}</span>
+                    </el-tooltip>
+                    <el-progress :percentage="dim.val ?? 0" :color="scoreColor(dim.val ?? 0)"
+                      :show-text="false" :stroke-width="6" style="flex:1" />
+                    <span class="dim-val">{{ dim.val ?? '—' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </el-col>
         </el-row>
 
         <!-- 附件区 -->
-        <div class="detail-section" style="margin-top:16px" v-if="currentRoute">
+        <div class="detail-section" v-if="currentRoute">
           <h3>路线附件</h3>
           <AttachmentPanel :route-id="currentRoute.路线ID" :readonly="true" />
         </div>
@@ -901,19 +934,18 @@ const viewDetail = (agent, route) => {
   detailVisible.value = true
 }
 
-const detailRowClassName = ({ row }) =>
-  row.备注 === '__GROUP_HEADER__' ? 'detail-group-header-row' : ''
-
 const detailFeeItemSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {
-    return columnIndex === 0 ? [1, 7] : [0, 0]
+    // 8列：费用类型/单价/数量/最低收费/原币/人民币/核算/备注
+    return columnIndex === 0 ? [1, 8] : [0, 0]
   }
   return [1, 1]
 }
 
 const detailFeeTotalSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {
-    return columnIndex === 0 ? [1, 4] : [0, 0]
+    // 5列：整单费用/原币/人民币/核算/备注
+    return columnIndex === 0 ? [1, 5] : [0, 0]
   }
   return [1, 1]
 }
@@ -921,6 +953,27 @@ const detailFeeTotalSpanMethod = ({ row, columnIndex }) => {
 
 <style scoped>
 .page-title { font-size: 22px; font-weight: 600; color: #262626; margin-bottom: 16px; }
+
+.sub-table-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #595959;
+  margin: 0 0 8px;
+}
+
+.remark-text {
+  font-size: 13px;
+  color: #434343;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+:deep(.excluded-view-row) td {
+  background-color: #fafafa !important;
+  color: #bfbfbf !important;
+  text-decoration: line-through;
+}
 
 .search-form { margin-bottom: 12px; border-radius: 8px; }
 .search-form :deep(.el-form-item) { margin-bottom: 12px; }
