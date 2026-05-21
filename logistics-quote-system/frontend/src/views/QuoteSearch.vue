@@ -177,6 +177,14 @@
             实重 {{ route.实际重量 }} kg
             <template v-if="route.计费重量">· 计费重 {{ route.计费重量 }} kg</template>
           </span>
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :icon="Download"
+            style="margin-left:auto"
+            @click.stop="doExportRoutes([route])"
+          >导出</el-button>
         </div>
 
         <!-- 代理商表格 -->
@@ -620,6 +628,7 @@ import { searchQuotes } from '@/api/quote'
 import { getSearchOptions } from '@/api/recommend'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
+
 const route = useRoute()
 const loading = ref(false)
 
@@ -684,75 +693,106 @@ const toggleSelect = (agent, route) => {
 }
 
 // 对比表行定义
-const compareRows = computed(() => [
-  { key: 's1', isSection: true, label: '基本信息' },
-  { key: '运输方式', label: '运输方式', render: ({ agent }) => agent.运输方式 || '—' },
-  { key: '贸易类型', label: '贸易类型', render: ({ agent }) => agent.贸易类型 || '—' },
-  {
-    key: '时效天数', label: '时效', numeric: true, lowerBetter: true,
-    getValue: ({ agent }) => agent.时效天数,
-    render: ({ agent }) => agent.时效天数 ? `${agent.时效天数} 天` : (agent.时效 || '—'),
-  },
-  { key: '是否赔付', label: '赔付保障', render: ({ agent }) => isCompensation(agent.是否赔付) ? '<span style="color:#52c41a;font-weight:600">✔ 有赔付</span>' : '<span style="color:#bfbfbf">✘ 无赔付</span>' },
-  { key: '赔付内容', label: '赔付说明', render: ({ agent }) => agent.赔付内容 || '—' },
-  { key: '不含', label: '不含项目', render: ({ agent }) => agent.不含 || '—' },
+const compareRows = computed(() => {
+  // 收集所有代理商的明细费用和整单费用名称（保序去重）
+  const seenItems = new Set(), seenTotal = new Set()
+  const feeItemNames = [], feeTotalNames = []
+  selectedAgents.value.forEach(({ agent }) => {
+    ;(agent.fee_items || []).forEach(i => {
+      if (i.备注 === '__GROUP_HEADER__') return
+      if (!seenItems.has(i.费用类型)) { seenItems.add(i.费用类型); feeItemNames.push(i.费用类型) }
+    })
+    ;(agent.fee_total || []).forEach(i => {
+      if (i.备注 === '__GROUP_HEADER__') return
+      if (!seenTotal.has(i.费用名称)) { seenTotal.add(i.费用名称); feeTotalNames.push(i.费用名称) }
+    })
+  })
 
-  { key: 's2', isSection: true, label: '综合评分' },
-  {
-    key: '综合评分', label: '综合评分', numeric: true, lowerBetter: false,
-    getValue: ({ agent }) => agent.综合评分,
-    render: ({ agent }) => agent.综合评分 != null ? `<strong>${agent.综合评分}</strong> / 100` : '—',
-  },
-  {
-    key: '时效得分', label: '时效得分', numeric: true, lowerBetter: false,
-    getValue: ({ agent }) => agent.各项得分?.时效得分,
-    render: ({ agent }) => agent.各项得分?.时效得分 ?? '—',
-  },
-  {
-    key: '价格得分', label: '价格得分', numeric: true, lowerBetter: false,
-    getValue: ({ agent }) => agent.各项得分?.价格得分,
-    render: ({ agent }) => agent.各项得分?.价格得分 ?? '—',
-  },
-  {
-    key: 'LPI得分', label: 'LPI得分', numeric: true, lowerBetter: false,
-    getValue: ({ agent }) => agent.各项得分?.LPI得分,
-    render: ({ agent }) => agent.各项得分?.LPI得分 ?? '—',
-  },
-  {
-    key: '信用得分', label: '信用得分', numeric: true, lowerBetter: false,
-    getValue: ({ agent }) => agent.各项得分?.信用得分,
-    render: ({ agent }) => agent.各项得分?.信用得分 ?? '—',
-  },
+  const feeRender = (val, orig, currency) => {
+    if (val == null) return '<span style="color:#bbb">—</span>'
+    const rmb = val > 0 ? `¥ ${val.toFixed(2)}` : '¥ 0.00'
+    const hint = currency && currency !== 'RMB' && currency !== 'CNY' && orig > 0
+      ? `<br><span style="color:#8c8c8c;font-size:11px">${orig.toFixed(2)} ${currency}</span>`
+      : ''
+    return rmb + hint
+  }
 
-  { key: 's3', isSection: true, label: '费用（CNY）' },
-  {
-    key: '总费用', label: '小计（不含税汇损）', numeric: true, lowerBetter: true,
-    getValue: ({ agent }) => agent.总费用 > 0 ? agent.总费用 : null,
-    render: ({ agent }) => agent.总费用 > 0 ? `¥ ${agent.总费用.toFixed(2)}` : '—',
-  },
-  {
-    key: '总计', label: '总计（含税汇损）', numeric: true, lowerBetter: true,
-    getValue: ({ agent }) => agent.summary?.总计 > 0 ? agent.summary.总计 : null,
-    render: ({ agent }) => agent.summary?.总计 > 0 ? `¥ ${agent.summary.总计.toFixed(2)}` : '—',
-  },
-  { key: '税率', label: '税率', render: ({ agent }) => {
-    if (agent.summary?.进口税率原文) {
-      try {
-        const details = JSON.parse(agent.summary.进口税率原文)
-        return details.map((r, i) => `${r.货物名称 || ('货物'+(i+1))}：${r.税率说明 ? (r.税率说明 + ' ') : ''}${r.综合税率}%`).join('<br>')
-      } catch { return '多档税率' }
-    }
-    return agent.summary?.税率 != null ? (agent.summary.税率 * 100).toFixed(2) + '%' : '—'
-  }},
-  { key: '汇损率', label: '汇损率', render: ({ agent }) => agent.summary?.汇损率 != null ? (agent.summary.汇损率 * 100).toFixed(4) + '%' : '—' },
+  const feeItemRows = feeItemNames.map(name => ({
+    key: `fi_${name}`, label: name, numeric: true, lowerBetter: true,
+    getValue: ({ agent }) => {
+      const i = (agent.fee_items || []).find(x => x.费用类型 === name && x.备注 !== '__GROUP_HEADER__')
+      return i ? i.人民币金额 : null
+    },
+    render: ({ agent }) => {
+      const i = (agent.fee_items || []).find(x => x.费用类型 === name && x.备注 !== '__GROUP_HEADER__')
+      return i ? feeRender(i.人民币金额, i.原币金额, i.币种) : feeRender(null)
+    },
+  }))
 
-  { key: 's4', isSection: true, label: '路线信息' },
-  { key: '路线', label: '路线', render: ({ route }) => `${route.起始地} → ${route.目的地}` },
-  { key: '途径地', label: '途径地', render: ({ route }) => route.途径地 || '—' },
-  { key: '货物名称', label: '货物名称', render: ({ route }) => route.货物名称 || '—' },
-  { key: '交易日期', label: '报价日期', render: ({ route }) => `${route.交易开始日期 || '—'} 至 ${route.交易结束日期 || '—'}` },
-  { key: '实际重量', label: '实际重量', render: ({ route }) => route.实际重量 ? `${route.实际重量} kg` : '—' },
-])
+  const feeTotalRows = feeTotalNames.map(name => ({
+    key: `ft_${name}`, label: name, numeric: true, lowerBetter: true,
+    getValue: ({ agent }) => {
+      const i = (agent.fee_total || []).find(x => x.费用名称 === name && x.备注 !== '__GROUP_HEADER__')
+      return i ? i.人民币金额 : null
+    },
+    render: ({ agent }) => {
+      const i = (agent.fee_total || []).find(x => x.费用名称 === name && x.备注 !== '__GROUP_HEADER__')
+      return i ? feeRender(i.人民币金额, i.原币金额, i.币种) : feeRender(null)
+    },
+  }))
+
+  return [
+    // ── 方案概览 ──────────────────────────────────────────────────
+    { key: 's1', isSection: true, label: '方案概览' },
+    { key: '运输方式', label: '运输方式', render: ({ agent }) => agent.运输方式 || '—' },
+    { key: '贸易类型', label: '贸易类型', render: ({ agent }) => agent.贸易类型 || '—' },
+    {
+      key: '时效天数', label: '时效', numeric: true, lowerBetter: true,
+      getValue: ({ agent }) => agent.时效天数,
+      render: ({ agent }) => agent.时效天数 ? `${agent.时效天数} 天` : (agent.时效 || '—'),
+    },
+    {
+      key: '综合评分', label: '综合评分', numeric: true, lowerBetter: false,
+      getValue: ({ agent }) => agent.综合评分,
+      render: ({ agent }) => agent.综合评分 != null ? `<strong>${agent.综合评分}</strong> / 100` : '—',
+    },
+    { key: '税率', label: '税率', render: ({ agent }) => {
+      if (agent.summary?.进口税率原文) {
+        try {
+          const d = JSON.parse(agent.summary.进口税率原文)
+          return d.map((r, i) => `${r.货物名称 || ('货物'+(i+1))}：${r.税率说明 ? r.税率说明+' ' : ''}${r.综合税率}%`).join('<br>')
+        } catch { return '多档税率' }
+      }
+      return agent.summary?.税率 != null ? (agent.summary.税率 * 100).toFixed(2) + '%' : '—'
+    }},
+    { key: '汇损率', label: '汇损率', render: ({ agent }) => agent.summary?.汇损率 != null ? (agent.summary.汇损率 * 100).toFixed(4) + '%' : '—' },
+
+    // ── 明细费用（逐项人民币对比）───────────────────────────────────
+    ...(feeItemNames.length ? [
+      { key: 's2', isSection: true, label: '明细费用（人民币）' },
+      ...feeItemRows,
+    ] : []),
+
+    // ── 整单费用（逐项人民币对比）───────────────────────────────────
+    ...(feeTotalNames.length ? [
+      { key: 's3', isSection: true, label: '整单费用（人民币）' },
+      ...feeTotalRows,
+    ] : []),
+
+    // ── 合计 ──────────────────────────────────────────────────────
+    { key: 's4', isSection: true, label: '合计' },
+    {
+      key: '总费用', label: '小计（税前）', numeric: true, lowerBetter: true,
+      getValue: ({ agent }) => agent.总费用 > 0 ? agent.总费用 : null,
+      render: ({ agent }) => agent.总费用 > 0 ? `¥ ${agent.总费用.toFixed(2)}` : '—',
+    },
+    {
+      key: '总计', label: '总计（含税汇损）', numeric: true, lowerBetter: true,
+      getValue: ({ agent }) => agent.summary?.总计 > 0 ? agent.summary.总计 : null,
+      render: ({ agent }) => agent.summary?.总计 > 0 ? `<strong>¥ ${agent.summary.总计.toFixed(2)}</strong>` : '—',
+    },
+  ]
+})
 
 // 获取某行的最优/最差值集合（用于高亮）
 const getRowExtremes = (row) => {
@@ -882,38 +922,163 @@ const handleSearch = async () => {
   }
 }
 
-const handleExport = () => {
-  if (!quoteResults.value.length) {
+const doExportRoutes = async (routeRows) => {
+  if (!routeRows.length) {
     ElMessage.warning('没有可导出的数据，请先查询')
     return
   }
-  const rows = []
-  rows.push(['路线', '代理商', '运输方式', '贸易类型', '时效(天)', '小计(CNY)', '总计(CNY)', '综合评分', '是否赔付'])
-  for (const route of quoteResults.value) {
-    for (const agent of route.agents || []) {
-      rows.push([
-        `${route.起始地}→${route.目的地}`,
-        agent.代理商 || '',
-        agent.运输方式 || '',
-        agent.贸易类型 || '',
-        agent.时效天数 ?? '',
-        agent.总费用 > 0 ? agent.总费用.toFixed(2) : '',
-        agent.summary?.总计 > 0 ? agent.summary.总计.toFixed(2) : '',
-        agent.综合评分 ?? '',
-        (agent.是否赔付 === 1 || agent.是否赔付 === '1') ? '是' : '否',
-      ])
+
+  let ExcelJS
+  try {
+    ExcelJS = (await import('exceljs')).default
+  } catch {
+    ElMessage.error('导出组件加载失败，请刷新页面后重试')
+    return
+  }
+  const date = new Date().toISOString().slice(0, 10)
+
+  const buildFeeDetail = (agent) => {
+    const lines = []
+    const items = (agent.fee_items || []).filter(f => f.备注 !== '__GROUP_HEADER__')
+    for (const item of items) {
+      const cur = item.币种 || 'RMB'
+      const 单位 = item.单位 || ''
+      let line
+      if (单位) {
+        // 按单位计费：显示单价
+        line = `${item.费用类型 || '费用'}: ${cur} ${Number(item.单价 || 0).toFixed(2)}${单位}`
+      } else {
+        // 固定收费：直接显示总价
+        line = `${item.费用类型 || '费用'}: ${cur} ${Number(item.原币金额 || 0).toFixed(2)}`
+      }
+      if (item.最低收费 != null && Number(item.最低收费) > 0) {
+        const minCur = item.最低收费币种 || cur
+        line += `, min ${minCur} ${Number(item.最低收费).toFixed(2)}`
+      }
+      if (item.参与核算 === 0) line += ' [不参与核算]'
+      if (item.备注?.trim()) line += ` (${item.备注.trim()})`
+      lines.push(line)
+    }
+    const totals = (agent.fee_total || []).filter(f => f.备注 !== '__GROUP_HEADER__')
+    if (totals.length) {
+      if (lines.length) lines.push('── 整单费用 ──')
+      for (const item of totals) {
+        const cur = item.币种 || 'RMB'
+        let line = `${item.费用名称 || '费用'}: ${cur} ${Number(item.原币金额 || 0).toFixed(2)}`
+        if (item.参与核算 === 0) line += ' [不参与核算]'
+        if (item.备注?.trim()) line += ` (${item.备注.trim()})`
+        lines.push(line)
+      }
+    }
+    return lines.join('\n')
+  }
+
+  // 税率只显示百分比数字，多档去重后斜杠分隔，e.g. "9% / 6%"
+  const buildTaxRate = (summary) => {
+    if (!summary) return ''
+    if (summary.进口税率原文) {
+      try {
+        const details = JSON.parse(summary.进口税率原文)
+        const rates = [...new Set(details.map(r => `${r.综合税率}%`))]
+        return rates.join(' / ')
+      } catch { /* fall through */ }
+    }
+    return summary.税率 != null ? (summary.税率 * 100).toFixed(2) + '%' : ''
+  }
+
+  const buildTaxRawText = (summary) => {
+    if (!summary?.进口税率原文) return ''
+    try {
+      const details = JSON.parse(summary.进口税率原文)
+      return details.map((r, i) =>
+        `${r.货物名称 || ('货物' + (i + 1))}：${r.税率说明 ? r.税率说明 + ' ' : ''}${r.综合税率}%`
+      ).join('\n')
+    } catch {
+      return summary.进口税率原文
     }
   }
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-  const bom = '﻿'
-  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `报价查询_${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+
+  const buildExchangeLoss = (summary) => {
+    if (!summary) return ''
+    const rate = summary.汇损率 != null ? (summary.汇损率 * 100).toFixed(4) + '%' : ''
+    const amount = Number(summary.汇损 || 0).toFixed(2)
+    return rate ? `CNY ${amount} (汇损率 ${rate})` : `CNY ${amount}`
+  }
+
+  const wrapAlign = { wrapText: true, vertical: 'top' }
+
+  for (const routeRow of routeRows) {
+    const agents = (routeRow.agents || [])
+    if (!agents.length) continue
+
+    const routeInfo = [
+      `${routeRow.起始地} → ${routeRow.目的地}`,
+      routeRow.货物名称 ? `货物：${routeRow.货物名称}` : null,
+      routeRow['计费重量'] ? `计费重量：${routeRow['计费重量']}kg` : null,
+      routeRow.货值 ? `货值：${routeRow.货值币种 || 'CNY'} ${Number(routeRow.货值).toLocaleString()}` : null,
+    ].filter(Boolean).join('\n')
+
+    // 行定义：[行标签, 取值函数(agent)]
+    const rowDefs = [
+      ['路线信息', () => routeInfo],
+      ['代理',    (a) => a.代理商 || ''],
+      ['费用明细', (a) => buildFeeDetail(a)],
+      ['小计',    (a) => a.summary ? `CNY ${Number(a.summary.小计 || 0).toFixed(2)}` : ''],
+      ['税率',    (a) => buildTaxRate(a.summary)],
+      ['税率原文', (a) => buildTaxRawText(a.summary)],
+      ['税金',    (a) => a.summary ? `CNY ${Number(a.summary.税金 || 0).toFixed(2)}` : ''],
+      ['汇损',    (a) => buildExchangeLoss(a.summary)],
+      ['总计',    (a) => a.summary ? `CNY ${Number(a.summary.总计 || 0).toFixed(2)}` : ''],
+      ['不含',    (a) => a.不含 || ''],
+      ['时效',    (a) => a.时效 || (a.时效天数 != null ? `约${a.时效天数}天` : '')],
+      ['备注',    (a) => a.代理备注 || ''],
+      ['赔付标准', (a) => (a.是否赔付 === 1 || a.是否赔付 === '1') ? (a.赔付内容 || '有赔付') : '/'],
+    ]
+
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('报价对比')
+
+    worksheet.columns = [
+      { width: 14 },
+      ...agents.map(() => ({ width: 42 })),
+    ]
+
+    rowDefs.forEach(([label, getter]) => {
+      const rowData = [label, ...agents.map(a => getter(a))]
+      const wsRow = worksheet.addRow(rowData)
+      wsRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.alignment = wrapAlign
+      })
+      wsRow.getCell(1).font = { bold: true }
+    })
+
+    // 路线信息行跨越所有代理列
+    if (agents.length > 1) {
+      worksheet.mergeCells(1, 2, 1, agents.length + 1)
+      worksheet.getCell(1, 2).alignment = wrapAlign
+    }
+
+    let buffer
+    try {
+      buffer = await workbook.xlsx.writeBuffer()
+    } catch {
+      ElMessage.error(`导出失败：${routeRow.起始地}→${routeRow.目的地}，请重试`)
+      continue
+    }
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${routeRow.起始地}→${routeRow.目的地}_${date}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const count = routeRows.length
+  ElMessage.success(count > 1 ? `已导出 ${count} 个报价文件` : '导出成功')
 }
+
+const handleExport = () => doExportRoutes(quoteResults.value)
 
 const handleReset = () => {
   searchForm.起始地 = ''

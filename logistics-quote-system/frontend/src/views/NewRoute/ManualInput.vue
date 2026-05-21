@@ -542,10 +542,13 @@ const handleSubmit = async () => {
           单价: Number(item.单价) || 0,
           单位: item.单位 || '',
           数量: Number(item.数量) || 0,
+          最低收费: item.最低收费 != null ? Number(item.最低收费) : null,
+          最低收费币种: item.最低收费币种 || null,
           币种: item.币种 || 'RMB',
           原币金额: Number(item.原币金额) || 0,
           人民币金额: Number(item.人民币金额) || 0,
-          备注: item.备注 || ''
+          备注: item.备注 || '',
+          参与核算: (item.参与核算 === false || item.参与核算 === 0) ? 0 : 1
         }))
       }
 
@@ -555,7 +558,8 @@ const handleSubmit = async () => {
           原币金额: Number(total.原币金额) || 0,
           币种: total.币种 || 'RMB',
           人民币金额: Number(total.人民币金额) || 0,
-          备注: total.备注 || ''
+          备注: total.备注 || '',
+          参与核算: (total.参与核算 === false || total.参与核算 === 0) ? 0 : 1
         }))
       }
 
