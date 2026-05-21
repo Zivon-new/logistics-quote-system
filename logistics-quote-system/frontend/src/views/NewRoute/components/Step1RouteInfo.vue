@@ -107,13 +107,14 @@
             <el-input
               :model-value="货值Raw"
               type="text"
-              placeholder="0.00"
+              placeholder="如 500000 或 600000*0.8"
               clearable
               @input="on货值Input"
+              @blur="on货值Blur"
               @clear="() => { 货值Raw = ''; formData.货值 = 0; handleInput() }"
               style="width: calc(100% - 90px);"
             />
-            <el-select v-model="formData.货值币种" style="width: 100px; margin-left: 2px;">
+            <el-select v-model="formData.货值币种" style="width: 100px; margin-left: 2px;" @change="handleInput">
               <el-option label="RMB" value="RMB" />
               <el-option label="USD 美元" value="USD" />
               <el-option label="EUR 欧元" value="EUR" />
@@ -151,6 +152,7 @@
 
 <script setup>
 import { reactive, ref, watch, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { InfoFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -215,15 +217,41 @@ const rules = {
   ]
 }
 
-// 货值专用：type="text" 保留中间状态（如 500.0），仅过滤非法字符
+// 货值：允许算术表达式（如 600000*0.8），输入时只过滤明显非法字符
 const on货值Input = (val) => {
-  let filtered = val.replace(/[^\d.]/g, '')
-  const firstDot = filtered.indexOf('.')
-  if (firstDot !== -1) {
-    filtered = filtered.slice(0, firstDot + 1) + filtered.slice(firstDot + 1).replace(/\./g, '')
-  }
+  // 允许数字、小数点、运算符、括号、空格
+  const filtered = val.replace(/[^\d.+\-*/() ]/g, '')
   货值Raw.value = filtered
-  formData.货值 = parseFloat(filtered) || 0
+  // 如果是纯数字，实时更新货值；否则等失焦时再求值
+  const asNum = parseFloat(filtered)
+  if (!isNaN(asNum) && String(asNum) === filtered.trim()) {
+    formData.货值 = asNum
+    handleInput()
+  }
+}
+
+// 失焦时对表达式求值
+const on货值Blur = () => {
+  const raw = 货值Raw.value.trim()
+  if (!raw) {
+    formData.货值 = 0
+    handleInput()
+    return
+  }
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = Function('"use strict"; return (' + raw + ')')()
+    if (typeof result === 'number' && isFinite(result) && result >= 0) {
+      formData.货值 = Math.round(result * 100) / 100
+      货值Raw.value = String(formData.货值)
+    } else {
+      ElMessage.warning('货值计算结果无效，请检查表达式（结果须为正数）')
+      货值Raw.value = formData.货值 > 0 ? String(formData.货值) : ''
+    }
+  } catch {
+    ElMessage.warning('货值表达式格式错误，已恢复原值')
+    货值Raw.value = formData.货值 > 0 ? String(formData.货值) : ''
+  }
   handleInput()
 }
 
