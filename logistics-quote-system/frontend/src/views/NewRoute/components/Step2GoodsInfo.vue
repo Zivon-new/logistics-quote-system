@@ -180,7 +180,8 @@ const props = defineProps({
   goodsTotal: { type: Array, default: () => [] },
   routeWeight: { type: Number, default: 0 },
   routeVolume: { type: Number, default: 0 },
-  routeValue: { type: Number, default: 0 }
+  routeValue: { type: Number, default: 0 },
+  routeValueCurrency: { type: String, default: 'RMB' }
 })
 
 const emit = defineEmits(['update:goodsDetails', 'update:goodsTotal'])
@@ -224,7 +225,7 @@ const addGoodsTotal = () => {
     货物名称: '',
     实际重量: props.routeWeight || 0,
     货值: props.routeValue || 0,
-    货值币种: 'RMB',
+    货值币种: props.routeValueCurrency || 'RMB',
     总体积: props.routeVolume || 0,
     备注: ''
   })

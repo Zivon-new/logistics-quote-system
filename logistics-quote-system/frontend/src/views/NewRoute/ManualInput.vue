@@ -27,6 +27,7 @@
           :route-weight="formData.route.实际重量"
           :route-volume="formData.route.总体积"
           :route-value="formData.route.货值"
+          :route-value-currency="formData.route.货值币种 || 'RMB'"
         />
 
         <!-- Step 3: 代理商及费用 -->
@@ -526,6 +527,7 @@ const handleSubmit = async () => {
         运输方式: agent.运输方式 || '',
         贸易类型: agent.贸易类型 || '',
         时效: agent.时效 || '',
+        时效天数: parseInt((agent.时效 || '').match(/\d+/)?.[0]) || null,
         时效备注: agent.时效备注 || '',
         不含: agent.不含 || '',
         是否赔付: String(agent.是否赔付 ?? '0'),
