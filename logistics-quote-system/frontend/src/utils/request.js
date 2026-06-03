@@ -37,10 +37,20 @@ request.interceptors.response.use(
       const { status, data } = error.response
       
       if (status === 401) {
-        ElMessage.error('登录已过期，请重新登录')
         const userStore = useUserStore()
-        userStore.clearAuth()
-        router.push('/login')
+        const isAuthEndpoint = error.config?.url?.includes('/auth/login') ||
+                               error.config?.url?.includes('/auth/logout')
+        if (userStore.token && !isAuthEndpoint) {
+          // 已登录用户 token 失效：弹出重登录弹窗，保留当前页数据
+          userStore.setAuthExpired(true)
+        } else {
+          // 登录请求本身失败（密码错误）或未登录状态：直接显示错误
+          ElMessage.error(data?.detail || '认证失败，请重新登录')
+          if (!isAuthEndpoint && router.currentRoute.value.path !== '/login') {
+            userStore.clearAuth()
+            router.push('/login')
+          }
+        }
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
       } else if (status === 404) {

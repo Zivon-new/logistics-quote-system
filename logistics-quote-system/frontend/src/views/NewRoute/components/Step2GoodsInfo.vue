@@ -113,9 +113,14 @@
                   <el-input v-model="item.货物名称" placeholder="如：服务器设备" />
                 </el-form-item>
               </el-col>
-              <el-col :span="12">
+              <el-col :span="6">
                 <el-form-item label="实际重量(kg)">
                   <el-input-number :controls="false" v-model="item.实际重量" :precision="2" :min="0" style="width: 100%;" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item label="数量">
+                  <el-input-number :controls="false" v-model="item.数量" :precision="3" :min="0" style="width: 100%;" />
                 </el-form-item>
               </el-col>
             </el-row>
@@ -224,6 +229,7 @@ const addGoodsTotal = () => {
   goodsTotal.value.push({
     货物名称: '',
     实际重量: props.routeWeight || 0,
+    数量: 0,
     货值: props.routeValue || 0,
     货值币种: props.routeValueCurrency || 'RMB',
     总体积: props.routeVolume || 0,

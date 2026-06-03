@@ -37,11 +37,14 @@ env/
 # 项目特定
 data_raw/*.xlsx
 data_clean/*.json
+data/checkpoints/
 logs/*.log
 *.log
 logistics-quote-system/backend/data/
 logistics-quote-system/backend/temp/
 logistics-quote-system/backend/uploads/
+logistics-quote-system/backend/logs/
+everything-claude-code/
 
 # 测试
 .pytest_cache/

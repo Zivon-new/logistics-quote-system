@@ -43,6 +43,7 @@ class GoodsTotal(Base):
     实际重量 = Column("实际重量(/kg)", DECIMAL(18, 2), default=0.00)
     货值 = Column("货值", DECIMAL(18, 2), default=0.00)
     货值币种 = Column("货值币种", String(20), default='RMB')
+    数量 = Column("数量", DECIMAL(18, 3), default=0.000)
     总体积 = Column("总体积(/cbm)", DECIMAL(18, 3), default=0.000)
     备注 = Column("备注", String(255), nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())

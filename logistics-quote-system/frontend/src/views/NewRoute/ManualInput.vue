@@ -312,9 +312,11 @@ onMounted(async () => {
     if (props.initialData.goods_total) {
       formData.goodsTotal = props.initialData.goods_total.map(g => ({
         货物名称: g.货物名称 || '',
-        实际重量: g['实际重量(/kg)'] || 0,
+        实际重量: g['实际重量(/kg)'] || g.实际重量 || 0,
+        数量: g.数量 || 0,
         货值: g.货值 || 0,
-        总体积: g['总体积(/cbm)'] || 0,
+        货值币种: g.货值币种 || 'RMB',
+        总体积: g['总体积(/cbm)'] || g.总体积 || 0,
         备注: g.备注 || ''
       }))
     }
@@ -461,6 +463,7 @@ const handleSubmit = async () => {
       formData.route.计费重量 = Number(s1.计费重量 ?? 0)
       formData.route.总体积   = Number(s1.总体积   ?? 0)
       formData.route.货值     = Number(s1.货值     ?? 0)
+      formData.route.货值币种 = s1.货值币种 || 'RMB'
       formData.route.交易开始日期 = s1.交易开始日期 || ''
       formData.route.交易结束日期 = s1.交易结束日期 || ''
       
@@ -507,7 +510,8 @@ const handleSubmit = async () => {
       实际重量: pickNum(formData.route.实际重量, gt0.实际重量, '实际重量'),
       计费重量: pickNum(formData.route.计费重量, gt0.计费重量, '计费重量'),
       总体积:   pickNum(formData.route.总体积,   gt0.总体积,   '总体积'),
-      货值:     pickNum(formData.route.货值,     gt0.货值,     '货值')
+      货值:     pickNum(formData.route.货值,     gt0.货值,     '货值'),
+      货值币种: formData.route.货值币种 || 'RMB'
     }
     console.log('📦 cleanRoute:', JSON.stringify(cleanRoute))
     
@@ -636,7 +640,9 @@ const handleSubmit = async () => {
     const cleanGoodsTotal = formData.goodsTotal.map(goods => ({
       货物名称: goods.货物名称 || '',
       实际重量: goods['实际重量'] || goods['实际重量(/kg)'] || 0,
+      数量: goods.数量 || 0,
       货值: goods.货值 || 0,
+      货值币种: goods.货值币种 || 'RMB',
       总体积: goods['总体积'] || goods['总体积(/cbm)'] || 0,
       备注: goods.备注 || ''
     }))

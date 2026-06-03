@@ -197,6 +197,28 @@ export function useFeeCalculation(props) {
     agent.summary.总计 = calculateTotal(agent)
   }
 
+  // ── Group subtotals ───────────────────────────────────────
+  // 按分组标题聚合 fee_items 原币小计
+  // 返回 [{name: 'KUL-AMS', amounts: {USD: 1035.5}}, ...]
+  const calcGroupSubtotals = (agent) => {
+    const groups = []
+    let cur = null
+    for (const item of (agent.fee_items || [])) {
+      if (item.备注 === '__GROUP_HEADER__') {
+        if (cur) groups.push(cur)
+        cur = { name: item.费用类型 || '未命名组', amounts: {} }
+        continue
+      }
+      if (!cur) continue
+      if (item.参与核算 === false || item.参与核算 === 0) continue
+      const currency = item.币种 || 'RMB'
+      const amt = calcOriginalAmount(item)
+      if (amt > 0) cur.amounts[currency] = (cur.amounts[currency] || 0) + amt
+    }
+    if (cur) groups.push(cur)
+    return groups.filter(g => Object.keys(g.amounts).length > 0)
+  }
+
   // ── Multi-tax detail helpers ───────────────────────────────
 
   const addTaxDetail = (agent) => {
@@ -314,6 +336,7 @@ export function useFeeCalculation(props) {
     calcTaxDetailRowCNY, calcMultiTaxTotal,
     calculateTaxOriginal, calculateLossOriginal,
     calculateTax, calculateLoss, calculateTotal, updateSummary,
+    calcGroupSubtotals,
     addTaxDetail, removeTaxDetail, importTaxFromGoods,
     evalFormula, activateFormula, clearFormula, applyFormula,
     taxRateToDisplay, taxRateFromDisplay,

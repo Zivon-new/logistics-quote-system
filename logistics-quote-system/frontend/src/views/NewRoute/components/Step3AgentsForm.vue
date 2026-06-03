@@ -567,6 +567,26 @@
             </el-button>
           </h4>
           <el-form :model="agent.summary" label-width="120px" class="summary-form">
+            <!-- 分组小计（仅当 fee_items 中存在分组标题时显示） -->
+            <template v-if="calcGroupSubtotals(agent).length > 0">
+              <div class="group-subtotals-block">
+                <div
+                  v-for="grp in calcGroupSubtotals(agent)"
+                  :key="grp.name"
+                  class="group-subtotal-row"
+                >
+                  <span class="group-subtotal-label">{{ grp.name }}</span>
+                  <span class="group-subtotal-amounts">
+                    <span
+                      v-for="(amt, cur) in grp.amounts"
+                      :key="cur"
+                      class="group-subtotal-item"
+                    >{{ cur }} {{ amt.toFixed(2) }}</span>
+                  </span>
+                </div>
+              </div>
+              <el-divider style="margin:6px 0 10px" />
+            </template>
             <el-row :gutter="16">
               <el-col :span="12">
                 <el-form-item label="小计">
@@ -635,7 +655,32 @@
             <div v-else class="multi-tax-section">
               <div class="multi-tax-header">
                 <span class="multi-tax-title">货物税率明细</span>
-                <div style="display:flex;gap:8px">
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <!-- 同步按钮：只在有其他已填写税率明细的代理时显示 -->
+                  <template v-if="taxSyncSources(agentIndex).length === 1">
+                    <el-button
+                      size="small"
+                      @click="syncTaxFrom(agent, taxSyncSources(agentIndex)[0].agent)"
+                    >
+                      从{{ taxSyncSources(agentIndex)[0].label }}同步
+                    </el-button>
+                  </template>
+                  <template v-else-if="taxSyncSources(agentIndex).length > 1">
+                    <el-dropdown @command="src => syncTaxFrom(agent, src)">
+                      <el-button size="small">
+                        从其他代理同步<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                      </el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item
+                            v-for="src in taxSyncSources(agentIndex)"
+                            :key="src.index"
+                            :command="src.agent"
+                          >{{ src.label }}</el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </template>
                   <el-button size="small" @click="importTaxFromGoods(agent, agentIndex)">
                     从货物信息导入
                   </el-button>
@@ -644,6 +689,7 @@
                   </el-button>
                 </div>
               </div>
+              <div @keydown="handleTaxKeydown($event, agent)">
               <el-table
                 :data="agent.summary.税率明细 || []"
                 border size="small"
@@ -691,7 +737,7 @@
                   <template #default="scope">
                     <el-input-number
                       :controls="false" v-model="scope.row.综合税率"
-                      :precision="2" :min="0" :max="999" size="small"
+                      :min="0" :max="999" size="small"
                       @change="updateSummary(agent)"
                     />
                   </template>
@@ -709,6 +755,7 @@
                   </template>
                 </el-table-column>
               </el-table>
+              </div><!-- /keydown wrapper tax -->
               <div class="multi-tax-total">
                 汇总税金：<span class="total-amount">¥{{ calcMultiTaxTotal(agent).toFixed(2) }}</span>
                 <span class="unit-label">（已自动写入税金）</span>
@@ -863,7 +910,7 @@
 
 <script setup>
 import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
-import { Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
+import { Plus, Delete, InfoFilled, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import Sortable from 'sortablejs'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
@@ -910,6 +957,7 @@ const {
   calcOriginalAmount, updateFeeAmount, updateFeeRMB, updateFeeTotalRMB, calculateRMB,
   calculateSubtotalByCurrency, getFeesCurrency, getCargoCurrency,
   getQuoteSingleCurrency, calculateSubtotal,
+  calcGroupSubtotals,
   calcTaxDetailRowCNY, calcMultiTaxTotal,
   calculateTaxOriginal, calculateLossOriginal,
   calculateTax, calculateLoss, calculateTotal, updateSummary,
@@ -1074,11 +1122,11 @@ const removeAgent = (index) => {
   props.modelValue.splice(index, 1)
 }
 
-// 费用明细表格 span-method：13列（含拖拽列），分组标题行横跨列1-11
+// 费用明细表格 span-method：12列（含拖拽列），分组标题行横跨列1-10，操作列（11）保留以显示删除按钮
 const feeItemSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {
-    if (columnIndex === 1) return [1, 11]
-    if (columnIndex > 1 && columnIndex < 12) return [0, 0]
+    if (columnIndex === 1) return [1, 10]
+    if (columnIndex > 1 && columnIndex < 11) return [0, 0]
   }
   return [1, 1]
 }
@@ -1200,6 +1248,68 @@ const handleUnitChange = (feeItem) => {
 // Calculation functions — from useFeeCalculation composable
 
 // ── 键盘导航 ──────────────────────────────────────────────
+
+// 返回当前代理以外、已有多货物税率明细的代理列表，用于同步来源选择
+const taxSyncSources = (currentAgentIndex) => {
+  return props.modelValue
+    .map((a, i) => ({ agent: a, index: i, label: `代理${i + 1}（${a.代理商 || '未命名'}）` }))
+    .filter(({ agent, index }) =>
+      index !== currentAgentIndex &&
+      agent.summary?.税率模式 === 'multi' &&
+      agent.summary?.税率明细?.length > 0
+    )
+}
+
+// 从来源代理同步税率明细到目标代理（完全覆盖）
+const syncTaxFrom = (targetAgent, sourceAgent) => {
+  targetAgent.summary.税率明细 = JSON.parse(JSON.stringify(sourceAgent.summary.税率明细))
+  updateSummary(targetAgent)
+  ElMessage.success('税率明细已同步')
+}
+
+// 税率明细表格的键盘导航（Enter/方向键，与费用明细一致）
+const handleTaxKeydown = (e, agent) => {
+  if (!['Enter', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
+  const target = e.target
+  if (!target || target.tagName !== 'INPUT') return
+  const tr = target.closest('tr.el-table__row')
+  if (!tr) return
+  const td = target.closest('td')
+  if (!td) return
+  const tbody = tr.closest('tbody')
+  if (!tbody) return
+
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const allInputs = [...tr.querySelectorAll('input')]
+    const curIdx = allInputs.indexOf(target)
+    if (curIdx < 0) return
+    const next = e.key === 'ArrowRight' ? allInputs[curIdx + 1] : allInputs[curIdx - 1]
+    if (next) { e.preventDefault(); next.focus(); next.select() }
+    return
+  }
+
+  e.preventDefault()
+  const allRows = [...tbody.querySelectorAll('tr.el-table__row')]
+  const rowIdx = allRows.indexOf(tr)
+  const allTds = [...tr.querySelectorAll('td')]
+  const colIdx = allTds.indexOf(td)
+
+  if (e.key === 'ArrowUp') {
+    if (rowIdx <= 0) return
+    focusCell(allRows, rowIdx - 1, colIdx)
+    return
+  }
+
+  if (rowIdx + 1 >= allRows.length) {
+    addTaxDetail(agent)
+    nextTick(() => {
+      const newRows = [...tbody.querySelectorAll('tr.el-table__row')]
+      focusCell(newRows, newRows.length - 1, colIdx)
+    })
+  } else {
+    focusCell(allRows, rowIdx + 1, colIdx)
+  }
+}
 
 const handleFeeKeydown = (e, agentIndex, tableType) => {
   if (!['Enter', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
@@ -1534,5 +1644,29 @@ defineExpose({
   padding: 12px 0 4px;
   color: #bfbfbf;
   font-size: 13px;
+}
+.group-subtotals-block {
+  padding: 4px 0 4px 120px;
+}
+.group-subtotal-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #595959;
+  padding: 2px 0;
+}
+.group-subtotal-label {
+  font-weight: 500;
+  min-width: 80px;
+}
+.group-subtotal-amounts {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.group-subtotal-item {
+  color: #1890ff;
+  font-weight: 600;
 }
 </style>

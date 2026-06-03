@@ -30,8 +30,10 @@ class FeeItem:
     单位: Optional[str] = None  # kg, cbm, KG, CBM
     数量: Optional[float] = None  # ✅ 新增：数量（从货物重量/体积来）
     币种: str = 'RMB'
+    最低收费: Optional[float] = None
+    最低收费币种: Optional[str] = None
     备注: Optional[str] = None
-    
+
     def to_dict(self):
         return asdict(self)
 
@@ -112,6 +114,19 @@ class FeeItemExtractor(BaseExtractor):
             )
         return self._PRICE_UNIT_SEARCH
 
+    # 匹配 "min USD45" / "MIN EUR 75" / "最低 JPY6500" 等模式
+    _MIN_FEE_RE = re.compile(
+        r'(?:min|MIN|最低)\s*([A-Z]{2,4})\s*(\d+(?:\.\d+)?)',
+        re.IGNORECASE
+    )
+
+    def _extract_min_fee(self, text: str) -> tuple:
+        """从单元格全文中提取最低收费（金额, 币种），找不到返回 (None, None)。"""
+        m = self._MIN_FEE_RE.search(text)
+        if m:
+            return float(m.group(2)), m.group(1).upper()
+        return None, None
+
     def _extract_from_text(self, text: str) -> List[FeeItem]:
         """
         从文本中提取所有单价费用（按行处理，支持跨行费用名）。
@@ -143,6 +158,14 @@ class FeeItemExtractor(BaseExtractor):
                 pending_name = None
             else:
                 pending_name = new_pending  # 可能是新的纯名称行，或 None
+
+        # 对整个单元格文本提取最低收费，附加到所有提取出的费用上
+        if fee_items:
+            min_amount, min_currency = self._extract_min_fee(text)
+            if min_amount is not None:
+                for item in fee_items:
+                    item.最低收费 = min_amount
+                    item.最低收费币种 = min_currency
 
         return fee_items
 

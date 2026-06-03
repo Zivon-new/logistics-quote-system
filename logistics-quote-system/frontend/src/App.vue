@@ -1,9 +1,10 @@
 <template>
   <router-view />
+  <ReLoginModal />
 </template>
 
 <script setup>
-// App根组件
+import ReLoginModal from '@/components/ReLoginModal.vue'
 </script>
 
 <style>

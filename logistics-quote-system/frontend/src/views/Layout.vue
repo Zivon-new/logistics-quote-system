@@ -141,18 +141,14 @@ const handleCommand = async (command) => {
         cancelButtonText: '取消',
         type: 'warning'
       })
-
-      // 调用登出接口
-      await logout()
-      
-      // 清除本地信息
-      userStore.clearAuth()
-      
-      ElMessage.success('已退出登录')
-      router.push('/login')
-    } catch (error) {
-      // 取消操作
+    } catch {
+      return  // 用户点了取消
     }
+    // 用户确认退出：API 调用失败也强制本地退出，不弹重登录框
+    try { await logout() } catch { /* 忽略，token 可能已过期 */ }
+    userStore.clearAuth()
+    ElMessage.success('已退出登录')
+    router.push('/login')
   }
 }
 </script>

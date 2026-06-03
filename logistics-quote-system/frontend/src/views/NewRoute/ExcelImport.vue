@@ -375,7 +375,8 @@ const saveSingleRoute = async (route, index) => {
         实际重量: route.实际重量 || 0,
         计费重量: route.计费重量 || 0,
         总体积: route.总体积 || 0,
-        货值: route.货值 || 0
+        货值: route.货值 || 0,
+        货值币种: route.货值币种 || 'RMB'
       },
       goods_details: route.goods_details || [],
       goods_total: route.goods_total || [],
@@ -452,13 +453,14 @@ const saveAll = async () => {
             实际重量: route.实际重量 || 0,
             计费重量: route.计费重量 || 0,
             总体积: route.总体积 || 0,
-            货值: route.货值 || 0
+            货值: route.货值 || 0,
+            货值币种: route.货值币种 || 'RMB'
           },
           goods_details: route.goods_details || [],
           goods_total: route.goods_total || [],
           agents: cleanAgents
         }
-        
+
         console.log(`=== 保存路线 ${route.起始地}→${route.目的地} ===`)
         console.log('agents数量:', submitData.agents.length)
         console.log('agents详情:', JSON.stringify(submitData.agents, null, 2))

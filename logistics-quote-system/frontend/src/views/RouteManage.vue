@@ -62,25 +62,34 @@
             {{ scope.row.货值币种 || 'RMB' }} {{ scope.row.货值 }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column label="操作" width="260" align="center" fixed="right">
           <template #default="scope">
             <el-button type="primary" link size="small" @click="handleView(scope.row, (pagination.page - 1) * pagination.page_size + scope.$index + 1)">
               查看
             </el-button>
-            <el-button 
-              v-if="userStore.userInfo.is_admin" 
-              type="warning" 
-              link 
-              size="small" 
+            <el-button
+              v-if="userStore.userInfo.is_admin"
+              type="success"
+              link
+              size="small"
+              @click="handleCopy(scope.row)"
+            >
+              复制
+            </el-button>
+            <el-button
+              v-if="userStore.userInfo.is_admin"
+              type="warning"
+              link
+              size="small"
               @click="handleEdit(scope.row)"
             >
               编辑
             </el-button>
-            <el-button 
-              v-if="userStore.userInfo.is_admin" 
-              type="danger" 
-              link 
-              size="small" 
+            <el-button
+              v-if="userStore.userInfo.is_admin"
+              type="danger"
+              link
+              size="small"
               @click="handleDelete(scope.row)"
             >
               删除
@@ -198,6 +207,14 @@
                   <el-table-column label="数量" width="80" align="right">
                     <template #default="scope">
                       {{ Number(scope.row.数量).toFixed(0) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="最低收费" width="120" align="right">
+                    <template #default="scope">
+                      <span v-if="scope.row.最低收费 && scope.row.备注 !== '__GROUP_HEADER__'" style="color:#8c8c8c;font-size:12px">
+                        min {{ scope.row.最低收费 }} {{ scope.row.最低收费币种 || scope.row.币种 }}
+                      </span>
+                      <span v-else-if="scope.row.备注 !== '__GROUP_HEADER__'">—</span>
                     </template>
                   </el-table-column>
                   <el-table-column label="原币金额" width="120" align="right">
@@ -322,7 +339,7 @@
                   <div v-for="goods in currentRoute.goods_total" :key="goods.整单货物ID" class="summary-item">
                     <span class="summary-label">{{ goods.货物名称 || '货物信息' }}:</span>
                     <span class="summary-value">
-                      实重 {{ goods['实际重量(/kg)'] }} kg · 货值 ¥{{ goods.货值?.toFixed(2) }} · 体积 {{ goods['总体积(/cbm)'] }} cbm
+                      实重 {{ goods['实际重量(/kg)'] }} kg · 货值 {{ goods.货值币种 || 'RMB' }} {{ goods.货值?.toFixed(2) }} · 体积 {{ goods['总体积(/cbm)'] }} cbm
                     </span>
                     <p v-if="goods.备注" class="remark-text" style="margin:4px 0 0">{{ goods.备注 }}</p>
                   </div>
@@ -360,12 +377,12 @@
                       <div class="summary-cell">
                         <span class="s-label">进口税率</span>
                         <span class="s-value">
-                          <template v-if="agent.summary.进口税率原文">
+                          <template v-if="parseTaxDetails(agent.summary.进口税率原文).length > 0">
                             <span v-for="(row, i) in parseTaxDetails(agent.summary.进口税率原文)" :key="i" style="display:block">
                               {{ row.货物名称 || ('货物'+(i+1)) }}：{{ row.税率说明 ? (row.税率说明 + ' ') : '' }}{{ row.综合税率 }}%
                             </span>
                           </template>
-                          <template v-else>{{ (agent.summary.税率 * 100)?.toFixed(2) }}%</template>
+                          <template v-else>{{ agent.summary.税率 ? (agent.summary.税率 * 100).toFixed(2) + '%' : '—' }}</template>
                         </span>
                       </div>
                       <div class="summary-cell">
@@ -427,12 +444,17 @@
 import { ref, reactive, onMounted, onActivated, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import { getRoutes, getRouteDetail, deleteRoute, updateRoute } from '@/api/route'
 import { useUserStore } from '@/stores/user'
+import { useRouteCopyStore } from '@/stores/routeCopy'
+import { transformForCopy } from '@/utils/routeCopyTransform'
 import RouteEditDialog from './NewRoute/components/RouteEditDialog.vue'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
-const userStore = useUserStore()
+const userStore     = useUserStore()
+const routeCopyStore = useRouteCopyStore()
+const router        = useRouter()
 
 const loading = ref(false)
 const routeList = ref([])
@@ -593,6 +615,24 @@ const handleEdit = async (row) => {
   } catch (error) {
     console.error('编辑路线失败:', error)
     ElMessage.error('编辑路线失败: ' + error.message)
+  }
+}
+
+// 复制路线：克隆代理费用结构，导航到新建路线页
+const handleCopy = async (row) => {
+  try {
+    const res = await getRouteDetail(row.路线ID)
+    if (!res?.success || !res.data) {
+      ElMessage.error('获取路线数据失败')
+      return
+    }
+    routeCopyStore.setCopyTemplate(
+      transformForCopy(res.data),
+      `${res.data.起始地} → ${res.data.目的地}`
+    )
+    router.push('/route-manage/new')
+  } catch {
+    ElMessage.error('复制路线失败')
   }
 }
 

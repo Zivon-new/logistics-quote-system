@@ -5,6 +5,17 @@
       <el-button @click="goBack">返回</el-button>
     </div>
 
+    <!-- 复制模式提示条 -->
+    <el-alert
+      v-if="copyInitialData && !isEdit"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom:16px"
+      :title="`复制模式：基于「${copySourceLabel}」新建批次`"
+      description="代理费用结构已复制，请在步骤1修改货物重量/货值后提交。"
+    />
+
     <!-- 选择导入方式（仅新增时显示） -->
     <el-card v-if="!isEdit && !importMethod" class="method-selector">
       <h3>选择录入方式</h3>
@@ -34,10 +45,11 @@
     </el-card>
 
     <!-- 手动录入 -->
-    <ManualInput 
+    <ManualInput
       v-if="importMethod === 'manual' || isEdit"
       :route-id="routeId"
       :is-edit="isEdit"
+      :initial-data="copyInitialData"
       @success="handleSuccess"
       @cancel="handleCancel"
     />
@@ -52,16 +64,28 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Edit, Upload } from '@element-plus/icons-vue'
 import ManualInput from './ManualInput.vue'
 import ExcelImport from './ExcelImport.vue'
+import { useRouteCopyStore } from '@/stores/routeCopy'
 
 const route = useRoute()
 const router = useRouter()
+const routeCopyStore = useRouteCopyStore()
 
-const importMethod = ref('')
+const importMethod    = ref('')
+const copyInitialData = ref(null)
+const copySourceLabel = ref('')
+
+onMounted(() => {
+  if (routeCopyStore.copyTemplate) {
+    copyInitialData.value = routeCopyStore.copyTemplate
+    copySourceLabel.value = routeCopyStore.sourceLabel
+    importMethod.value    = 'manual'
+  }
+})
 
 // ✅ 是否为编辑模式
 const isEdit = computed(() => {
@@ -83,6 +107,7 @@ const goBack = () => {
 
 // 成功回调
 const handleSuccess = () => {
+  routeCopyStore.clearCopyTemplate()
   router.push('/route-manage')
 }
 
@@ -91,7 +116,9 @@ const handleCancel = () => {
   if (isEdit.value) {
     goBack()
   } else {
-    importMethod.value = ''
+    routeCopyStore.clearCopyTemplate()
+    copyInitialData.value = null
+    importMethod.value    = ''
   }
 }
 </script>

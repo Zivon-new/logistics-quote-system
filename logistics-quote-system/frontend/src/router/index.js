@@ -90,16 +90,33 @@ const router = createRouter({
   routes
 })
 
+function isTokenExpired(token) {
+  try {
+    // JWT uses base64url: replace - → + and _ → / before atob
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(base64))
+    return Date.now() / 1000 > payload.exp
+  } catch {
+    return true
+  }
+}
+
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
   const token = userStore.token
 
-  if (to.meta.requiresAuth && !token) {
-    // 需要登录但未登录，跳转到登录页
-    next('/login')
-  } else if (to.path === '/login' && token) {
-    // 已登录访问登录页，跳转到首页
+  if (to.meta.requiresAuth) {
+    if (!token || isTokenExpired(token)) {
+      // token 不存在或已过期：清掉再去登录，避免进入页面后才发现
+      userStore.clearAuth()
+      next('/login')
+      return
+    }
+  }
+
+  if (to.path === '/login' && token && !isTokenExpired(token)) {
+    // 已登录且 token 有效时访问登录页，跳转到首页
     next('/dashboard')
   } else {
     next()

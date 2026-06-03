@@ -18,6 +18,26 @@ from ...services.recommend_service import (
 from .warnings import get_warnings_for_destinations
 
 
+def _get_forex_rates(db: Session) -> dict:
+    """Return {currency: rmb_rate} from forex_rate table."""
+    rows = db.execute(text("SELECT 币种, 汇率 FROM forex_rate")).fetchall()
+    rates = {r[0]: float(r[1]) for r in rows}
+    rates.setdefault('RMB', 1.0)
+    rates.setdefault('CNY', 1.0)
+    return rates
+
+
+def _convert_min_to_fee_currency(min_fee: float, min_cur: str, fee_cur: str, rates: dict) -> float:
+    """Convert min_fee from min_cur to fee_cur using RMB as the pivot currency."""
+    if min_cur == fee_cur:
+        return min_fee
+    rmb_per_min = rates.get(min_cur, 1.0)
+    rmb_per_fee = rates.get(fee_cur, 1.0)
+    if rmb_per_fee == 0:
+        return min_fee
+    return min_fee * rmb_per_min / rmb_per_fee
+
+
 def _add_scores(db: Session, results: List[Dict]) -> Dict[str, dict]:
     """
     为 quote_results 中的每个 agent 补充智能评分。
@@ -184,6 +204,9 @@ async def search_quotes(
         for s in db.query(Summary).join(latest_subq, Summary.汇总ID == latest_subq.c.max_id).all():
             summary_map[s.代理路线ID] = s
 
+    # 查汇率（用于跨币种最低收费换算）
+    forex_rates = _get_forex_rates(db)
+
     # 手动序列化所有数据
     quote_results = []
     for route in results:
@@ -228,10 +251,19 @@ async def search_quotes(
             # 添加费用明细
             total_fee = 0.00
             for fee in agent.fee_items:
-                最低收费 = float(fee.最低收费) if fee.最低收费 else None
+                最低收费_raw = float(fee.最低收费) if fee.最低收费 else None
                 原币金额 = float(fee.原币金额) if fee.原币金额 else 0.00
-                # 应用最低收费：取 max(原币金额, 最低收费)
+                人民币金额_raw = float(fee.人民币金额) if fee.人民币金额 else 0.00
+                fee_cur = fee.币种 or 'RMB'
+                min_cur = fee.最低收费币种 or fee_cur
+                # 跨币种转换后应用最低收费
+                最低收费 = _convert_min_to_fee_currency(最低收费_raw, min_cur, fee_cur, forex_rates) if 最低收费_raw else None
                 实际原币金额 = max(原币金额, 最低收费) if 最低收费 else 原币金额
+                # 当最低收费生效时，按比例重算人民币金额
+                if 最低收费 and 实际原币金额 > 原币金额 and 原币金额 > 0:
+                    实际人民币金额 = round(人民币金额_raw * 实际原币金额 / 原币金额, 2)
+                else:
+                    实际人民币金额 = 人民币金额_raw
                 fee_dict = {
                     "费用ID":       fee.费用ID,
                     "代理路线ID":   fee.代理路线ID,
@@ -239,17 +271,17 @@ async def search_quotes(
                     "单价":         float(fee.单价) if fee.单价 else 0.00,
                     "单位":         fee.单位,
                     "数量":         float(fee.数量) if fee.数量 else 0,
-                    "最低收费":     最低收费,
+                    "最低收费":     最低收费_raw,
                     "最低收费币种": fee.最低收费币种,
                     "币种":         fee.币种,
                     "原币金额":     实际原币金额,
-                    "人民币金额":   float(fee.人民币金额) if fee.人民币金额 else 0.00,
+                    "人民币金额":   实际人民币金额,
                     "备注":         fee.备注,
                     "参与核算":     fee.参与核算 if fee.参与核算 is not None else 1,
                     "创建时间":     fee.创建时间.isoformat() if fee.创建时间 else None
                 }
                 agent_dict["fee_items"].append(fee_dict)
-                total_fee += float(fee.人民币金额) if fee.人民币金额 else 0.00
+                total_fee += 实际人民币金额
 
             # 添加整单费用
             for fee_total_item in agent.fee_total:

@@ -315,7 +315,7 @@
                 <el-descriptions-item label="实际重量">{{ currentRoute.实际重量 }} kg</el-descriptions-item>
                 <el-descriptions-item label="计费重量">{{ currentRoute.计费重量 || '—' }} kg</el-descriptions-item>
                 <el-descriptions-item label="总体积">{{ currentRoute.总体积 || '—' }} cbm</el-descriptions-item>
-                <el-descriptions-item label="货值">¥{{ currentRoute.货值 }}</el-descriptions-item>
+                <el-descriptions-item label="货值">{{ currentRoute.货值币种 || 'RMB' }} {{ currentRoute.货值 }}</el-descriptions-item>
               </el-descriptions>
             </div>
           </el-col>
@@ -487,7 +487,7 @@
                 <p class="sub-table-title">整单货物</p>
                 <div v-for="g in currentRoute.goods_total" :key="g.整单货物ID" class="goods-total-item">
                   <span>{{ g.货物名称 || '整单' }}</span>
-                  <span>实重 {{ g['实际重量(/kg)'] }} kg · 货值 ¥{{ g.货值?.toFixed(2) }} · 体积 {{ g['总体积(/cbm)'] }} cbm</span>
+                  <span>实重 {{ g['实际重量(/kg)'] }} kg · 货值 {{ g.货值币种 || 'RMB' }} {{ g.货值?.toFixed(2) }} · 体积 {{ g['总体积(/cbm)'] }} cbm</span>
                   <p v-if="g.备注" class="remark-text" style="margin:2px 0 0">{{ g.备注 }}</p>
                 </div>
               </div>
@@ -502,12 +502,12 @@
               <el-descriptions :column="2" border size="small">
                 <el-descriptions-item label="小计">¥{{ currentAgent.summary.小计?.toFixed(2) }}</el-descriptions-item>
                 <el-descriptions-item label="税率">
-                  <template v-if="currentAgent.summary.进口税率原文">
+                  <template v-if="parseTaxDetails(currentAgent.summary.进口税率原文).length > 0">
                     <div v-for="(row, i) in parseTaxDetails(currentAgent.summary.进口税率原文)" :key="i">
                       {{ row.货物名称 || ('货物'+(i+1)) }}：{{ row.税率说明 ? (row.税率说明 + ' ') : '' }}{{ row.综合税率 }}%
                     </div>
                   </template>
-                  <template v-else>{{ (currentAgent.summary.税率 * 100)?.toFixed(2) }}%</template>
+                  <template v-else>{{ currentAgent.summary.税率 ? (currentAgent.summary.税率 * 100).toFixed(2) + '%' : '—' }}</template>
                 </el-descriptions-item>
                 <el-descriptions-item label="税金">¥{{ currentAgent.summary.税金?.toFixed(2) }}</el-descriptions-item>
                 <el-descriptions-item label="汇损率">{{ (currentAgent.summary.汇损率 * 100)?.toFixed(4) }}%</el-descriptions-item>

@@ -2,7 +2,7 @@
 """
 路线相关模型 - 修复版：添加缺失的字段
 """
-from sqlalchemy import Column, Integer, String, Date, DECIMAL, DateTime, func, ForeignKey, Text, SmallInteger, Computed
+from sqlalchemy import Column, Integer, String, Date, DECIMAL, DateTime, func, ForeignKey, Text, SmallInteger, Computed  # noqa: F401
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -49,13 +49,13 @@ class RouteAgent(Base):
     代理商 = Column("代理商", String(200), nullable=True)
     运输方式 = Column("运输方式", String(100), nullable=True)
     贸易类型 = Column("贸易类型", String(100), nullable=True)
-    代理备注 = Column("代理备注", String(255), nullable=True)
+    代理备注 = Column("代理备注", Text, nullable=True)
     时效 = Column("时效", String(50), nullable=True)
     时效天数 = Column("时效天数", SmallInteger, nullable=True)
-    时效备注 = Column("时效备注", String(255), nullable=True)
-    不含 = Column("不含", String(511), nullable=True)
-    是否赔付 = Column("是否赔付", String(255), default='0')
-    赔付内容 = Column("赔付内容", String(255), nullable=True)
+    时效备注 = Column("时效备注", Text, nullable=True)
+    不含 = Column("不含", Text, nullable=True)
+    是否赔付 = Column("是否赔付", String(10), default='0')
+    赔付内容 = Column("赔付内容", Text, nullable=True)
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
 
     # 关系

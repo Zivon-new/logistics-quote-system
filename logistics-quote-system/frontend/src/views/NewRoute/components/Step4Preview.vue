@@ -88,7 +88,7 @@
           </el-table-column>
           <el-table-column label="总价" width="90" align="right">
             <template #default="scope">
-              ¥{{ (scope.row.总价 || 0)?.toFixed(2) }}
+              {{ scope.row.币种 || 'RMB' }} {{ (scope.row.总价 || 0)?.toFixed(2) }}
             </template>
           </el-table-column>
           <el-table-column prop="备注" label="备注" min-width="80" show-overflow-tooltip />
