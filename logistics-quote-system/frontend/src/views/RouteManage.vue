@@ -363,6 +363,18 @@
                     费用汇总
                     <span v-if="currentRoute.agents.length > 1" class="agent-label">{{ agent.代理商 }}</span>
                   </h3>
+                  <!-- 分组小计 -->
+                  <template v-if="calcGroupSubtotals(agent).length > 0">
+                    <div class="group-subtotals-block">
+                      <div v-for="grp in calcGroupSubtotals(agent)" :key="grp.name" class="group-subtotal-row">
+                        <span class="group-subtotal-label">{{ grp.name }}</span>
+                        <span class="group-subtotal-amounts">
+                          <span v-for="(amt, cur) in grp.amounts" :key="cur" class="group-subtotal-item">{{ cur }} {{ amt.toFixed(2) }}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <el-divider style="margin:6px 0 10px" />
+                  </template>
                   <div class="summary-grid">
                     <div class="summary-row">
                       <div class="summary-cell">
@@ -498,6 +510,33 @@ const getAgentForeignSubtotal = (agent, currency) => {
   agent.fee_total?.filter(i => i.备注 !== '__GROUP_HEADER__' && isIncluded(i) && i.币种 === currency)
     .forEach(i => { total += parseFloat(i.原币金额) || 0 })
   return total
+}
+
+// 按分组标题聚合各段原币小计（fee_items + fee_total，只读视图直接用原币金额）
+const calcGroupSubtotals = (agent) => {
+  const groupMap = new Map()
+  const groupOrder = []
+  const processItems = (items) => {
+    let curName = null
+    for (const item of (items || [])) {
+      if (item.备注 === '__GROUP_HEADER__') {
+        curName = item.费用类型 || item.费用名称 || '未命名组'
+        if (!groupMap.has(curName)) { groupMap.set(curName, {}); groupOrder.push(curName) }
+        continue
+      }
+      if (!curName) continue
+      if (item.参与核算 === false || item.参与核算 === 0) continue
+      const currency = item.币种 || 'RMB'
+      const amt = parseFloat(item.原币金额) || 0
+      if (amt > 0) {
+        const amounts = groupMap.get(curName)
+        amounts[currency] = (amounts[currency] || 0) + amt
+      }
+    }
+  }
+  processItems(agent.fee_items)
+  processItems(agent.fee_total)
+  return groupOrder.map(name => ({ name, amounts: groupMap.get(name) })).filter(g => Object.keys(g.amounts).length > 0)
 }
 
 // 分组标题 span-method（费用明细表：7列 — 费用类型/单价/数量/原币/人民币/核算/备注）
@@ -914,4 +953,9 @@ onActivated(() => {
   background: #fafafa;
   border-top: 1px solid #f0f0f0;
 }
+.group-subtotals-block { padding: 4px 0; margin-bottom: 4px; }
+.group-subtotal-row { display: flex; justify-content: space-between; font-size: 13px; color: #595959; padding: 2px 0; }
+.group-subtotal-label { font-weight: 500; min-width: 80px; }
+.group-subtotal-amounts { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.group-subtotal-item { color: #1890ff; font-weight: 600; }
 </style>

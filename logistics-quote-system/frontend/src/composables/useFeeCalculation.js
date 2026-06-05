@@ -208,7 +208,7 @@ export function useFeeCalculation(props) {
       let curName = null
       for (const item of (items || [])) {
         if (item.备注 === '__GROUP_HEADER__') {
-          curName = item.费用类型 || '未命名组'
+          curName = item.费用类型 || item.费用名称 || '未命名组'
           if (!groupMap.has(curName)) {
             groupMap.set(curName, {})
             groupOrder.push(curName)
