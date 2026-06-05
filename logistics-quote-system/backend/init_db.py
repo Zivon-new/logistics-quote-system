@@ -9,6 +9,21 @@ from app.database import engine, SessionLocal, Base
 from app.models.user import User
 from app.core.security import get_password_hash
 
+# ────────────────────────────────────────────────────────────
+# 在下方填写要创建的账号。已存在的用户名会自动跳过。
+# username: 登录用，英文/拼音，不能重复
+# full_name: 显示姓名
+# password: 初始密码
+# is_admin: True = 管理员，False = 普通用户
+# ────────────────────────────────────────────────────────────
+USERS_TO_CREATE = [
+    # {"username": "zhangsan",  "full_name": "张三",   "password": "your_password", "is_admin": True},
+    # {"username": "lisi",      "full_name": "李四",   "password": "your_password", "is_admin": True},
+    # {"username": "wangwu",    "full_name": "王五",   "password": "your_password", "is_admin": True},
+    # 继续填写...
+]
+
+
 def init_database():
     """初始化数据库"""
     print("开始初始化数据库...")
@@ -53,11 +68,23 @@ def init_database():
         else:
             print("⚠ 普通用户已存在，跳过")
         
+        # 批量创建 USERS_TO_CREATE 中的账号
+        for u in USERS_TO_CREATE:
+            exists = db.query(User).filter(User.username == u["username"]).first()
+            if not exists:
+                db.add(User(
+                    username=u["username"],
+                    hashed_password=get_password_hash(u["password"]),
+                    full_name=u["full_name"],
+                    is_admin=u.get("is_admin", False),
+                    is_active=True,
+                ))
+                print(f"✓ 创建用户: {u['username']} ({u['full_name']})")
+            else:
+                print(f"⚠ 已存在，跳过: {u['username']}")
+
         db.commit()
         print("\n✓ 数据库初始化完成！")
-        print("\n登录信息:")
-        print("  管理员: admin / admin123")
-        print("  普通用户: user / user123")
         
     except Exception as e:
         print(f"✗ 初始化失败: {e}")
