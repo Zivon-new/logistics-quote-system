@@ -114,14 +114,13 @@ async def get_trend(
     current_user: User = Depends(get_current_user)
 ):
     """报价趋势：支持按周/月/季度/年聚合"""
-    if granularity == "week":
-        date_expr = "DATE_FORMAT(r.交易开始日期, '%Y-%u周')"
-    elif granularity == "quarter":
-        date_expr = "CONCAT(YEAR(r.交易开始日期), '-Q', QUARTER(r.交易开始日期))"
-    elif granularity == "year":
-        date_expr = "DATE_FORMAT(r.交易开始日期, '%Y年')"
-    else:
-        date_expr = "DATE_FORMAT(r.交易开始日期, '%Y-%m')"
+    _GRANULARITY_MAP = {
+        "week":    "DATE_FORMAT(r.交易开始日期, '%Y-%u周')",
+        "quarter": "CONCAT(YEAR(r.交易开始日期), '-Q', QUARTER(r.交易开始日期))",
+        "year":    "DATE_FORMAT(r.交易开始日期, '%Y年')",
+        "month":   "DATE_FORMAT(r.交易开始日期, '%Y-%m')",
+    }
+    date_expr = _GRANULARITY_MAP.get(granularity, _GRANULARITY_MAP["month"])
 
     rows = db.execute(text(f"""
         SELECT
@@ -190,14 +189,17 @@ async def get_forex_history(
     if not currency_list:
         return {"success": True, "data": result, "days": days}
     try:
-        placeholders = ",".join(f"'{c}'" for c in currency_list)
+        # 使用参数化占位符避免字符串拼接进 SQL
+        placeholders = ",".join([f":c{i}" for i in range(len(currency_list))])
+        params = {f"c{i}": c for i, c in enumerate(currency_list)}
+        params["days"] = days
         rows = db.execute(text(f"""
             SELECT `币种`, `参考日期`, `汇率`
             FROM forex_rate_history
             WHERE `币种` IN ({placeholders})
               AND `参考日期` >= DATE_SUB(CURDATE(), INTERVAL :days DAY)
             ORDER BY `参考日期` ASC
-        """), {"days": days}).fetchall()
+        """), params).fetchall()
         for row in rows:
             currency, ref_date, rate = row[0], str(row[1]), float(row[2])
             if currency in result:

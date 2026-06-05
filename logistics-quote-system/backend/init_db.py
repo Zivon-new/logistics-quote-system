@@ -16,7 +16,9 @@ from app.core.security import get_password_hash
 # password: 初始密码
 # is_admin: True = 管理员，False = 普通用户
 # ────────────────────────────────────────────────────────────
-_PWD = "JHL181116"
+# 密码从环境变量读取，不写死在代码里
+import os as _os
+_PWD = _os.environ.get("INIT_USER_PASSWORD") or input("请输入初始用户密码: ")
 USERS_TO_CREATE = [
     {"username": "sdream",   "full_name": "Sdream 谢斯俊", "password": _PWD, "is_admin": True},
     {"username": "anna",     "full_name": "Anna 李瑾",     "password": _PWD, "is_admin": True},
@@ -35,6 +37,7 @@ USERS_TO_CREATE = [
     {"username": "bonnie",   "full_name": "Bonnie 王玮",   "password": _PWD, "is_admin": True},
     {"username": "mia",      "full_name": "Mia 虞靓",      "password": _PWD, "is_admin": True},
     {"username": "simon",    "full_name": "Simon 廖威",     "password": _PWD, "is_admin": True},
+    {"username": "yangtong",    "full_name": "杨统",     "password": _PWD, "is_admin": True},
 ]
 
 

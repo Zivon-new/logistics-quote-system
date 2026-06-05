@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # 应用配置
     APP_NAME: str = "国际物流报价系统"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # 数据库配置（从 .env 读取，无默认密码）
     DB_HOST: str = "localhost"
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # JWT配置（从 .env 读取，无默认值）
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7天
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1天（原7天，缩短降低Token窃取风险）
 
     # CORS配置
     CORS_ORIGINS: list = [
