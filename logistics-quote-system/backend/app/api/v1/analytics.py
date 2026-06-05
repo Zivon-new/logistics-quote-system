@@ -304,20 +304,29 @@ async def get_agent_report(
     代理商: str = Query(..., description="代理商名称（模糊匹配）"),
     year: int = Query(..., description="分析年份"),
     compare_year: Optional[int] = Query(None, description="对比年份，默认 year-1"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="分析月份，不填则全年"),
+    compare_month: Optional[int] = Query(None, ge=1, le=12, description="对比月份，不填同 month"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     代理商年度综合报告：
-    1. 年度概览（使用次数、小计总额、总计总额、计费重量）与上一年对比
-    2. 贸易类型 / 运输方式分布（今年 vs 去年）
-    3. 单价异动分析（按路线+运输方式+费用类型+单位，跨年比较平均单价）
+    1. 年度/月度概览（使用次数、小计总额、总计总额、计费重量）与对比期对比
+    2. 贸易类型 / 运输方式分布
+    3. 单价异动分析（按路线+运输方式+费用类型+单位，跨期比较平均单价）
     """
-    cmp_year = compare_year if compare_year else year - 1
+    cmp_year  = compare_year  if compare_year  else year - 1
+    cmp_month = compare_month if compare_month else month
     agent_like = f"%{代理商}%"
 
-    def _overview(y):
-        row = db.execute(text("""
+    def _month_clause(m):
+        return "AND MONTH(r.交易开始日期) = :m" if m else ""
+
+    def _overview(y, m=None):
+        mc = _month_clause(m)
+        params = {"agent": agent_like, "y": y}
+        if m: params["m"] = m
+        row = db.execute(text(f"""
             SELECT
                 COUNT(ra.代理路线ID)                    AS 使用次数,
                 COALESCE(SUM(s.小计),  0)               AS 小计总额,
@@ -326,8 +335,8 @@ async def get_agent_report(
             FROM route_agents ra
             JOIN routes r ON ra.路线ID = r.路线ID
             LEFT JOIN summary s ON ra.代理路线ID = s.代理路线ID
-            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y
-        """), {"agent": agent_like, "y": y}).fetchone()
+            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y {mc}
+        """), params).fetchone()
         return {
             "使用次数":  int(row[0] or 0),
             "小计总额":  float(row[1] or 0),
@@ -335,21 +344,24 @@ async def get_agent_report(
             "计费重量":  float(row[3] or 0),
         }
 
-    def _dist(y, field):
+    def _dist(y, m, field):
+        mc = _month_clause(m)
+        params = {"agent": agent_like, "y": y}
+        if m: params["m"] = m
         rows = db.execute(text(f"""
             SELECT ra.`{field}`, COUNT(*) AS 条数
             FROM route_agents ra
             JOIN routes r ON ra.路线ID = r.路线ID
-            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y
+            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y {mc}
               AND ra.`{field}` IS NOT NULL AND ra.`{field}` != ''
             GROUP BY ra.`{field}`
             ORDER BY 条数 DESC
-        """), {"agent": agent_like, "y": y}).fetchall()
+        """), params).fetchall()
         return {r[0]: int(r[1]) for r in rows}
 
     # ── 概览 ──
-    cur_ov  = _overview(year)
-    prv_ov  = _overview(cmp_year)
+    cur_ov  = _overview(year, month)
+    prv_ov  = _overview(cmp_year, cmp_month)
 
     def _pct(cur, prv):
         if prv and prv > 0:
@@ -358,7 +370,9 @@ async def get_agent_report(
 
     overview = {
         "today_year":    year,
+        "today_month":   month,
         "compare_year":  cmp_year,
+        "compare_month": cmp_month,
         "today":         cur_ov,
         "previous":      prv_ov,
         "changes": {k: _pct(cur_ov[k], prv_ov[k]) for k in cur_ov},
@@ -366,16 +380,23 @@ async def get_agent_report(
 
     # ── 分布 ──
     def _merge_dist(field):
-        cur = _dist(year, field)
-        prv = _dist(cmp_year, field)
+        cur = _dist(year, month, field)
+        prv = _dist(cmp_year, cmp_month, field)
         keys = sorted(set(cur) | set(prv), key=lambda k: -(cur.get(k, 0) + prv.get(k, 0)))
         return [{"类型": k, "今年": cur.get(k, 0), "去年": prv.get(k, 0)} for k in keys]
 
     trade_dist     = _merge_dist("贸易类型")
     transport_dist = _merge_dist("运输方式")
 
-    # ── 单价异动（跨年，按路线+运输方式+费用类型+单位） ──
-    price_rows = db.execute(text("""
+    # ── 单价异动（跨期，按路线+运输方式+费用类型+单位） ──
+    # 今年/去年各自加月份条件（若有）
+    m1_clause = "AND MONTH(r.交易开始日期) = :m1" if month     else ""
+    m2_clause = "AND MONTH(r.交易开始日期) = :m2" if cmp_month else ""
+    price_params = {"agent": agent_like, "y1": year, "y2": cmp_year}
+    if month:     price_params["m1"] = month
+    if cmp_month: price_params["m2"] = cmp_month
+
+    price_rows = db.execute(text(f"""
         SELECT
             r.起始地, r.目的地, ra.运输方式,
             fi.费用类型, fi.单位,
@@ -385,14 +406,18 @@ async def get_agent_report(
         JOIN routes r ON ra.路线ID = r.路线ID
         JOIN fee_items fi ON fi.代理路线ID = ra.代理路线ID
         WHERE ra.代理商 LIKE :agent
-          AND YEAR(r.交易开始日期) IN (:y1, :y2)
+          AND (
+            (YEAR(r.交易开始日期) = :y1 {m1_clause})
+            OR
+            (YEAR(r.交易开始日期) = :y2 {m2_clause})
+          )
           AND fi.备注 != '__GROUP_HEADER__'
           AND (fi.参与核算 IS NULL OR fi.参与核算 != 0)
           AND fi.单价 > 0
           AND fi.单位 IS NOT NULL AND fi.单位 != ''
         GROUP BY r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位, yr
         ORDER BY r.起始地, r.目的地, fi.费用类型, yr
-    """), {"agent": agent_like, "y1": year, "y2": cmp_year}).fetchall()
+    """), price_params).fetchall()
 
     # 按 (路线, 运输方式, 费用类型, 单位) 聚合，拿今年和去年单价
     from collections import defaultdict

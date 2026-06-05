@@ -221,11 +221,19 @@
         <el-card shadow="never" class="chart-card">
           <template #header>
             <span class="card-title">代理商年度综合报告</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <el-input v-model="agentQuery.代理商" placeholder="代理商名称，如：融讯" clearable style="width:180px" />
-              <el-input-number v-model="agentQuery.year" :min="2020" :max="2030" style="width:110px" />
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <el-input v-model="agentQuery.代理商" placeholder="代理商名称，如：融讯" clearable style="width:160px" />
+              <el-input-number v-model="agentQuery.year" :min="2020" :max="2030" :controls="false" style="width:72px" />
+              <el-select v-model="agentQuery.month" style="width:80px" placeholder="全年">
+                <el-option label="全年" :value="null" />
+                <el-option v-for="m in 12" :key="m" :label="`${m}月`" :value="m" />
+              </el-select>
               <span style="color:#8c8c8c;font-size:13px">vs</span>
-              <el-input-number v-model="agentQuery.compare_year" :min="2019" :max="2029" style="width:110px" />
+              <el-input-number v-model="agentQuery.compare_year" :min="2019" :max="2029" :controls="false" style="width:72px" />
+              <el-select v-model="agentQuery.compare_month" style="width:80px" placeholder="全年">
+                <el-option label="全年" :value="null" />
+                <el-option v-for="m in 12" :key="m" :label="`${m}月`" :value="m" />
+              </el-select>
               <el-button type="primary" size="small" @click="loadAgentReport" :loading="agentLoading">查询</el-button>
             </div>
           </template>
@@ -276,44 +284,62 @@
             </el-row>
 
             <!-- ③ 单价异动分析 -->
-            <div class="agent-section-title">
-              单价异动分析
-              <span v-if="agentReport.异常单价数 > 0" style="color:#f5222d;margin-left:8px;font-size:13px">
-                {{ agentReport.异常单价数 }} 项涨幅超15%
+            <div class="agent-section-title" style="display:flex;justify-content:space-between;align-items:center">
+              <span>
+                单价异动分析
+                <span v-if="agentReport.异常单价数 > 0" style="color:#f5222d;margin-left:8px;font-size:13px">
+                  {{ agentReport.异常单价数 }} 项涨幅超15%
+                </span>
               </span>
+              <el-radio-group v-model="unitPriceFilter" size="small">
+                <el-radio-button value="全部">全部</el-radio-button>
+                <el-radio-button value="异常">只看异常</el-radio-button>
+                <el-radio-button value="有对比">有对比</el-radio-button>
+              </el-radio-group>
             </div>
-            <el-table :data="agentReport.单价异动" border size="small"
-              :row-class-name="({ row }) => row.异常 ? 'agent-suspicious-row' : ''">
-              <el-table-column prop="路线" label="路线" min-width="150" />
-              <el-table-column prop="运输方式" label="运输方式" width="90" align="center" />
-              <el-table-column prop="费用类型" label="费用类型" width="110" />
-              <el-table-column prop="单位" label="计费单位" width="80" align="center" />
-              <el-table-column :label="`${agentReport.overview.compare_year}年单价`" width="110" align="right">
+            <el-table :data="processedUnitPrices" border size="small"
+              :span-method="unitPriceSpanMethod"
+              :row-class-name="({ row }) => row._isGroupHeader ? 'up-group-header-row' : (row.异常 ? 'agent-suspicious-row' : '')">
+              <el-table-column label="路线 / 运输方式" min-width="210">
                 <template #default="{ row }">
-                  <span v-if="row.去年单价 != null">{{ row.去年单价.toFixed(2) }}</span>
-                  <span v-else style="color:#bfbfbf">—</span>
+                  <div v-if="row._isGroupHeader" class="up-group-header-cell">
+                    <span class="up-route">{{ row.路线 }}</span>
+                    <el-tag size="small" type="info" style="margin-left:6px">{{ row.运输方式 }}</el-tag>
+                  </div>
                 </template>
               </el-table-column>
-              <el-table-column :label="`${agentReport.overview.today_year}年单价`" width="110" align="right">
+              <el-table-column prop="费用类型" label="费用类型" width="110" />
+              <el-table-column prop="单位" label="计费单位" width="80" align="center" />
+              <el-table-column :label="periodLabel(agentReport.overview.compare_year, agentReport.overview.compare_month)" width="110" align="right">
                 <template #default="{ row }">
-                  <span v-if="row.今年单价 != null">{{ row.今年单价.toFixed(2) }}</span>
-                  <span v-else style="color:#bfbfbf">—</span>
+                  <span v-if="!row._isGroupHeader && row.去年单价 != null">{{ row.去年单价.toFixed(2) }}</span>
+                  <span v-else-if="!row._isGroupHeader" style="color:#bfbfbf">—</span>
+                </template>
+              </el-table-column>
+              <el-table-column :label="periodLabel(agentReport.overview.today_year, agentReport.overview.today_month)" width="110" align="right">
+                <template #default="{ row }">
+                  <span v-if="!row._isGroupHeader && row.今年单价 != null">{{ row.今年单价.toFixed(2) }}</span>
+                  <span v-else-if="!row._isGroupHeader" style="color:#bfbfbf">—</span>
                 </template>
               </el-table-column>
               <el-table-column label="涨幅" width="90" align="center">
                 <template #default="{ row }">
-                  <span v-if="row.涨幅 != null"
-                    :style="{ color: row.涨幅 > 15 ? '#f5222d' : row.涨幅 > 0 ? '#fa8c16' : '#52c41a', fontWeight:'600' }">
-                    {{ row.涨幅 > 0 ? '+' : '' }}{{ row.涨幅 }}%
-                  </span>
-                  <span v-else style="color:#bfbfbf">仅单年</span>
+                  <template v-if="!row._isGroupHeader">
+                    <span v-if="row.涨幅 != null"
+                      :style="{ color: row.涨幅 > 15 ? '#f5222d' : row.涨幅 > 0 ? '#fa8c16' : '#52c41a', fontWeight:'600' }">
+                      {{ row.涨幅 > 0 ? '+' : '' }}{{ row.涨幅 }}%
+                    </span>
+                    <span v-else style="color:#bfbfbf">仅单年</span>
+                  </template>
                 </template>
               </el-table-column>
               <el-table-column label="状态" width="70" align="center">
                 <template #default="{ row }">
-                  <el-tag v-if="row.异常" type="danger" size="small">异常</el-tag>
-                  <el-tag v-else-if="row.涨幅 != null" type="success" size="small">正常</el-tag>
-                  <el-tag v-else type="info" size="small">无对比</el-tag>
+                  <template v-if="!row._isGroupHeader">
+                    <el-tag v-if="row.异常" type="danger" size="small">异常</el-tag>
+                    <el-tag v-else-if="row.涨幅 != null" type="success" size="small">正常</el-tag>
+                    <el-tag v-else type="info" size="small">无对比</el-tag>
+                  </template>
                 </template>
               </el-table-column>
             </el-table>
@@ -351,17 +377,51 @@ use([CanvasRenderer, BarChart, PieChart, LineChart,
 // ── 数据 ──────────────────────────────────────────────────
 // 代理商年度分析
 const curY = new Date().getFullYear()
-const agentQuery = ref({ 代理商: '', year: curY, compare_year: curY - 1 })
+const agentQuery = ref({ 代理商: '', year: curY, month: null, compare_year: curY - 1, compare_month: null })
 const agentReport = ref(null)
 const agentLoading = ref(false)
+const unitPriceFilter = ref('全部')
 
 const agentMetrics = { 使用次数: '使用次数（次）', 小计总额: '运费小计（¥）', 总计总额: '含税总计（¥）', 计费重量: '计费重量（kg）' }
+
+const periodLabel = (y, m) => m ? `${y}年${m}月` : `${y}年`
 
 const formatAgentVal = (key, val) => {
   if (val == null) return '—'
   if (key === '使用次数') return val + ' 次'
   if (key === '计费重量') return val.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) + ' kg'
   return '¥' + val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// 单价异动：筛选 + 按路线分组注入分组标题行
+const processedUnitPrices = computed(() => {
+  if (!agentReport.value) return []
+  let data = agentReport.value.单价异动 || []
+  if (unitPriceFilter.value === '异常') data = data.filter(r => r.异常)
+  if (unitPriceFilter.value === '有对比') data = data.filter(r => r.涨幅 != null)
+
+  const sorted = [...data].sort((a, b) => {
+    const ka = `${a.路线}|${a.运输方式}`
+    const kb = `${b.路线}|${b.运输方式}`
+    return ka < kb ? -1 : ka > kb ? 1 : 0
+  })
+
+  const result = []
+  let lastKey = null
+  for (const row of sorted) {
+    const key = `${row.路线}|${row.运输方式}`
+    if (key !== lastKey) {
+      result.push({ _isGroupHeader: true, 路线: row.路线, 运输方式: row.运输方式 })
+      lastKey = key
+    }
+    result.push(row)
+  }
+  return result
+})
+
+const unitPriceSpanMethod = ({ row, columnIndex }) => {
+  if (row._isGroupHeader) return columnIndex === 0 ? [1, 7] : [0, 0]
+  return [1, 1]
 }
 
 const loadAgentReport = async () => {
@@ -373,6 +433,8 @@ const loadAgentReport = async () => {
       year: agentQuery.value.year,
       compare_year: agentQuery.value.compare_year,
     }
+    if (agentQuery.value.month) params.month = agentQuery.value.month
+    if (agentQuery.value.compare_month) params.compare_month = agentQuery.value.compare_month
     agentReport.value = await request.get('/v1/analytics/agent-report', { params })
   } catch (e) {
     ElMessage.error('查询失败：' + (e.message || '未知错误'))
@@ -821,7 +883,10 @@ const fuelChartOption = computed(() => ({
 .market-empty { padding: 24px 0; text-align: center; }
 .empty-tip { font-size: 12px; color: #8c8c8c; margin-top: 8px; }
 :deep(.agent-suspicious-row) td { background-color: #fff1f0 !important; }
-.agent-section-title { font-size: 13px; font-weight: 600; color: #262626; margin: 0 0 8px; padding-left: 8px; border-left: 3px solid #1890ff; }
+.agent-section-title { font-size: 13px; font-weight: 600; color: #262626; margin: 0 0 8px; padding-left: 8px; border-left: 3px solid #1890ff; display: flex; align-items: center; }
+:deep(.up-group-header-row) td { background: #f0f5ff !important; font-weight: 600; }
+.up-group-header-cell { display: flex; align-items: center; }
+.up-route { color: #262626; font-weight: 600; }
 .agent-metric-card { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 6px; padding: 12px; }
 .am-label { font-size: 12px; color: #8c8c8c; margin-bottom: 6px; }
 .am-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
