@@ -400,7 +400,8 @@ async def get_agent_report(
         SELECT
             r.起始地, r.目的地, ra.运输方式,
             fi.费用类型, fi.单位,
-            YEAR(r.交易开始日期) AS yr,
+            YEAR(r.交易开始日期)  AS yr,
+            MONTH(r.交易开始日期) AS mo,
             ROUND(AVG(fi.单价), 4) AS avg_price
         FROM route_agents ra
         JOIN routes r ON ra.路线ID = r.路线ID
@@ -415,21 +416,27 @@ async def get_agent_report(
           AND (fi.参与核算 IS NULL OR fi.参与核算 != 0)
           AND fi.单价 > 0
           AND fi.单位 IS NOT NULL AND fi.单位 != ''
-        GROUP BY r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位, yr
-        ORDER BY r.起始地, r.目的地, fi.费用类型, yr
+        GROUP BY r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位, yr, mo
+        ORDER BY r.起始地, r.目的地, fi.费用类型, yr, mo
     """), price_params).fetchall()
 
-    # 按 (路线, 运输方式, 费用类型, 单位) 聚合，拿今年和去年单价
+    # 按 (路线, 运输方式, 费用类型, 单位) 聚合，用语义 key 'cur'/'prv' 区分两个比较期
+    # 避免同年不同月时 yr 相同导致数据混淆
     from collections import defaultdict
     price_map = defaultdict(dict)
     for row in price_rows:
         key = (f"{row[0]} → {row[1]}", row[2] or "—", row[3], row[4])
-        price_map[key][int(row[5])] = float(row[6])
+        row_yr, row_mo = int(row[5]), int(row[6])
+        # 判断该行属于"当前期"还是"对比期"
+        is_cur = (row_yr == year     and (not month     or row_mo == month))
+        is_prv = (row_yr == cmp_year and (not cmp_month or row_mo == cmp_month))
+        if is_cur: price_map[key]['cur'] = float(row[7])
+        if is_prv: price_map[key]['prv'] = float(row[7])
 
     unit_price_changes = []
-    for (route, transport, fee_type, unit), yr_map in price_map.items():
-        cur_p = yr_map.get(year)
-        prv_p = yr_map.get(cmp_year)
+    for (route, transport, fee_type, unit), pm in price_map.items():
+        cur_p = pm.get('cur')
+        prv_p = pm.get('prv')
         pct   = round((cur_p - prv_p) / prv_p * 100, 1) if cur_p and prv_p and prv_p > 0 else None
         unit_price_changes.append({
             "路线":      route,
