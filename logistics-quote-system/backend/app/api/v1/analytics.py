@@ -388,55 +388,35 @@ async def get_agent_report(
     trade_dist     = _merge_dist("贸易类型")
     transport_dist = _merge_dist("运输方式")
 
-    # ── 单价异动（跨期，按路线+运输方式+费用类型+单位） ──
-    # 今年/去年各自加月份条件（若有）
-    m1_clause = "AND MONTH(r.交易开始日期) = :m1" if month     else ""
-    m2_clause = "AND MONTH(r.交易开始日期) = :m2" if cmp_month else ""
-    price_params = {"agent": agent_like, "y1": year, "y2": cmp_year}
-    if month:     price_params["m1"] = month
-    if cmp_month: price_params["m2"] = cmp_month
+    # ── 单价异动（cur期和prv期独立查询，全年/月份各自正确GROUP BY） ──
+    def _fetch_period_prices(y, m):
+        """按指定年（+月）查单价平均，无月份时全年AVG，有月份时当月AVG"""
+        mo_where = "AND MONTH(r.交易开始日期) = :m" if m else ""
+        params = {"agent": agent_like, "y": y}
+        if m: params["m"] = m
+        rows = db.execute(text(f"""
+            SELECT r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位,
+                   ROUND(AVG(fi.单价), 4) AS avg_price
+            FROM route_agents ra
+            JOIN routes r ON ra.路线ID = r.路线ID
+            JOIN fee_items fi ON fi.代理路线ID = ra.代理路线ID
+            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y {mo_where}
+              AND fi.备注 != '__GROUP_HEADER__'
+              AND (fi.参与核算 IS NULL OR fi.参与核算 != 0)
+              AND fi.单价 > 0
+              AND fi.单位 IS NOT NULL AND fi.单位 != ''
+            GROUP BY r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位
+        """), params).fetchall()
+        return {(f"{r[0]} → {r[1]}", r[2] or "—", r[3], r[4]): float(r[5]) for r in rows}
 
-    price_rows = db.execute(text(f"""
-        SELECT
-            r.起始地, r.目的地, ra.运输方式,
-            fi.费用类型, fi.单位,
-            YEAR(r.交易开始日期)  AS yr,
-            MONTH(r.交易开始日期) AS mo,
-            ROUND(AVG(fi.单价), 4) AS avg_price
-        FROM route_agents ra
-        JOIN routes r ON ra.路线ID = r.路线ID
-        JOIN fee_items fi ON fi.代理路线ID = ra.代理路线ID
-        WHERE ra.代理商 LIKE :agent
-          AND (
-            (YEAR(r.交易开始日期) = :y1 {m1_clause})
-            OR
-            (YEAR(r.交易开始日期) = :y2 {m2_clause})
-          )
-          AND fi.备注 != '__GROUP_HEADER__'
-          AND (fi.参与核算 IS NULL OR fi.参与核算 != 0)
-          AND fi.单价 > 0
-          AND fi.单位 IS NOT NULL AND fi.单位 != ''
-        GROUP BY r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位, yr, mo
-        ORDER BY r.起始地, r.目的地, fi.费用类型, yr, mo
-    """), price_params).fetchall()
+    cur_prices = _fetch_period_prices(year, month)
+    prv_prices = _fetch_period_prices(cmp_year, cmp_month)
 
-    # 按 (路线, 运输方式, 费用类型, 单位) 聚合，用语义 key 'cur'/'prv' 区分两个比较期
-    # 避免同年不同月时 yr 相同导致数据混淆
-    from collections import defaultdict
-    price_map = defaultdict(dict)
-    for row in price_rows:
-        key = (f"{row[0]} → {row[1]}", row[2] or "—", row[3], row[4])
-        row_yr, row_mo = int(row[5]), int(row[6])
-        # 判断该行属于"当前期"还是"对比期"
-        is_cur = (row_yr == year     and (not month     or row_mo == month))
-        is_prv = (row_yr == cmp_year and (not cmp_month or row_mo == cmp_month))
-        if is_cur: price_map[key]['cur'] = float(row[7])
-        if is_prv: price_map[key]['prv'] = float(row[7])
-
+    all_keys = set(cur_prices) | set(prv_prices)
     unit_price_changes = []
-    for (route, transport, fee_type, unit), pm in price_map.items():
-        cur_p = pm.get('cur')
-        prv_p = pm.get('prv')
+    for (route, transport, fee_type, unit) in all_keys:
+        cur_p = cur_prices.get((route, transport, fee_type, unit))
+        prv_p = prv_prices.get((route, transport, fee_type, unit))
         pct   = round((cur_p - prv_p) / prv_p * 100, 1) if cur_p and prv_p and prv_p > 0 else None
         unit_price_changes.append({
             "路线":      route,
