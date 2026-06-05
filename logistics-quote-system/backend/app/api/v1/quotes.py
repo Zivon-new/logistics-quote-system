@@ -181,9 +181,12 @@ async def search_quotes(
         ).distinct()
         query = query.filter(Route.路线ID.in_(goods_subquery))
 
-    # 代理商筛选（模糊搜索）
+    # 代理商筛选（子查询，避免与 joinedload 冲突）
     if 代理商:
-        query = query.join(RouteAgent).filter(RouteAgent.代理商.like(f"%{代理商}%"))
+        agent_subquery = db.query(RouteAgent.路线ID).filter(
+            RouteAgent.代理商.like(f"%{代理商}%")
+        ).distinct()
+        query = query.filter(Route.路线ID.in_(agent_subquery))
 
     # 获取总数
     total = query.count()

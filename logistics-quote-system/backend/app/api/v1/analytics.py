@@ -5,6 +5,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from typing import Optional
 from ...database import get_db
 from ...core.deps import get_current_user
 from ...models.user import User
@@ -296,3 +297,96 @@ async def get_price_distribution(db: Session = Depends(get_db), current_user: Us
         ORDER BY 排序
     """)).fetchall()
     return [{"区间": r[0], "数量": r[1]} for r in rows]
+
+
+@router.get("/agent-report", summary="代理商年度报价汇总")
+async def get_agent_report(
+    代理商: str = Query(..., description="代理商名称（精确或模糊）"),
+    year: Optional[int] = Query(None, description="年份，不填则查全部"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    汇总指定代理商在给定年度的全部报价，按路线分组，
+    计算每条路线最早/最新报价及涨幅，辅助核查不合理抬价。
+    """
+    year_clause = "AND YEAR(r.交易开始日期) = :year" if year else ""
+    params = {"agent": f"%{代理商}%"}
+    if year:
+        params["year"] = year
+
+    rows = db.execute(text(f"""
+        SELECT
+            r.路线ID,
+            r.起始地,
+            r.途径地,
+            r.目的地,
+            r.交易开始日期,
+            r.交易结束日期,
+            ra.代理路线ID,
+            ra.代理商,
+            ra.运输方式,
+            ra.时效,
+            COALESCE(s.小计, 0)  AS 小计,
+            COALESCE(s.总计, 0)  AS 总计
+        FROM routes r
+        JOIN route_agents ra ON r.路线ID = ra.路线ID
+        LEFT JOIN summary    s  ON ra.代理路线ID = s.代理路线ID
+        WHERE ra.代理商 LIKE :agent
+        {year_clause}
+        ORDER BY r.起始地, r.目的地, r.交易开始日期
+    """), params).fetchall()
+
+    # 按路线(起始地→目的地)分组，计算价格趋势
+    from collections import defaultdict
+    route_groups = defaultdict(list)
+    for r in rows:
+        key = f"{r[1]} → {r[3]}"
+        route_groups[key].append({
+            "路线ID":       r[0],
+            "起始地":       r[1],
+            "途径地":       r[2],
+            "目的地":       r[3],
+            "交易开始日期": str(r[4]) if r[4] else None,
+            "交易结束日期": str(r[5]) if r[5] else None,
+            "代理路线ID":   r[6],
+            "代理商":       r[7],
+            "运输方式":     r[8],
+            "时效":         r[9],
+            "小计":         float(r[10]),
+            "总计":         float(r[11]),
+        })
+
+    result = []
+    for route_key, records in route_groups.items():
+        priced = [rec for rec in records if rec["总计"] > 0]
+        price_change = None
+        is_suspicious = False
+        if len(priced) >= 2:
+            first_price = priced[0]["总计"]
+            last_price  = priced[-1]["总计"]
+            if first_price > 0:
+                pct = (last_price - first_price) / first_price * 100
+                price_change = round(pct, 2)
+                is_suspicious = pct > 15  # 涨幅超过15%标记为异常
+        result.append({
+            "路线":         route_key,
+            "记录数":       len(records),
+            "最早日期":     records[0]["交易开始日期"],
+            "最新日期":     records[-1]["交易开始日期"],
+            "首次报价":     priced[0]["总计"] if priced else None,
+            "最新报价":     priced[-1]["总计"] if priced else None,
+            "涨幅百分比":   price_change,
+            "异常标记":     is_suspicious,
+            "明细":         records,
+        })
+
+    # 异常路线排前面
+    result.sort(key=lambda x: (not x["异常标记"], -(x["涨幅百分比"] or 0)))
+    return {
+        "代理商": 代理商,
+        "year":  year,
+        "路线数": len(result),
+        "异常路线数": sum(1 for r in result if r["异常标记"]),
+        "routes": result,
+    }

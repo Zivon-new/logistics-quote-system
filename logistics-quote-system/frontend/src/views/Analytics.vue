@@ -215,6 +215,72 @@
         </el-card>
       </el-col>
     </el-row>
+    <!-- 代理商年度报价分析 -->
+    <el-row :gutter="16" style="margin-top:16px">
+      <el-col :span="24">
+        <el-card shadow="never" class="chart-card">
+          <template #header>
+            <span class="card-title">代理商年度报价分析</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <el-input v-model="agentQuery.代理商" placeholder="代理商名称，如：融讯" clearable style="width:180px" />
+              <el-input-number v-model="agentQuery.year" :min="2020" :max="2030" placeholder="年份" style="width:110px" />
+              <el-button type="primary" size="small" @click="loadAgentReport" :loading="agentLoading">查询</el-button>
+            </div>
+          </template>
+
+          <div v-if="agentReport">
+            <div style="margin-bottom:12px;color:#595959;font-size:13px">
+              共 <b>{{ agentReport.路线数 }}</b> 条路线，
+              <span style="color:#f5222d;font-weight:600">{{ agentReport.异常路线数 }}</span> 条涨幅超15%（标红）
+            </div>
+            <el-table :data="agentReport.routes" border size="small" row-key="路线"
+              :row-class-name="({ row }) => row.异常标记 ? 'agent-suspicious-row' : ''">
+              <el-table-column prop="路线" label="路线" min-width="160" />
+              <el-table-column prop="记录数" label="报价次数" width="90" align="center" />
+              <el-table-column prop="最早日期" label="首次日期" width="110" align="center" />
+              <el-table-column prop="最新日期" label="最新日期" width="110" align="center" />
+              <el-table-column label="首次报价(¥)" width="110" align="right">
+                <template #default="{ row }">{{ row.首次报价 != null ? '¥' + row.首次报价.toFixed(2) : '—' }}</template>
+              </el-table-column>
+              <el-table-column label="最新报价(¥)" width="110" align="right">
+                <template #default="{ row }">{{ row.最新报价 != null ? '¥' + row.最新报价.toFixed(2) : '—' }}</template>
+              </el-table-column>
+              <el-table-column label="涨幅" width="90" align="center">
+                <template #default="{ row }">
+                  <span v-if="row.涨幅百分比 != null"
+                    :style="{ color: row.涨幅百分比 > 15 ? '#f5222d' : row.涨幅百分比 > 0 ? '#fa8c16' : '#52c41a', fontWeight: '600' }">
+                    {{ row.涨幅百分比 > 0 ? '+' : '' }}{{ row.涨幅百分比 }}%
+                  </span>
+                  <span v-else style="color:#bfbfbf">—</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.异常标记" type="danger" size="small">异常</el-tag>
+                  <el-tag v-else type="success" size="small">正常</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column type="expand" width="50">
+                <template #default="{ row }">
+                  <el-table :data="row.明细" size="small" border style="margin:8px 16px">
+                    <el-table-column prop="交易开始日期" label="日期" width="110" />
+                    <el-table-column prop="运输方式" label="运输方式" width="90" />
+                    <el-table-column prop="时效" label="时效" width="80" />
+                    <el-table-column prop="小计" label="小计(¥)" width="100" align="right">
+                      <template #default="{ row: r }">{{ r.小计 > 0 ? '¥' + r.小计.toFixed(2) : '—' }}</template>
+                    </el-table-column>
+                    <el-table-column prop="总计" label="总计(¥)" width="100" align="right">
+                      <template #default="{ row: r }">{{ r.总计 > 0 ? '¥' + r.总计.toFixed(2) : '—' }}</template>
+                    </el-table-column>
+                  </el-table>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <el-empty v-else-if="!agentLoading" description="输入代理商名称并点击查询" :image-size="60" />
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -233,6 +299,7 @@ import {
   getOverview, getRouteUsage, getRouteAgentDist, getTrend, getByAgent, getPriceDistribution,
   getForexHistory, getFuelHistory, triggerFuelBackfill, triggerForexBackfill
 } from '@/api/analytics'
+import request from '@/utils/request'
 import { refreshForexRates } from '@/api/route'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -241,6 +308,24 @@ use([CanvasRenderer, BarChart, PieChart, LineChart,
   TitleComponent, TooltipComponent, GridComponent, LegendComponent, DataZoomComponent])
 
 // ── 数据 ──────────────────────────────────────────────────
+// 代理商年度分析
+const agentQuery = ref({ 代理商: '', year: new Date().getFullYear() })
+const agentReport = ref(null)
+const agentLoading = ref(false)
+const loadAgentReport = async () => {
+  if (!agentQuery.value.代理商) return
+  agentLoading.value = true
+  try {
+    const params = { 代理商: agentQuery.value.代理商 }
+    if (agentQuery.value.year) params.year = agentQuery.value.year
+    agentReport.value = await request.get('/api/v1/analytics/agent-report', { params })
+  } catch (e) {
+    ElMessage.error('查询失败：' + (e.message || '未知错误'))
+  } finally {
+    agentLoading.value = false
+  }
+}
+
 const loadingOverview = ref(true)
 const overview = ref({ total_routes: 0, total_agents: 0, total_destinations: 0, avg_price: 0, min_price: 0, max_price: 0 })
 const routeUsageData = ref([])
@@ -680,4 +765,5 @@ const fuelChartOption = computed(() => ({
 .card-hint { font-size: 12px; color: #bfbfbf; margin-left: 8px; }
 .market-empty { padding: 24px 0; text-align: center; }
 .empty-tip { font-size: 12px; color: #8c8c8c; margin-top: 8px; }
+:deep(.agent-suspicious-row) td { background-color: #fff1f0 !important; }
 </style>
