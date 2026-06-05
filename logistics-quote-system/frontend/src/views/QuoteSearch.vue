@@ -637,6 +637,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Download, Histogram, Tickets, Warning } from '@element-plus/icons-vue'
 import { searchQuotes } from '@/api/quote'
+import { calcGroupSubtotalsReadOnly } from '@/utils/feeGroupSubtotals'
 import { getSearchOptions } from '@/api/recommend'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
 
@@ -1111,32 +1112,8 @@ const viewDetail = (agent, route) => {
   detailVisible.value = true
 }
 
-// 按分组标题聚合各段原币小计（只读视图直接用原币金额）
-const calcGroupSubtotals = (agent) => {
-  const groupMap = new Map()
-  const groupOrder = []
-  const processItems = (items) => {
-    let curName = null
-    for (const item of (items || [])) {
-      if (item.备注 === '__GROUP_HEADER__') {
-        curName = item.费用类型 || item.费用名称 || '未命名组'
-        if (!groupMap.has(curName)) { groupMap.set(curName, {}); groupOrder.push(curName) }
-        continue
-      }
-      if (!curName) continue
-      if (item.参与核算 === false || item.参与核算 === 0) continue
-      const currency = item.币种 || 'RMB'
-      const amt = parseFloat(item.原币金额) || 0
-      if (amt > 0) {
-        const amounts = groupMap.get(curName)
-        amounts[currency] = (amounts[currency] || 0) + amt
-      }
-    }
-  }
-  processItems(agent.fee_items)
-  processItems(agent.fee_total)
-  return groupOrder.map(name => ({ name, amounts: groupMap.get(name) })).filter(g => Object.keys(g.amounts).length > 0)
-}
+// 分组小计 — 使用公共工具函数（src/utils/feeGroupSubtotals.js）
+const calcGroupSubtotals = calcGroupSubtotalsReadOnly
 
 const detailFeeItemSpanMethod = ({ row, columnIndex }) => {
   if (row.备注 === '__GROUP_HEADER__') {

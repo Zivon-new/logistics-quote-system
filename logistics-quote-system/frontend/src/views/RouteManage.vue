@@ -470,6 +470,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { getRoutes, getRouteDetail, deleteRoute, updateRoute } from '@/api/route'
+import { calcGroupSubtotalsReadOnly } from '@/utils/feeGroupSubtotals'
 import { useUserStore } from '@/stores/user'
 import { useRouteCopyStore } from '@/stores/routeCopy'
 import { transformForCopy } from '@/utils/routeCopyTransform'
@@ -524,32 +525,8 @@ const getAgentForeignSubtotal = (agent, currency) => {
   return total
 }
 
-// 按分组标题聚合各段原币小计（fee_items + fee_total，只读视图直接用原币金额）
-const calcGroupSubtotals = (agent) => {
-  const groupMap = new Map()
-  const groupOrder = []
-  const processItems = (items) => {
-    let curName = null
-    for (const item of (items || [])) {
-      if (item.备注 === '__GROUP_HEADER__') {
-        curName = item.费用类型 || item.费用名称 || '未命名组'
-        if (!groupMap.has(curName)) { groupMap.set(curName, {}); groupOrder.push(curName) }
-        continue
-      }
-      if (!curName) continue
-      if (item.参与核算 === false || item.参与核算 === 0) continue
-      const currency = item.币种 || 'RMB'
-      const amt = parseFloat(item.原币金额) || 0
-      if (amt > 0) {
-        const amounts = groupMap.get(curName)
-        amounts[currency] = (amounts[currency] || 0) + amt
-      }
-    }
-  }
-  processItems(agent.fee_items)
-  processItems(agent.fee_total)
-  return groupOrder.map(name => ({ name, amounts: groupMap.get(name) })).filter(g => Object.keys(g.amounts).length > 0)
-}
+// 分组小计 — 使用公共工具函数（src/utils/feeGroupSubtotals.js）
+const calcGroupSubtotals = calcGroupSubtotalsReadOnly
 
 // 分组标题 span-method（费用明细表：7列 — 费用类型/单价/数量/原币/人民币/核算/备注）
 const feeItemsSpanMethod = ({ row, columnIndex }) => {

@@ -100,68 +100,42 @@ class ExcelImportService:
             # 前端期望：data.routes（数组）、data.goods_details、data.agents
             # 每个agent需要有路线索引
 
-            # 为每个route添加索引
+            # 为每个route添加索引，同时构建 O(1) 查找表（原来用O(n×m)嵌套循环）
+            route_id_to_idx = {}
             for idx, route in enumerate(routes):
                 if isinstance(route, dict):
                     route['_index'] = idx
                     route['路线索引'] = idx
+                    route_id_to_idx[route.get('路线ID')] = idx
 
             # 将fee_items、fee_totals、summary按代理路线ID分组
-            summary_by_agent = {}
-            for s in summaries:
-                aid = s.get('代理路线ID')
-                summary_by_agent[aid] = s
+            summary_by_agent = {s.get('代理路线ID'): s for s in summaries}
 
-            fee_items_by_agent = {}
+            fee_items_by_agent: dict = {}
             for fi in fee_items:
-                aid = fi.get('代理路线ID')
-                if aid not in fee_items_by_agent:
-                    fee_items_by_agent[aid] = []
-                fee_items_by_agent[aid].append(fi)
+                fee_items_by_agent.setdefault(fi.get('代理路线ID'), []).append(fi)
 
-            fee_totals_by_agent = {}
+            fee_totals_by_agent: dict = {}
             for ft in fee_totals:
-                aid = ft.get('代理路线ID')
-                if aid not in fee_totals_by_agent:
-                    fee_totals_by_agent[aid] = []
-                fee_totals_by_agent[aid].append(ft)
+                fee_totals_by_agent.setdefault(ft.get('代理路线ID'), []).append(ft)
 
-            # 为每个agent添加路线索引及费用数据
+            # 为每个agent添加路线索引及费用数据（O(n) dict 查找）
             for agent in route_agents:
                 if isinstance(agent, dict):
-                    # route_agents已经有路线ID，需要转换为索引
-                    route_id = agent.get('路线ID')
-                    # 查找对应的索引
-                    for idx, route in enumerate(routes):
-                        route_dict = route if isinstance(route, dict) else route.__dict__
-                        if route_dict.get('路线ID') == route_id:
-                            agent['路线索引'] = idx
-                            break
-                    # 附加费用数据和summary
+                    agent['路线索引'] = route_id_to_idx.get(agent.get('路线ID'))
                     agent_id = agent.get('代理路线ID')
                     agent['fee_items'] = fee_items_by_agent.get(agent_id, [])
                     agent['fee_total'] = fee_totals_by_agent.get(agent_id, [])
                     agent['summary'] = summary_by_agent.get(agent_id)
 
-            # 为每个goods_details添加路线索引
+            # 为goods添加路线索引（O(1) dict 查找）
             for goods in goods_details:
                 if isinstance(goods, dict):
-                    route_id = goods.get('路线ID')
-                    for idx, route in enumerate(routes):
-                        route_dict = route if isinstance(route, dict) else route.__dict__
-                        if route_dict.get('路线ID') == route_id:
-                            goods['路线索引'] = idx
-                            break
+                    goods['路线索引'] = route_id_to_idx.get(goods.get('路线ID'))
 
-            # 为每个goods_total添加路线索引
             for goods in goods_total:
                 if isinstance(goods, dict):
-                    route_id = goods.get('路线ID')
-                    for idx, route in enumerate(routes):
-                        route_dict = route if isinstance(route, dict) else route.__dict__
-                        if route_dict.get('路线ID') == route_id:
-                            goods['路线索引'] = idx
-                            break
+                    goods['路线索引'] = route_id_to_idx.get(goods.get('路线ID'))
 
             self.logger.debug(
                 "数据转换完成: routes=%d, agents=%d, goods_details=%d, goods_total=%d",

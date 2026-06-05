@@ -7,67 +7,13 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional, List, Dict
+from .scoring_service import get_lpi_map, match_country, normalize_inverse, lpi_to_score
 
-
-# 目的地关键词 → ISO 3166-1 国家代码映射
-DEST_TO_COUNTRY_CODE = {
-    '荷兰': 'NL', '鹿特丹': 'NL',
-    '德国': 'DE', '汉堡': 'DE', '法兰克福': 'DE',
-    '英国': 'GB', '伦敦': 'GB', '费利克斯托': 'GB',
-    '西班牙': 'ES', '巴塞罗那': 'ES', '瓦伦西亚': 'ES',
-    '美国': 'US', '洛杉矶': 'US', '达拉斯': 'US', '迈阿密': 'US', '圣何塞': 'US',
-    '日本': 'JP', '东京': 'JP', '大阪': 'JP',
-    '韩国': 'KR', '釜山': 'KR',
-    '新加坡': 'SG',
-    '越南': 'VN', '胡志明': 'VN', '河内': 'VN',
-    '菲律宾': 'PH', '马尼拉': 'PH',
-    '马来西亚': 'MY', '马来': 'MY', '槟城': 'MY',
-    '澳大利亚': 'AU', '澳洲': 'AU', '悉尼': 'AU', '墨尔本': 'AU',
-    '香港': 'HK',
-    '阿联酋': 'AE', '迪拜': 'AE',
-    '沙特': 'SA', '吉达': 'SA',
-    '澳门': 'MO',
-    '中国': 'CN', '深圳': 'CN', '上海': 'CN', '广州': 'CN', '北京': 'CN',
-}
-
-
-def _get_lpi_map(db: Session) -> Dict[str, Dict]:
-    """加载 country_lpi 表：国家代码 → {LPI综合评分, 风险等级, 国家中文名}"""
-    rows = db.execute(text(
-        "SELECT 国家代码, LPI综合评分, 风险等级, 国家中文名 FROM country_lpi"
-    )).fetchall()
-    return {
-        r[0]: {
-            "lpi": float(r[1]) if r[1] else None,
-            "风险等级": r[2],
-            "国家中文名": r[3]
-        }
-        for r in rows
-    }
-
-
-def _match_country(destination: str) -> Optional[str]:
-    """从目的地文本中匹配国家代码"""
-    for keyword, code in DEST_TO_COUNTRY_CODE.items():
-        if keyword in destination:
-            return code
-    return None
-
-
-def _normalize_inverse(val, min_v, max_v, default=60.0) -> float:
-    """低值更优：min→100分，max→0分"""
-    if val is None or min_v is None:
-        return default
-    if max_v == min_v:
-        return 100.0
-    return round((1 - (val - min_v) / (max_v - min_v)) * 100, 1)
-
-
-def _lpi_to_score(lpi: Optional[float]) -> float:
-    """LPI(1-5) → 百分制"""
-    if lpi is None:
-        return 50.0
-    return round((lpi - 1) / 4 * 100, 1)
+# 保留别名，避免修改下方大量调用点
+_get_lpi_map     = get_lpi_map
+_match_country   = match_country
+_normalize_inverse = normalize_inverse
+_lpi_to_score    = lpi_to_score
 
 
 def get_recommendations(
