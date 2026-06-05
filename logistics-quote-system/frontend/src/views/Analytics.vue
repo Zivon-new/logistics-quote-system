@@ -220,64 +220,105 @@
       <el-col :span="24">
         <el-card shadow="never" class="chart-card">
           <template #header>
-            <span class="card-title">代理商年度报价分析</span>
+            <span class="card-title">代理商年度综合报告</span>
             <div style="display:flex;gap:8px;align-items:center">
               <el-input v-model="agentQuery.代理商" placeholder="代理商名称，如：融讯" clearable style="width:180px" />
-              <el-input-number v-model="agentQuery.year" :min="2020" :max="2030" placeholder="年份" style="width:110px" />
+              <el-input-number v-model="agentQuery.year" :min="2020" :max="2030" style="width:110px" />
+              <span style="color:#8c8c8c;font-size:13px">vs</span>
+              <el-input-number v-model="agentQuery.compare_year" :min="2019" :max="2029" style="width:110px" />
               <el-button type="primary" size="small" @click="loadAgentReport" :loading="agentLoading">查询</el-button>
             </div>
           </template>
 
           <div v-if="agentReport">
-            <div style="margin-bottom:12px;color:#595959;font-size:13px">
-              共 <b>{{ agentReport.路线数 }}</b> 条路线，
-              <span style="color:#f5222d;font-weight:600">{{ agentReport.异常路线数 }}</span> 条涨幅超15%（标红）
+            <!-- ① 年度概览对比 -->
+            <div class="agent-section-title">年度概览</div>
+            <el-row :gutter="12" style="margin-bottom:16px">
+              <el-col :span="6" v-for="(label, key) in agentMetrics" :key="key">
+                <div class="agent-metric-card">
+                  <div class="am-label">{{ label }}</div>
+                  <div class="am-row">
+                    <div class="am-year">{{ agentReport.overview.today_year }}年</div>
+                    <div class="am-val">{{ formatAgentVal(key, agentReport.overview.today[key]) }}</div>
+                  </div>
+                  <div class="am-row">
+                    <div class="am-year">{{ agentReport.overview.compare_year }}年</div>
+                    <div class="am-val am-prv">{{ formatAgentVal(key, agentReport.overview.previous[key]) }}</div>
+                  </div>
+                  <div class="am-change" v-if="agentReport.overview.changes[key] != null"
+                    :style="{ color: agentReport.overview.changes[key] > 0 ? '#f5222d' : '#52c41a' }">
+                    {{ agentReport.overview.changes[key] > 0 ? '▲' : '▼' }}
+                    {{ Math.abs(agentReport.overview.changes[key]) }}%
+                  </div>
+                  <div class="am-change" v-else style="color:#bfbfbf">—</div>
+                </div>
+              </el-col>
+            </el-row>
+
+            <!-- ② 贸易类型 & 运输方式分布 -->
+            <el-row :gutter="16" style="margin-bottom:16px">
+              <el-col :span="12">
+                <div class="agent-section-title">贸易类型分布</div>
+                <el-table :data="agentReport.贸易类型分布" border size="small">
+                  <el-table-column prop="类型" label="贸易类型" />
+                  <el-table-column :label="`${agentReport.overview.today_year}年`" prop="今年" align="center" width="80" />
+                  <el-table-column :label="`${agentReport.overview.compare_year}年`" prop="去年" align="center" width="80" />
+                </el-table>
+              </el-col>
+              <el-col :span="12">
+                <div class="agent-section-title">运输方式分布</div>
+                <el-table :data="agentReport.运输方式分布" border size="small">
+                  <el-table-column prop="类型" label="运输方式" />
+                  <el-table-column :label="`${agentReport.overview.today_year}年`" prop="今年" align="center" width="80" />
+                  <el-table-column :label="`${agentReport.overview.compare_year}年`" prop="去年" align="center" width="80" />
+                </el-table>
+              </el-col>
+            </el-row>
+
+            <!-- ③ 单价异动分析 -->
+            <div class="agent-section-title">
+              单价异动分析
+              <span v-if="agentReport.异常单价数 > 0" style="color:#f5222d;margin-left:8px;font-size:13px">
+                {{ agentReport.异常单价数 }} 项涨幅超15%
+              </span>
             </div>
-            <el-table :data="agentReport.routes" border size="small" row-key="路线"
-              :row-class-name="({ row }) => row.异常标记 ? 'agent-suspicious-row' : ''">
-              <el-table-column prop="路线" label="路线" min-width="160" />
-              <el-table-column prop="记录数" label="报价次数" width="90" align="center" />
-              <el-table-column prop="最早日期" label="首次日期" width="110" align="center" />
-              <el-table-column prop="最新日期" label="最新日期" width="110" align="center" />
-              <el-table-column label="首次报价(¥)" width="110" align="right">
-                <template #default="{ row }">{{ row.首次报价 != null ? '¥' + row.首次报价.toFixed(2) : '—' }}</template>
-              </el-table-column>
-              <el-table-column label="最新报价(¥)" width="110" align="right">
-                <template #default="{ row }">{{ row.最新报价 != null ? '¥' + row.最新报价.toFixed(2) : '—' }}</template>
-              </el-table-column>
-              <el-table-column label="涨幅" width="90" align="center">
+            <el-table :data="agentReport.单价异动" border size="small"
+              :row-class-name="({ row }) => row.异常 ? 'agent-suspicious-row' : ''">
+              <el-table-column prop="路线" label="路线" min-width="150" />
+              <el-table-column prop="运输方式" label="运输方式" width="90" align="center" />
+              <el-table-column prop="费用类型" label="费用类型" width="110" />
+              <el-table-column prop="单位" label="计费单位" width="80" align="center" />
+              <el-table-column :label="`${agentReport.overview.compare_year}年单价`" width="110" align="right">
                 <template #default="{ row }">
-                  <span v-if="row.涨幅百分比 != null"
-                    :style="{ color: row.涨幅百分比 > 15 ? '#f5222d' : row.涨幅百分比 > 0 ? '#fa8c16' : '#52c41a', fontWeight: '600' }">
-                    {{ row.涨幅百分比 > 0 ? '+' : '' }}{{ row.涨幅百分比 }}%
-                  </span>
+                  <span v-if="row.去年单价 != null">{{ row.去年单价.toFixed(2) }}</span>
                   <span v-else style="color:#bfbfbf">—</span>
                 </template>
               </el-table-column>
-              <el-table-column label="状态" width="80" align="center">
+              <el-table-column :label="`${agentReport.overview.today_year}年单价`" width="110" align="right">
                 <template #default="{ row }">
-                  <el-tag v-if="row.异常标记" type="danger" size="small">异常</el-tag>
-                  <el-tag v-else type="success" size="small">正常</el-tag>
+                  <span v-if="row.今年单价 != null">{{ row.今年单价.toFixed(2) }}</span>
+                  <span v-else style="color:#bfbfbf">—</span>
                 </template>
               </el-table-column>
-              <el-table-column type="expand" width="50">
+              <el-table-column label="涨幅" width="90" align="center">
                 <template #default="{ row }">
-                  <el-table :data="row.明细" size="small" border style="margin:8px 16px">
-                    <el-table-column prop="交易开始日期" label="日期" width="110" />
-                    <el-table-column prop="运输方式" label="运输方式" width="90" />
-                    <el-table-column prop="时效" label="时效" width="80" />
-                    <el-table-column prop="小计" label="小计(¥)" width="100" align="right">
-                      <template #default="{ row: r }">{{ r.小计 > 0 ? '¥' + r.小计.toFixed(2) : '—' }}</template>
-                    </el-table-column>
-                    <el-table-column prop="总计" label="总计(¥)" width="100" align="right">
-                      <template #default="{ row: r }">{{ r.总计 > 0 ? '¥' + r.总计.toFixed(2) : '—' }}</template>
-                    </el-table-column>
-                  </el-table>
+                  <span v-if="row.涨幅 != null"
+                    :style="{ color: row.涨幅 > 15 ? '#f5222d' : row.涨幅 > 0 ? '#fa8c16' : '#52c41a', fontWeight:'600' }">
+                    {{ row.涨幅 > 0 ? '+' : '' }}{{ row.涨幅 }}%
+                  </span>
+                  <span v-else style="color:#bfbfbf">仅单年</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="70" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.异常" type="danger" size="small">异常</el-tag>
+                  <el-tag v-else-if="row.涨幅 != null" type="success" size="small">正常</el-tag>
+                  <el-tag v-else type="info" size="small">无对比</el-tag>
                 </template>
               </el-table-column>
             </el-table>
           </div>
-          <el-empty v-else-if="!agentLoading" description="输入代理商名称并点击查询" :image-size="60" />
+          <el-empty v-else-if="!agentLoading" description="输入代理商名称和年份后点击查询" :image-size="60" />
         </el-card>
       </el-col>
     </el-row>
@@ -309,15 +350,29 @@ use([CanvasRenderer, BarChart, PieChart, LineChart,
 
 // ── 数据 ──────────────────────────────────────────────────
 // 代理商年度分析
-const agentQuery = ref({ 代理商: '', year: new Date().getFullYear() })
+const curY = new Date().getFullYear()
+const agentQuery = ref({ 代理商: '', year: curY, compare_year: curY - 1 })
 const agentReport = ref(null)
 const agentLoading = ref(false)
+
+const agentMetrics = { 使用次数: '使用次数（次）', 小计总额: '运费小计（¥）', 总计总额: '含税总计（¥）', 计费重量: '计费重量（kg）' }
+
+const formatAgentVal = (key, val) => {
+  if (val == null) return '—'
+  if (key === '使用次数') return val + ' 次'
+  if (key === '计费重量') return val.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) + ' kg'
+  return '¥' + val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 const loadAgentReport = async () => {
   if (!agentQuery.value.代理商) return
   agentLoading.value = true
   try {
-    const params = { 代理商: agentQuery.value.代理商 }
-    if (agentQuery.value.year) params.year = agentQuery.value.year
+    const params = {
+      代理商: agentQuery.value.代理商,
+      year: agentQuery.value.year,
+      compare_year: agentQuery.value.compare_year,
+    }
     agentReport.value = await request.get('/v1/analytics/agent-report', { params })
   } catch (e) {
     ElMessage.error('查询失败：' + (e.message || '未知错误'))
@@ -766,4 +821,12 @@ const fuelChartOption = computed(() => ({
 .market-empty { padding: 24px 0; text-align: center; }
 .empty-tip { font-size: 12px; color: #8c8c8c; margin-top: 8px; }
 :deep(.agent-suspicious-row) td { background-color: #fff1f0 !important; }
+.agent-section-title { font-size: 13px; font-weight: 600; color: #262626; margin: 0 0 8px; padding-left: 8px; border-left: 3px solid #1890ff; }
+.agent-metric-card { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 6px; padding: 12px; }
+.am-label { font-size: 12px; color: #8c8c8c; margin-bottom: 6px; }
+.am-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.am-year { font-size: 11px; color: #bfbfbf; }
+.am-val { font-size: 14px; font-weight: 600; color: #262626; }
+.am-prv { font-size: 13px; font-weight: 400; color: #8c8c8c; }
+.am-change { font-size: 12px; font-weight: 600; margin-top: 4px; }
 </style>

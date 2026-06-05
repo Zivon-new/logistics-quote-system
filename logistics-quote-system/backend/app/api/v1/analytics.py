@@ -299,94 +299,131 @@ async def get_price_distribution(db: Session = Depends(get_db), current_user: Us
     return [{"区间": r[0], "数量": r[1]} for r in rows]
 
 
-@router.get("/agent-report", summary="代理商年度报价汇总")
+@router.get("/agent-report", summary="代理商年度报价汇总（含跨年对比与单价异动）")
 async def get_agent_report(
-    代理商: str = Query(..., description="代理商名称（精确或模糊）"),
-    year: Optional[int] = Query(None, description="年份，不填则查全部"),
+    代理商: str = Query(..., description="代理商名称（模糊匹配）"),
+    year: int = Query(..., description="分析年份"),
+    compare_year: Optional[int] = Query(None, description="对比年份，默认 year-1"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    汇总指定代理商在给定年度的全部报价，按路线分组，
-    计算每条路线最早/最新报价及涨幅，辅助核查不合理抬价。
+    代理商年度综合报告：
+    1. 年度概览（使用次数、小计总额、总计总额、计费重量）与上一年对比
+    2. 贸易类型 / 运输方式分布（今年 vs 去年）
+    3. 单价异动分析（按路线+运输方式+费用类型+单位，跨年比较平均单价）
     """
-    year_clause = "AND YEAR(r.交易开始日期) = :year" if year else ""
-    params = {"agent": f"%{代理商}%"}
-    if year:
-        params["year"] = year
+    cmp_year = compare_year if compare_year else year - 1
+    agent_like = f"%{代理商}%"
 
-    rows = db.execute(text(f"""
+    def _overview(y):
+        row = db.execute(text("""
+            SELECT
+                COUNT(ra.代理路线ID)                    AS 使用次数,
+                COALESCE(SUM(s.小计),  0)               AS 小计总额,
+                COALESCE(SUM(s.总计),  0)               AS 总计总额,
+                COALESCE(SUM(r.`计费重量(/kg)`), 0)     AS 计费重量
+            FROM route_agents ra
+            JOIN routes r ON ra.路线ID = r.路线ID
+            LEFT JOIN summary s ON ra.代理路线ID = s.代理路线ID
+            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y
+        """), {"agent": agent_like, "y": y}).fetchone()
+        return {
+            "使用次数":  int(row[0] or 0),
+            "小计总额":  float(row[1] or 0),
+            "总计总额":  float(row[2] or 0),
+            "计费重量":  float(row[3] or 0),
+        }
+
+    def _dist(y, field):
+        rows = db.execute(text(f"""
+            SELECT ra.`{field}`, COUNT(*) AS 条数
+            FROM route_agents ra
+            JOIN routes r ON ra.路线ID = r.路线ID
+            WHERE ra.代理商 LIKE :agent AND YEAR(r.交易开始日期) = :y
+              AND ra.`{field}` IS NOT NULL AND ra.`{field}` != ''
+            GROUP BY ra.`{field}`
+            ORDER BY 条数 DESC
+        """), {"agent": agent_like, "y": y}).fetchall()
+        return {r[0]: int(r[1]) for r in rows}
+
+    # ── 概览 ──
+    cur_ov  = _overview(year)
+    prv_ov  = _overview(cmp_year)
+
+    def _pct(cur, prv):
+        if prv and prv > 0:
+            return round((cur - prv) / prv * 100, 1)
+        return None
+
+    overview = {
+        "today_year":    year,
+        "compare_year":  cmp_year,
+        "today":         cur_ov,
+        "previous":      prv_ov,
+        "changes": {k: _pct(cur_ov[k], prv_ov[k]) for k in cur_ov},
+    }
+
+    # ── 分布 ──
+    def _merge_dist(field):
+        cur = _dist(year, field)
+        prv = _dist(cmp_year, field)
+        keys = sorted(set(cur) | set(prv), key=lambda k: -(cur.get(k, 0) + prv.get(k, 0)))
+        return [{"类型": k, "今年": cur.get(k, 0), "去年": prv.get(k, 0)} for k in keys]
+
+    trade_dist     = _merge_dist("贸易类型")
+    transport_dist = _merge_dist("运输方式")
+
+    # ── 单价异动（跨年，按路线+运输方式+费用类型+单位） ──
+    price_rows = db.execute(text("""
         SELECT
-            r.路线ID,
-            r.起始地,
-            r.途径地,
-            r.目的地,
-            r.交易开始日期,
-            r.交易结束日期,
-            ra.代理路线ID,
-            ra.代理商,
-            ra.运输方式,
-            ra.时效,
-            COALESCE(s.小计, 0)  AS 小计,
-            COALESCE(s.总计, 0)  AS 总计
-        FROM routes r
-        JOIN route_agents ra ON r.路线ID = ra.路线ID
-        LEFT JOIN summary    s  ON ra.代理路线ID = s.代理路线ID
+            r.起始地, r.目的地, ra.运输方式,
+            fi.费用类型, fi.单位,
+            YEAR(r.交易开始日期) AS yr,
+            ROUND(AVG(fi.单价), 4) AS avg_price
+        FROM route_agents ra
+        JOIN routes r ON ra.路线ID = r.路线ID
+        JOIN fee_items fi ON fi.代理路线ID = ra.代理路线ID
         WHERE ra.代理商 LIKE :agent
-        {year_clause}
-        ORDER BY r.起始地, r.目的地, r.交易开始日期
-    """), params).fetchall()
+          AND YEAR(r.交易开始日期) IN (:y1, :y2)
+          AND fi.备注 != '__GROUP_HEADER__'
+          AND (fi.参与核算 IS NULL OR fi.参与核算 != 0)
+          AND fi.单价 > 0
+          AND fi.单位 IS NOT NULL AND fi.单位 != ''
+        GROUP BY r.起始地, r.目的地, ra.运输方式, fi.费用类型, fi.单位, yr
+        ORDER BY r.起始地, r.目的地, fi.费用类型, yr
+    """), {"agent": agent_like, "y1": year, "y2": cmp_year}).fetchall()
 
-    # 按路线(起始地→目的地)分组，计算价格趋势
+    # 按 (路线, 运输方式, 费用类型, 单位) 聚合，拿今年和去年单价
     from collections import defaultdict
-    route_groups = defaultdict(list)
-    for r in rows:
-        key = f"{r[1]} → {r[3]}"
-        route_groups[key].append({
-            "路线ID":       r[0],
-            "起始地":       r[1],
-            "途径地":       r[2],
-            "目的地":       r[3],
-            "交易开始日期": str(r[4]) if r[4] else None,
-            "交易结束日期": str(r[5]) if r[5] else None,
-            "代理路线ID":   r[6],
-            "代理商":       r[7],
-            "运输方式":     r[8],
-            "时效":         r[9],
-            "小计":         float(r[10]),
-            "总计":         float(r[11]),
+    price_map = defaultdict(dict)
+    for row in price_rows:
+        key = (f"{row[0]} → {row[1]}", row[2] or "—", row[3], row[4])
+        price_map[key][int(row[5])] = float(row[6])
+
+    unit_price_changes = []
+    for (route, transport, fee_type, unit), yr_map in price_map.items():
+        cur_p = yr_map.get(year)
+        prv_p = yr_map.get(cmp_year)
+        pct   = round((cur_p - prv_p) / prv_p * 100, 1) if cur_p and prv_p and prv_p > 0 else None
+        unit_price_changes.append({
+            "路线":      route,
+            "运输方式":  transport,
+            "费用类型":  fee_type,
+            "单位":      unit,
+            "今年单价":  cur_p,
+            "去年单价":  prv_p,
+            "涨幅":      pct,
+            "异常":      pct is not None and pct > 15,
         })
 
-    result = []
-    for route_key, records in route_groups.items():
-        priced = [rec for rec in records if rec["总计"] > 0]
-        price_change = None
-        is_suspicious = False
-        if len(priced) >= 2:
-            first_price = priced[0]["总计"]
-            last_price  = priced[-1]["总计"]
-            if first_price > 0:
-                pct = (last_price - first_price) / first_price * 100
-                price_change = round(pct, 2)
-                is_suspicious = pct > 15  # 涨幅超过15%标记为异常
-        result.append({
-            "路线":         route_key,
-            "记录数":       len(records),
-            "最早日期":     records[0]["交易开始日期"],
-            "最新日期":     records[-1]["交易开始日期"],
-            "首次报价":     priced[0]["总计"] if priced else None,
-            "最新报价":     priced[-1]["总计"] if priced else None,
-            "涨幅百分比":   price_change,
-            "异常标记":     is_suspicious,
-            "明细":         records,
-        })
+    unit_price_changes.sort(key=lambda x: (not x["异常"], -(x["涨幅"] or 0)))
 
-    # 异常路线排前面
-    result.sort(key=lambda x: (not x["异常标记"], -(x["涨幅百分比"] or 0)))
     return {
-        "代理商": 代理商,
-        "year":  year,
-        "路线数": len(result),
-        "异常路线数": sum(1 for r in result if r["异常标记"]),
-        "routes": result,
+        "代理商":        代理商,
+        "overview":      overview,
+        "贸易类型分布":  trade_dist,
+        "运输方式分布":  transport_dist,
+        "单价异动":      unit_price_changes,
+        "异常单价数":    sum(1 for x in unit_price_changes if x["异常"]),
     }
