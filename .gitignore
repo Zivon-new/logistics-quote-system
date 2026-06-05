@@ -73,6 +73,6 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Frontend build
-frontend/dist/
+# frontend/dist/ 已移出忽略，部署时随代码一起提交
 .gstack/
 main.tex
