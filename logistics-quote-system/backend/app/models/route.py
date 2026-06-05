@@ -33,6 +33,8 @@ class Route(Base):
     货物名称 = Column("货物名称", Text, nullable=True)
 
     创建时间 = Column("创建时间", DateTime, server_default=func.now())
+    创建人ID = Column("创建人ID", Integer, ForeignKey("users.id"), nullable=True)
+    更新人ID = Column("更新人ID", Integer, ForeignKey("users.id"), nullable=True)
 
     # 关系
     agents = relationship("RouteAgent", back_populates="route", cascade="all, delete-orphan")

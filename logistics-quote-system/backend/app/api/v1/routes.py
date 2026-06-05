@@ -237,6 +237,17 @@ async def get_routes(
     for agent in all_agents:
         agents_by_route.setdefault(agent.路线ID, []).append(agent)
 
+    # 批量查操作人姓名
+    user_ids = set()
+    for r in routes:
+        if r.创建人ID: user_ids.add(r.创建人ID)
+        if r.更新人ID: user_ids.add(r.更新人ID)
+    user_names: dict = {}
+    if user_ids:
+        from ...models.user import User as UserModel
+        users = db.query(UserModel).filter(UserModel.id.in_(user_ids)).all()
+        user_names = {u.id: (u.full_name or u.username) for u in users}
+
     results = []
     for route in routes:
         results.append({
@@ -252,6 +263,8 @@ async def get_routes(
             "货值":          float(route.货值) if route.货值 else 0,
             "货值币种":      route.货值币种 or 'RMB',
             "创建时间":      str(route.创建时间) if route.创建时间 else None,
+            "创建人名":      user_names.get(route.创建人ID),
+            "更新人名":      user_names.get(route.更新人ID),
             "agents": [
                 {"代理商": a.代理商, "运输方式": a.运输方式}
                 for a in agents_by_route.get(route.路线ID, [])
@@ -440,6 +453,7 @@ async def create_full_route(
                 route_info[date_field] = None
 
         new_route = Route(**route_info)
+        new_route.创建人ID = current_user.id
         db.add(new_route)
         db.flush()
         route_id = new_route.路线ID
@@ -503,7 +517,9 @@ async def update_route(
                 clauses.append(f"`{col}` = :{p}")
         if clauses:
             db.execute(text(f"UPDATE routes SET {', '.join(clauses)} WHERE `路线ID` = :route_id"), params)
-            db.commit()
+        db.execute(text("UPDATE routes SET `更新人ID` = :uid WHERE `路线ID` = :route_id"),
+                   {"uid": current_user.id, "route_id": route_id})
+        db.commit()
 
         # Stage 2: Replace all agents (delete old, insert new)
         agent_summaries = []
@@ -671,6 +687,7 @@ async def save_imported_data(
         for route_data in data.get('routes', []):
             route_info = route_data.get('route', {})
             new_route = Route(**route_info)
+            new_route.创建人ID = current_user.id
             db.add(new_route)
             db.flush()
             route_id = new_route.路线ID

@@ -62,6 +62,18 @@
             {{ scope.row.货值币种 || 'RMB' }} {{ scope.row.货值 }}
           </template>
         </el-table-column>
+        <el-table-column label="操作人" width="100" align="center">
+          <template #default="scope">
+            <el-tooltip
+              v-if="scope.row.创建人名 || scope.row.更新人名"
+              placement="top"
+              :content="`新建人：${scope.row.创建人名 || '—'} / 最后编辑：${scope.row.更新人名 || '—'}`"
+            >
+              <span class="operator-name">{{ scope.row.更新人名 || scope.row.创建人名 }}</span>
+            </el-tooltip>
+            <span v-else class="operator-name">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="260" align="center" fixed="right">
           <template #default="scope">
             <el-button type="primary" link size="small" @click="handleView(scope.row, (pagination.page - 1) * pagination.page_size + scope.$index + 1)">
@@ -953,6 +965,7 @@ onActivated(() => {
   background: #fafafa;
   border-top: 1px solid #f0f0f0;
 }
+.operator-name { font-size: 13px; color: #595959; cursor: default; }
 .group-subtotals-block { padding: 4px 0; margin-bottom: 4px; }
 .group-subtotal-row { display: flex; justify-content: space-between; font-size: 13px; color: #595959; padding: 2px 0; }
 .group-subtotal-label { font-weight: 500; min-width: 80px; }

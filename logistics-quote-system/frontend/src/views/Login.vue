@@ -77,12 +77,6 @@
         </el-form-item>
       </el-form>
 
-      <!-- 测试账号提示 -->
-      <div class="test-accounts">
-        <p>测试账号：</p>
-        <p>管理员：admin / admin123</p>
-        <p>普通用户：user / user123</p>
-      </div>
     </div>
 
     <!-- 页脚 -->
@@ -264,20 +258,6 @@ const handleLogin = async () => {
   border-color: #1890ff;
 }
 
-.test-accounts {
-  margin-top: 20px;
-  padding: 15px;
-  background: #f0f2f5;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #595959;
-  line-height: 1.8;
-}
-
-.test-accounts p:first-child {
-  font-weight: 600;
-  margin-bottom: 5px;
-}
 
 .login-footer {
   position: absolute;
