@@ -318,7 +318,7 @@ const loadAgentReport = async () => {
   try {
     const params = { 代理商: agentQuery.value.代理商 }
     if (agentQuery.value.year) params.year = agentQuery.value.year
-    agentReport.value = await request.get('/api/v1/analytics/agent-report', { params })
+    agentReport.value = await request.get('/v1/analytics/agent-report', { params })
   } catch (e) {
     ElMessage.error('查询失败：' + (e.message || '未知错误'))
   } finally {
