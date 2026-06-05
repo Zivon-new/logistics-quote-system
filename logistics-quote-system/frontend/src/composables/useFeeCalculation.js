@@ -198,25 +198,40 @@ export function useFeeCalculation(props) {
   }
 
   // ── Group subtotals ───────────────────────────────────────
-  // 按分组标题聚合 fee_items 原币小计
+  // 按分组标题聚合费用明细 + 整单费用原币小计
   // 返回 [{name: 'KUL-AMS', amounts: {USD: 1035.5}}, ...]
   const calcGroupSubtotals = (agent) => {
-    const groups = []
-    let cur = null
-    for (const item of (agent.fee_items || [])) {
-      if (item.备注 === '__GROUP_HEADER__') {
-        if (cur) groups.push(cur)
-        cur = { name: item.费用类型 || '未命名组', amounts: {} }
-        continue
+    const groupMap = new Map()
+    const groupOrder = []
+
+    const processItems = (items) => {
+      let curName = null
+      for (const item of (items || [])) {
+        if (item.备注 === '__GROUP_HEADER__') {
+          curName = item.费用类型 || '未命名组'
+          if (!groupMap.has(curName)) {
+            groupMap.set(curName, {})
+            groupOrder.push(curName)
+          }
+          continue
+        }
+        if (!curName) continue
+        if (item.参与核算 === false || item.参与核算 === 0) continue
+        const currency = item.币种 || 'RMB'
+        const amt = calcOriginalAmount(item)
+        if (amt > 0) {
+          const amounts = groupMap.get(curName)
+          amounts[currency] = (amounts[currency] || 0) + amt
+        }
       }
-      if (!cur) continue
-      if (item.参与核算 === false || item.参与核算 === 0) continue
-      const currency = item.币种 || 'RMB'
-      const amt = calcOriginalAmount(item)
-      if (amt > 0) cur.amounts[currency] = (cur.amounts[currency] || 0) + amt
     }
-    if (cur) groups.push(cur)
-    return groups.filter(g => Object.keys(g.amounts).length > 0)
+
+    processItems(agent.fee_items)
+    processItems(agent.fee_total)
+
+    return groupOrder
+      .map(name => ({ name, amounts: groupMap.get(name) }))
+      .filter(g => Object.keys(g.amounts).length > 0)
   }
 
   // ── Multi-tax detail helpers ───────────────────────────────
