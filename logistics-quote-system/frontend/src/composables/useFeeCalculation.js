@@ -204,7 +204,7 @@ export function useFeeCalculation(props) {
     const groupMap = new Map()
     const groupOrder = []
 
-    const processItems = (items) => {
+    const processItems = (items, getAmt) => {
       let curName = null
       for (const item of (items || [])) {
         if (item.备注 === '__GROUP_HEADER__') {
@@ -218,7 +218,7 @@ export function useFeeCalculation(props) {
         if (!curName) continue
         if (item.参与核算 === false || item.参与核算 === 0) continue
         const currency = item.币种 || 'RMB'
-        const amt = calcOriginalAmount(item)
+        const amt = getAmt(item)
         if (amt > 0) {
           const amounts = groupMap.get(curName)
           amounts[currency] = (amounts[currency] || 0) + amt
@@ -226,8 +226,10 @@ export function useFeeCalculation(props) {
       }
     }
 
-    processItems(agent.fee_items)
-    processItems(agent.fee_total)
+    // fee_items: 优先用已计算的原币金额，兜底用单价×数量
+    // fee_total: 只有原币金额，无单价/数量字段
+    processItems(agent.fee_items, item => item.原币金额 != null ? item.原币金额 : calcOriginalAmount(item))
+    processItems(agent.fee_total, item => item.原币金额 || 0)
 
     return groupOrder
       .map(name => ({ name, amounts: groupMap.get(name) }))
