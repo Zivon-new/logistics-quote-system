@@ -246,11 +246,11 @@
                 <div class="agent-metric-card">
                   <div class="am-label">{{ label }}</div>
                   <div class="am-row">
-                    <div class="am-year">{{ agentReport.overview.today_year }}年</div>
+                    <div class="am-year">{{ periodLabel(agentReport.overview.today_year, agentReport.overview.today_month) }}</div>
                     <div class="am-val">{{ formatAgentVal(key, agentReport.overview.today[key]) }}</div>
                   </div>
                   <div class="am-row">
-                    <div class="am-year">{{ agentReport.overview.compare_year }}年</div>
+                    <div class="am-year">{{ periodLabel(agentReport.overview.compare_year, agentReport.overview.compare_month) }}</div>
                     <div class="am-val am-prv">{{ formatAgentVal(key, agentReport.overview.previous[key]) }}</div>
                   </div>
                   <div class="am-change" v-if="agentReport.overview.changes[key] != null"
@@ -269,16 +269,16 @@
                 <div class="agent-section-title">贸易类型分布</div>
                 <el-table :data="agentReport.贸易类型分布" border size="small">
                   <el-table-column prop="类型" label="贸易类型" />
-                  <el-table-column :label="`${agentReport.overview.today_year}年`" prop="今年" align="center" width="80" />
-                  <el-table-column :label="`${agentReport.overview.compare_year}年`" prop="去年" align="center" width="80" />
+                  <el-table-column :label="periodLabel(agentReport.overview.today_year, agentReport.overview.today_month)" prop="今年" align="center" width="90" />
+                  <el-table-column :label="periodLabel(agentReport.overview.compare_year, agentReport.overview.compare_month)" prop="去年" align="center" width="90" />
                 </el-table>
               </el-col>
               <el-col :span="12">
                 <div class="agent-section-title">运输方式分布</div>
                 <el-table :data="agentReport.运输方式分布" border size="small">
                   <el-table-column prop="类型" label="运输方式" />
-                  <el-table-column :label="`${agentReport.overview.today_year}年`" prop="今年" align="center" width="80" />
-                  <el-table-column :label="`${agentReport.overview.compare_year}年`" prop="去年" align="center" width="80" />
+                  <el-table-column :label="periodLabel(agentReport.overview.today_year, agentReport.overview.today_month)" prop="今年" align="center" width="90" />
+                  <el-table-column :label="periodLabel(agentReport.overview.compare_year, agentReport.overview.compare_month)" prop="去年" align="center" width="90" />
                 </el-table>
               </el-col>
             </el-row>
