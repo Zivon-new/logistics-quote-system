@@ -16,11 +16,25 @@ from app.core.security import get_password_hash
 # password: 初始密码
 # is_admin: True = 管理员，False = 普通用户
 # ────────────────────────────────────────────────────────────
+_PWD = "JHL181116"
 USERS_TO_CREATE = [
-    # {"username": "zhangsan",  "full_name": "张三",   "password": "your_password", "is_admin": True},
-    # {"username": "lisi",      "full_name": "李四",   "password": "your_password", "is_admin": True},
-    # {"username": "wangwu",    "full_name": "王五",   "password": "your_password", "is_admin": True},
-    # 继续填写...
+    {"username": "sdream",   "full_name": "Sdream 谢斯俊", "password": _PWD, "is_admin": True},
+    {"username": "anna",     "full_name": "Anna 李瑾",     "password": _PWD, "is_admin": True},
+    {"username": "sivan",    "full_name": "Sivan 孙万鹏",  "password": _PWD, "is_admin": True},
+    {"username": "leo",      "full_name": "Leo 王晶",      "password": _PWD, "is_admin": True},
+    {"username": "sean",     "full_name": "Sean 尹航",     "password": _PWD, "is_admin": True},
+    {"username": "helena",   "full_name": "Helena 贺影",   "password": _PWD, "is_admin": True},
+    {"username": "allie",    "full_name": "Allie 马媛",    "password": _PWD, "is_admin": True},
+    {"username": "jessie",   "full_name": "Jessie 苏桐渲", "password": _PWD, "is_admin": True},
+    {"username": "sally",    "full_name": "Sally 闫思琪",  "password": _PWD, "is_admin": True},
+    {"username": "blanche",  "full_name": "Blanche 韩文静","password": _PWD, "is_admin": True},
+    {"username": "jade",     "full_name": "Jade 郝佳",     "password": _PWD, "is_admin": True},
+    {"username": "ethan",    "full_name": "Ethan 荆博恩",  "password": _PWD, "is_admin": True},
+    {"username": "mary",     "full_name": "Mary 梁锐欣",   "password": _PWD, "is_admin": True},
+    {"username": "nina",     "full_name": "Nina 卢立坤",   "password": _PWD, "is_admin": True},
+    {"username": "bonnie",   "full_name": "Bonnie 王玮",   "password": _PWD, "is_admin": True},
+    {"username": "mia",      "full_name": "Mia 虞靓",      "password": _PWD, "is_admin": True},
+    {"username": "simon",    "full_name": "Simon 廖威",     "password": _PWD, "is_admin": True},
 ]
 
 
