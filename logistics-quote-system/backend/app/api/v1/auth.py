@@ -7,9 +7,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from ...core.deps import get_db, get_current_user
-from ...core.security import create_access_token
+from ...core.security import create_access_token, verify_password
 from ...core.captcha import generate_captcha, verify_captcha
-from ...crud import user as crud_user
 from ...schemas.user import LoginRequest, LoginResponse, UserResponse
 from ...models.user import User
 
@@ -46,8 +45,8 @@ async def login(
     if not verify_captcha(login_data.captcha_id, login_data.captcha_answer):
         raise HTTPException(status_code=400, detail="验证码错误或已过期")
 
-    user = crud_user.authenticate_user(db, login_data.username, login_data.password)
-    if not user:
+    user = db.query(User).filter(User.username == login_data.username).first()
+    if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",

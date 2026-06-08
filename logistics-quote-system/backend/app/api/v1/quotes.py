@@ -15,27 +15,8 @@ from ...models.user import User
 from ...services.recommend_service import (
     _get_lpi_map, _match_country, _normalize_inverse, _lpi_to_score
 )
+from ...services.fee_service import get_forex_rates as _get_forex_rates, convert_min_fee as _convert_min_to_fee_currency
 from .warnings import get_warnings_for_destinations
-
-
-def _get_forex_rates(db: Session) -> dict:
-    """Return {currency: rmb_rate} from forex_rate table."""
-    rows = db.execute(text("SELECT 币种, 汇率 FROM forex_rate")).fetchall()
-    rates = {r[0]: float(r[1]) for r in rows}
-    rates.setdefault('RMB', 1.0)
-    rates.setdefault('CNY', 1.0)
-    return rates
-
-
-def _convert_min_to_fee_currency(min_fee: float, min_cur: str, fee_cur: str, rates: dict) -> float:
-    """Convert min_fee from min_cur to fee_cur using RMB as the pivot currency."""
-    if min_cur == fee_cur:
-        return min_fee
-    rmb_per_min = rates.get(min_cur, 1.0)
-    rmb_per_fee = rates.get(fee_cur, 1.0)
-    if rmb_per_fee == 0:
-        return min_fee
-    return min_fee * rmb_per_min / rmb_per_fee
 
 
 def _add_scores(db: Session, results: List[Dict]) -> Dict[str, dict]:

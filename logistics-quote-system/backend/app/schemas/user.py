@@ -15,20 +15,6 @@ class UserBase(BaseModel):
     is_admin: bool = Field(False, description="是否管理员")
 
 
-class UserCreate(UserBase):
-    """创建用户Schema"""
-    password: str = Field(..., min_length=6, description="密码")
-
-
-class UserUpdate(BaseModel):
-    """更新用户Schema"""
-    full_name: Optional[str] = None
-    email: Optional[str] = None
-    password: Optional[str] = None
-    is_active: Optional[bool] = None
-    is_admin: Optional[bool] = None
-
-
 class UserResponse(UserBase):
     """用户响应Schema"""
     id: int

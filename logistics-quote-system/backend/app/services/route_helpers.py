@@ -1,4 +1,4 @@
-# backend/app/api/v1/route_helpers.py
+# backend/app/services/route_helpers.py
 """
 Pure utility functions extracted from routes.py for testability.
 These have no FastAPI or SQLAlchemy imports, so they can be imported in isolation.

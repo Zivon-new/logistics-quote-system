@@ -5,6 +5,7 @@ FastAPI应用主入口
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -124,7 +125,7 @@ async def health_check():
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """请求参数校验失败 → 400"""
-    return JSONResponse(status_code=400, content={"detail": exc.errors()})
+    return JSONResponse(status_code=400, content=jsonable_encoder({"detail": exc.errors()}))
 
 
 @app.exception_handler(StarletteHTTPException)
