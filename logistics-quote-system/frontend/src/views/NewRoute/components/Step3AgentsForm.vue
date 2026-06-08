@@ -230,9 +230,7 @@
                     size="small"
                     @change="updateFeeAmount(scope.row)"
                   />
-                  <el-tooltip content="公式（如 =货值*0.038）" placement="top">
-                    <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '单价')">=</el-button>
-                  </el-tooltip>
+                  <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '单价')">=</el-button>
                 </div>
               </template>
             </el-table-column>
@@ -267,29 +265,14 @@
                   <el-button link size="small" class="formula-clear" @click="clearFormula(scope.row, '数量')">×</el-button>
                 </div>
                 <div v-else class="price-wrap">
-                  <el-tooltip
-                    v-if="isAutoQuantity(scope.row.单位)"
-                    content="已按计费重量/体积自动填入，可手动修改"
-                    placement="top"
-                  >
-                    <el-input-number :controls="false"
-                      v-model="scope.row.数量"
-                      :precision="2"
-                      :min="0"
-                      size="small"
-                      @change="updateFeeAmount(scope.row)"
-                    />
-                  </el-tooltip>
-                  <el-input-number v-else :controls="false"
+                  <el-input-number :controls="false"
                     v-model="scope.row.数量"
                     :precision="2"
                     :min="0"
                     size="small"
                     @change="updateFeeAmount(scope.row)"
                   />
-                  <el-tooltip content="输入表达式（如 462*3）" placement="top">
-                    <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '数量')">=</el-button>
-                  </el-tooltip>
+                  <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '数量')">=</el-button>
                 </div>
               </template>
             </el-table-column>
@@ -324,16 +307,13 @@
 
             <el-table-column label="原币金额" width="110">
               <template #default="scope">
-                <el-tooltip
+                <span
                   v-if="scope.row.最低收费 > 0 && calcOriginalAmount(scope.row) > (scope.row.单价 * scope.row.数量)"
-                  content="已应用最低收费"
-                  placement="top"
+                  style="color: #fa8c16; font-weight: 600;"
                 >
-                  <span style="color: #fa8c16; font-weight: 600;">
-                    {{ calcOriginalAmount(scope.row).toFixed(2) }}
-                    <el-icon style="font-size:11px;vertical-align:-1px"><InfoFilled /></el-icon>
-                  </span>
-                </el-tooltip>
+                  {{ calcOriginalAmount(scope.row).toFixed(2) }}
+                  <el-icon style="font-size:11px;vertical-align:-1px"><InfoFilled /></el-icon>
+                </span>
                 <span v-else style="color: #1890ff; font-weight: 500;">
                   {{ calcOriginalAmount(scope.row).toFixed(2) }}
                 </span>
@@ -350,17 +330,12 @@
 
             <el-table-column label="核算" width="58" align="center">
               <template #default="scope">
-                <el-tooltip
+                <el-switch
                   v-if="scope.row.备注 !== '__GROUP_HEADER__'"
-                  :content="scope.row.参与核算 !== false ? '参与核算（点击排除）' : '已排除（点击恢复）'"
-                  placement="top"
-                >
-                  <el-switch
-                    :model-value="scope.row.参与核算 !== false"
-                    size="small"
-                    @change="val => { scope.row.参与核算 = val; updateFeeAmount(scope.row) }"
-                  />
-                </el-tooltip>
+                  :model-value="scope.row.参与核算 !== false"
+                  size="small"
+                  @change="val => { scope.row.参与核算 = val; updateFeeAmount(scope.row) }"
+                />
               </template>
             </el-table-column>
 
@@ -479,9 +454,7 @@
                     size="small"
                     @change="updateFeeTotalRMB(scope.row)"
                   />
-                  <el-tooltip content="公式（如 =货值*0.038）" placement="top">
-                    <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '原币金额')">=</el-button>
-                  </el-tooltip>
+                  <el-button link size="small" class="formula-btn" @click="activateFormula(scope.row, '原币金额')">=</el-button>
                 </div>
               </template>
             </el-table-column>
@@ -502,17 +475,12 @@
 
             <el-table-column label="核算" width="58" align="center">
               <template #default="scope">
-                <el-tooltip
+                <el-switch
                   v-if="scope.row.备注 !== '__GROUP_HEADER__'"
-                  :content="scope.row.参与核算 !== false ? '参与核算（点击排除）' : '已排除（点击恢复）'"
-                  placement="top"
-                >
-                  <el-switch
-                    :model-value="scope.row.参与核算 !== false"
-                    size="small"
-                    @change="val => { scope.row.参与核算 = val; updateSummary(props.modelValue[agentIndex]) }"
-                  />
-                </el-tooltip>
+                  :model-value="scope.row.参与核算 !== false"
+                  size="small"
+                  @change="val => { scope.row.参与核算 = val; updateSummary(props.modelValue[agentIndex]) }"
+                />
               </template>
             </el-table-column>
 
@@ -591,14 +559,12 @@
               <el-col :span="12">
                 <el-form-item label="小计">
                   <div class="manual-override-row">
-                    <el-tooltip content="切换为手动填写小计" placement="top">
-                      <el-switch
-                        v-model="agent.summary.小计手动"
-                        size="small"
-                        style="margin-right:8px;flex-shrink:0"
-                        @change="updateSummary(agent)"
-                      />
-                    </el-tooltip>
+                    <el-switch
+                      v-model="agent.summary.小计手动"
+                      size="small"
+                      style="margin-right:8px;flex-shrink:0"
+                      @change="updateSummary(agent)"
+                    />
                     <el-input-number
                       v-if="agent.summary.小计手动"
                       :controls="false"
@@ -766,14 +732,12 @@
               <el-col :span="12">
                 <el-form-item label="税金">
                   <div class="manual-override-row">
-                    <el-tooltip content="切换为手动填写" placement="top">
-                      <el-switch
-                        v-model="agent.summary.税金手动"
-                        size="small"
-                        style="margin-right:8px;flex-shrink:0"
-                        @change="updateSummary(agent)"
-                      />
-                    </el-tooltip>
+                    <el-switch
+                      v-model="agent.summary.税金手动"
+                      size="small"
+                      style="margin-right:8px;flex-shrink:0"
+                      @change="updateSummary(agent)"
+                    />
                     <template v-if="agent.summary.税金手动">
                       <el-input-number
                         :controls="false"
@@ -820,14 +784,12 @@
               <el-col :span="12">
                 <el-form-item label="汇损">
                   <div class="manual-override-row">
-                    <el-tooltip content="切换为手动填写" placement="top">
-                      <el-switch
-                        v-model="agent.summary.汇损手动"
-                        size="small"
-                        style="margin-right:8px;flex-shrink:0"
-                        @change="updateSummary(agent)"
-                      />
-                    </el-tooltip>
+                    <el-switch
+                      v-model="agent.summary.汇损手动"
+                      size="small"
+                      style="margin-right:8px;flex-shrink:0"
+                      @change="updateSummary(agent)"
+                    />
                     <el-input-number
                       v-if="agent.summary.汇损手动"
                       :controls="false"
@@ -1226,11 +1188,6 @@ const queryUnits = (query, cb) => {
     ? UNIT_OPTIONS.filter(u => u.includes(q)).map(u => ({ value: u }))
     : UNIT_OPTIONS.map(u => ({ value: u }))
   cb(results)
-}
-
-// 判断是否自动计算数量
-const isAutoQuantity = (unit) => {
-  return unit === '/kg' || unit === '/cbm'
 }
 
 // 处理单位变化

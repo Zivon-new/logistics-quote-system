@@ -9,7 +9,7 @@
         <el-step title="预览确认" />
       </el-steps>
 
-      <div class="step-content">
+      <div class="step-content" @keydown="blockNumberInputSpin">
         <!-- Step 1: 路线信息 -->
         <Step1RouteInfo
           v-show="currentStep === 0"
@@ -160,6 +160,13 @@ const formData = reactive({
     }
   ]
 })
+
+// 数字输入框上/下方向键会触发浏览器原生的加一/减一，录入费用时容易误触，统一屏蔽
+const blockNumberInputSpin = (e) => {
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.target?.tagName === 'INPUT' && e.target?.type === 'number') {
+    e.preventDefault()
+  }
+}
 
 const debugRouteValue = computed(() => {
   const value = formData.route.货值
