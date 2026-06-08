@@ -56,7 +56,15 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=400, detail="用户已被禁用")
 
-    access_token = create_access_token(data={"sub": user.username})
+    # 原子递增会话版本号（数据库端 +1，避免并发登录时读改写竞态导致版本号重复），
+    # 使该账号此前在其他设备/浏览器上的登录态失效（同一时间只允许一处登录）
+    db.query(User).filter(User.id == user.id).update(
+        {User.session_version: User.session_version + 1}
+    )
+    db.commit()
+    db.refresh(user)
+
+    access_token = create_access_token(data={"sub": user.username, "ver": user.session_version})
 
     return {
         "access_token": access_token,
@@ -72,8 +80,17 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout", summary="用户登出")
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
-    用户登出接口（JWT无状态，客户端删除Token即可）
+    用户登出接口
+
+    递增会话版本号，使当前Token立即失效（不必等待过期）
     """
+    db.query(User).filter(User.id == current_user.id).update(
+        {User.session_version: User.session_version + 1}
+    )
+    db.commit()
     return {"message": "登出成功"}

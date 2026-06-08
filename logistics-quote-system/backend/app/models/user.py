@@ -17,5 +17,6 @@ class User(Base):
     email = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
+    session_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

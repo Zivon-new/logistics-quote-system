@@ -46,6 +46,14 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    # 会话版本号不一致：账号已在其他设备/浏览器重新登录，使旧Token失效（同账号同时只允许一处登录）
+    if payload.get("ver") != user.session_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="登录状态已失效，可能因为该账号在其他设备上登录，请重新登录",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     if not user.is_active:
         raise HTTPException(status_code=400, detail="用户已被禁用")
 
