@@ -10,7 +10,7 @@ from app.models.user import User
 from app.core.security import get_password_hash
 
 # ────────────────────────────────────────────────────────────
-# 在下方填写要创建的账号。已存在的用户名会自动跳过。
+# 在下方填写要创建/更新的账号。已存在的用户名会覆盖更新，不存在则新建。
 # username: 登录用，英文/拼音，不能重复
 # full_name: 显示姓名
 # password: 初始密码
@@ -85,10 +85,16 @@ def init_database():
         else:
             print("⚠ 普通用户已存在，跳过")
         
-        # 批量创建 USERS_TO_CREATE 中的账号
+        # 批量创建/更新 USERS_TO_CREATE 中的账号：用户名已存在则覆盖，不存在则新建
         for u in USERS_TO_CREATE:
-            exists = db.query(User).filter(User.username == u["username"]).first()
-            if not exists:
+            existing = db.query(User).filter(User.username == u["username"]).first()
+            if existing:
+                existing.hashed_password = get_password_hash(u["password"])
+                existing.full_name = u["full_name"]
+                existing.is_admin = u.get("is_admin", False)
+                existing.is_active = True
+                print(f"✓ 已覆盖用户: {u['username']} ({u['full_name']})")
+            else:
                 db.add(User(
                     username=u["username"],
                     hashed_password=get_password_hash(u["password"]),
@@ -97,8 +103,6 @@ def init_database():
                     is_active=True,
                 ))
                 print(f"✓ 创建用户: {u['username']} ({u['full_name']})")
-            else:
-                print(f"⚠ 已存在，跳过: {u['username']}")
 
         db.commit()
         print("\n✓ 数据库初始化完成！")
