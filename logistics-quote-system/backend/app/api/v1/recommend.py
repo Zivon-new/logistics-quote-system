@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from ...database import get_db
+from ...core.deps import get_current_user
+from ...models.user import User
 from ...services import recommend_service
 
 router = APIRouter(prefix="/recommend", tags=["智能推荐"])
@@ -21,7 +23,8 @@ async def get_recommendations(
     transport_mode: Optional[str] = Query(None, description="运输方式：海运/空运/铁路"),
     sort_by: str = Query("score", description="排序方式：score/time/price"),
     top_n: int = Query(10, ge=1, le=20, description="最多返回条数"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     智能推荐接口
@@ -41,7 +44,10 @@ async def get_recommendations(
 
 
 @router.get("/options")
-async def get_search_options(db: Session = Depends(get_db)):
+async def get_search_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """获取搜索选项（起始地/目的地/货物列表，用于前端下拉）"""
     return {
         "origins": recommend_service.get_available_origins(db),
