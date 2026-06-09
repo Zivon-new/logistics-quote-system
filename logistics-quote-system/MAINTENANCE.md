@@ -58,6 +58,18 @@ MySQL 数据库（price_test_v2）
 crontab -l
 ```
 
+### 程序内置定时任务（APScheduler）
+
+以下任务由后端程序自动调度，**不在 crontab 里**，服务运行时自动执行：
+
+| 时间 | 任务 |
+|------|------|
+| 每天 08:00 | 贸法通预警同步（爬取最新贸易政策预警） |
+| 每天 09:30 | 汇率自动同步（open.er-api.com） |
+| 每天 18:30 | 原油期货价格同步（AKShare SC0 合约） |
+
+> 如果在这三个时间点前后系统出现短暂卡顿或浏览器响应慢，属于正常现象，爬虫任务完成后会自动恢复。
+
 ---
 
 ## 三、服务管理
@@ -72,7 +84,41 @@ crontab -l
 
 ---
 
-## 四、代码更新流程
+## 四、日志与轮转
+
+应用日志由 logrotate 自动管理，**无需手动清理**。
+
+| 日志文件 | 内容 |
+|----------|------|
+| `logs/error.log` | 应用程序 ERROR/CRITICAL 级别错误 |
+| `logs/monitor.log` | 监控脚本每次运行结果 |
+| `logs/backup.log` | 备份脚本每次运行结果 |
+
+轮转策略：每天轮转一次，保留最近 30 份，超过 100MB 立即轮转，压缩存档。
+
+手动触发轮转（日志异常过大时）：
+```bash
+logrotate -f /etc/logrotate.d/logistics
+```
+
+---
+
+## 五、Nginx 管理
+
+Nginx 负责将外部请求转发到后端，并直接服务前端静态文件。
+
+| 操作 | 命令 |
+|------|------|
+| 查看状态 | `systemctl status nginx` |
+| 重载配置（不中断服务） | `systemctl reload nginx` |
+| 测试配置是否有语法错误 | `nginx -t` |
+| 查看配置文件 | `cat /etc/nginx/sites-enabled/logistics` |
+
+> 通常只有修改了 Nginx 配置文件（如绑定域名、配置 HTTPS）后才需要操作 Nginx，日常不需要碰它。
+
+---
+
+## 六、代码更新流程
 
 每次改完代码、推送到 GitHub 后，SSH 登录服务器执行：
 
@@ -88,7 +134,7 @@ cd /opt/logistics && git pull origin main && systemctl restart logistics
 
 ---
 
-## 五、数据库恢复（出现数据丢失时）
+## 七、数据库恢复（出现数据丢失时）
 
 ### 第一步：找到备份文件
 
@@ -118,7 +164,7 @@ systemctl restart logistics
 
 ---
 
-## 六、收到告警邮件怎么处理
+## 八、收到告警邮件怎么处理
 
 ### 邮件标题：【物流系统告警】
 
@@ -151,7 +197,7 @@ tail -100 /opt/logistics/logistics-quote-system/backend/logs/error.log
 
 ---
 
-## 七、服务器关键路径速查
+## 九、服务器关键路径速查
 
 | 内容 | 路径 |
 |------|------|
@@ -163,12 +209,12 @@ tail -100 /opt/logistics/logistics-quote-system/backend/logs/error.log
 | 监控运行日志 | `/opt/logistics/logistics-quote-system/backend/logs/monitor.log` |
 | 备份运行日志 | `/opt/logistics/logistics-quote-system/backend/logs/backup.log` |
 | systemd 服务文件 | `/etc/systemd/system/logistics.service` |
-| Nginx 配置 | `/etc/nginx/` |
+| Nginx 配置 | `/etc/nginx/sites-enabled/logistics` |
 | 启动脚本 | `/opt/logistics/start.sh` |
 
 ---
 
-## 八、账号与密钥
+## 十、账号与密钥
 
 > 以下信息不要外传，不要提交到 git。
 
