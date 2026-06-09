@@ -219,6 +219,21 @@ async def get_history(
     ]
 
 
+@router.delete("/history/{check_id}")
+async def delete_history(
+    check_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = db.execute(text(
+        "DELETE FROM agent_check_history WHERE 查调ID = :id"
+    ), {"id": check_id})
+    db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    return {"ok": True}
+
+
 @router.get("/history/{check_id}")
 async def get_history_detail(
     check_id: int,

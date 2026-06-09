@@ -19,7 +19,6 @@
           <div class="step-label">① 输入公司名称</div>
           <el-input
             v-model="keyword"
-            placeholder="如：北京嘉恒利供应链有限公司"
             clearable
             style="margin-bottom:12px"
           />
@@ -33,7 +32,6 @@
             v-model="rawText"
             type="textarea"
             :rows="12"
-            placeholder="将天眼查或企查查上的公司工商信息、股东结构、风险记录等内容粘贴到此处..."
             style="margin-bottom:12px"
           />
 
@@ -76,7 +74,16 @@
             >
               <div class="history-row1">
                 <span class="history-kw">{{ item.keyword }}</span>
-                <el-tag :type="riskTagType(item.risk_level)" size="small">{{ item.risk_level }}</el-tag>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <el-tag :type="riskTagType(item.risk_level)" size="small">{{ item.risk_level }}</el-tag>
+                  <el-button
+                    link
+                    size="small"
+                    :icon="Delete"
+                    style="color:#bfbfbf;padding:0"
+                    @click.stop="handleDelete(item.id)"
+                  />
+                </div>
               </div>
               <div class="history-row2">
                 <span class="history-time">{{ item.created_at?.slice(0, 16) }}</span>
@@ -196,9 +203,10 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   EditPen, Document, RefreshRight, MagicStick,
-  Lightning, Notebook, OfficeBuilding, Files
+  Lightning, Notebook, OfficeBuilding, Files, Delete
 } from '@element-plus/icons-vue'
-import { checkAgent, getHistory, getHistoryDetail } from '@/api/agentCheck'
+import { ElMessageBox } from 'element-plus'
+import { checkAgent, getHistory, getHistoryDetail, deleteHistory } from '@/api/agentCheck'
 
 const keyword = ref('')
 const rawText = ref('')
@@ -263,6 +271,23 @@ const viewHistory = async (id) => {
     rawText.value = ''
   } catch (e) {
     ElMessage.error('加载失败')
+  }
+}
+
+const handleDelete = async (id) => {
+  try {
+    await ElMessageBox.confirm('确定删除这条背调记录吗？', '删除确认', {
+      confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning'
+    })
+    await deleteHistory(id)
+    if (activeHistoryId.value === id) {
+      result.value = null
+      activeHistoryId.value = null
+    }
+    history.value = history.value.filter(item => item.id !== id)
+    ElMessage.success('已删除')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('删除失败')
   }
 }
 

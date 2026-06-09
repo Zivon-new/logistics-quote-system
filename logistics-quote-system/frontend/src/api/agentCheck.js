@@ -16,3 +16,7 @@ export function getHistory() {
 export function getHistoryDetail(id) {
   return request({ url: `/v1/agent-check/history/${id}`, method: 'get' })
 }
+
+export function deleteHistory(id) {
+  return request({ url: `/v1/agent-check/history/${id}`, method: 'delete' })
+}
