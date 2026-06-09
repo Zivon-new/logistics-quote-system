@@ -91,6 +91,18 @@ def check_systemd_service() -> tuple[bool, str]:
         return False, f"systemctl 检查失败: {e}"
 
 
+def check_disk_space() -> tuple[bool, str]:
+    if sys.platform == "win32":
+        return True, "Windows 跳过磁盘检查"
+    import shutil
+    usage = shutil.disk_usage("/")
+    free_pct = usage.free / usage.total * 100
+    free_gb = usage.free / 1024 ** 3
+    if free_pct < 20:
+        return False, f"磁盘剩余空间不足 {free_pct:.1f}%（{free_gb:.1f} GB），请及时清理"
+    return True, f"{free_pct:.1f}% 可用"
+
+
 def scan_new_errors(state: dict) -> tuple[list[str], int]:
     if not LOG_FILE.exists():
         return [], state.get("log_offset", 0)
@@ -139,6 +151,10 @@ def main():
     if not svc_ok:
         issues.append(f"[服务异常] {svc_msg}")
 
+    disk_ok, disk_msg = check_disk_space()
+    if not disk_ok:
+        issues.append(f"[磁盘告警] {disk_msg}")
+
     new_errors, new_offset = scan_new_errors(state)
     if new_errors:
         issues.append(f"[错误日志] 发现 {len(new_errors)} 条新错误（最多展示 {MAX_ERROR_LINES_IN_ALERT} 条）:")
@@ -167,8 +183,8 @@ def main():
     else:
         http_label = f"HTTP {http_msg}"
         svc_label = svc_msg if sys.platform != "win32" else "systemd跳过"
-        err_label = f"日志无新增错误" if not new_errors else f"日志{len(new_errors)}条错误"
-        print(f"[{now}] 正常 — {http_label} | 服务:{svc_label} | {err_label}")
+        err_label = "日志无新增错误" if not new_errors else f"日志{len(new_errors)}条错误"
+        print(f"[{now}] 正常 — {http_label} | 服务:{svc_label} | 磁盘:{disk_msg} | {err_label}")
 
 
 if __name__ == "__main__":
