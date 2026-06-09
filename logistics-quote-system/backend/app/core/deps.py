@@ -2,6 +2,7 @@
 """
 依赖注入（用于API路由）
 """
+from datetime import datetime
 from typing import Generator, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -56,6 +57,9 @@ async def get_current_user(
 
     if not user.is_active:
         raise HTTPException(status_code=400, detail="用户已被禁用")
+
+    user.last_active = datetime.now()
+    db.commit()
 
     return user
 

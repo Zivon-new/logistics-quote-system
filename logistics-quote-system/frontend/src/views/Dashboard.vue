@@ -66,6 +66,25 @@
       </div>
     </el-card>
 
+    <!-- 在线用户（仅 admin 可见） -->
+    <el-card v-if="userStore.userInfo.username === 'admin'" class="online-card" shadow="never">
+      <template #header>
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <span>当前在线用户（5分钟内）</span>
+          <el-button link size="small" @click="loadOnlineUsers">刷新</el-button>
+        </div>
+      </template>
+      <el-empty v-if="!onlineUsers.length" description="暂无在线用户" :image-size="40" />
+      <div v-else style="display:flex;flex-wrap:wrap;gap:10px">
+        <div v-for="u in onlineUsers" :key="u.username"
+          style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:20px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#52c41a;display:inline-block"></span>
+          <span style="font-size:13px;color:#262626">{{ u.full_name }}</span>
+          <span style="font-size:11px;color:#8c8c8c">{{ u.last_active }}</span>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 系统信息 -->
     <el-card class="system-info">
       <template #header>
@@ -94,29 +113,37 @@
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { getStats } from '@/api/route'
+import { getOnlineUsers } from '@/api/users'
 
 const userStore = useUserStore()
 
-const stats = ref({
-  totalRoutes: 0,
-  totalAgents: 0,
-  thisMonthRoutes: 0
-})
+const stats = ref({ totalRoutes: 0, totalAgents: 0, thisMonthRoutes: 0 })
+const onlineUsers = ref([])
+
+const loadOnlineUsers = async () => {
+  try {
+    onlineUsers.value = await getOnlineUsers()
+  } catch {
+    // 非 admin 会收到 403，静默忽略
+  }
+}
 
 onMounted(async () => {
   try {
     const res = await getStats()
-    // ✅ 修复：正确解析返回数据
     if (res.success && res.data) {
       stats.value = {
         totalRoutes: res.data.total_routes || 0,
         totalAgents: res.data.total_agents || 0,
-        thisMonthRoutes: res.data.month_routes || 0  // ✅ 修复：使用正确的字段名
+        thisMonthRoutes: res.data.month_routes || 0
       }
     }
   } catch (error) {
     console.error('获取统计数据失败:', error)
-    // 失败也不影响页面显示，只是数据为0
+  }
+
+  if (userStore.userInfo.username === 'admin') {
+    loadOnlineUsers()
   }
 })
 </script>

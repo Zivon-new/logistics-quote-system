@@ -13,6 +13,7 @@ from .risk import router as risk_router
 from .agent_check import router as agent_check_router
 from .warnings import router as warnings_router
 from .attachments import router as attachments_router
+from .users import router as users_router
 
 api_router = APIRouter(prefix="/v1")
 
@@ -27,3 +28,4 @@ api_router.include_router(risk_router)
 api_router.include_router(agent_check_router)
 api_router.include_router(warnings_router)
 api_router.include_router(attachments_router)
+api_router.include_router(users_router)
