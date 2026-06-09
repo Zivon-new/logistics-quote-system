@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
 
+    # 监控告警配置（monitor.py 使用）
+    SERVICE_URL: str = "http://localhost:8000"
+    SYSTEMD_SERVICE: str = "logistics"
+    SMTP_USER: str = "sunzhiweiblcu@163.com"
+    SMTP_AUTH_CODE: str = ""
+    ALERT_EMAIL: str = "sunzhiweiblcu@163.com"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
