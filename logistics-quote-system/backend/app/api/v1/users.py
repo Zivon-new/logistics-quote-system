@@ -8,7 +8,7 @@ from ...models.user import User
 
 router = APIRouter(prefix="/users", tags=["用户"])
 
-ONLINE_THRESHOLD_MINUTES = 5
+ONLINE_THRESHOLD_MINUTES = 2
 
 
 @router.get("/online")

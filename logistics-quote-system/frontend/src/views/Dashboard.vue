@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { getStats } from '@/api/route'
 import { getOnlineUsers } from '@/api/users'
@@ -119,6 +119,7 @@ const userStore = useUserStore()
 
 const stats = ref({ totalRoutes: 0, totalAgents: 0, thisMonthRoutes: 0 })
 const onlineUsers = ref([])
+let onlineTimer = null
 
 const loadOnlineUsers = async () => {
   try {
@@ -144,7 +145,12 @@ onMounted(async () => {
 
   if (userStore.userInfo.username === 'admin') {
     loadOnlineUsers()
+    onlineTimer = setInterval(loadOnlineUsers, 30000)
   }
+})
+
+onUnmounted(() => {
+  if (onlineTimer) clearInterval(onlineTimer)
 })
 </script>
 
