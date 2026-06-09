@@ -70,7 +70,7 @@
     <el-card v-if="userStore.userInfo.username === 'admin'" class="online-card" shadow="never">
       <template #header>
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
-          <span>当前在线用户（5分钟内）</span>
+          <span>当前在线用户</span>
           <el-button link size="small" @click="loadOnlineUsers">刷新</el-button>
         </div>
       </template>
