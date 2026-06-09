@@ -72,6 +72,22 @@ def backup_database():
     size_mb = backup_file.stat().st_size / 1024 / 1024
     print(f"✓ 备份完成: {backup_file.name} ({size_mb:.2f} MB)")
     cleanup_old_backups()
+    upload_to_oss(backup_file)
+
+
+def upload_to_oss(backup_file: Path):
+    if not settings.OSS_ACCESS_KEY_ID or not settings.OSS_ACCESS_KEY_SECRET:
+        print("  OSS 未配置，跳过异地备份")
+        return
+    try:
+        import oss2
+        auth = oss2.Auth(settings.OSS_ACCESS_KEY_ID, settings.OSS_ACCESS_KEY_SECRET)
+        bucket = oss2.Bucket(auth, settings.OSS_ENDPOINT, settings.OSS_BUCKET)
+        oss_key = f"backups/{backup_file.name}"
+        bucket.put_object_from_file(oss_key, str(backup_file))
+        print(f"  ✓ 已上传至 OSS: {oss_key}")
+    except Exception as e:
+        print(f"  ✗ OSS 上传失败（本地备份仍有效）: {e}")
 
 
 def cleanup_old_backups():

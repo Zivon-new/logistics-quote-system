@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     SMTP_AUTH_CODE: str = ""
     ALERT_EMAIL: str = "sunzhiweiblcu@163.com"
 
+    # 阿里云 OSS 配置（backup_database.py 异地备份使用）
+    OSS_ACCESS_KEY_ID: str = ""
+    OSS_ACCESS_KEY_SECRET: str = ""
+    OSS_BUCKET: str = "cjnldhj"
+    OSS_ENDPOINT: str = "oss-cn-beijing-internal.aliyuncs.com"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
