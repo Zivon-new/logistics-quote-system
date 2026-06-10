@@ -2,7 +2,7 @@
 """
 用户模型
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func
 from ..database import Base
 
 
@@ -21,3 +21,13 @@ class User(Base):
     last_active = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class UserLoginLog(Base):
+    """登录历史日志：每次成功登录记录一条"""
+    __tablename__ = "user_login_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    login_at = Column(DateTime, nullable=False, server_default=func.now())
+    ip_address = Column(String(45), nullable=True)

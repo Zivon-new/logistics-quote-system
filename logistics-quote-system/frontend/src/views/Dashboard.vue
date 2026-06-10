@@ -85,6 +85,25 @@
       </div>
     </el-card>
 
+    <!-- 登录历史（仅 admin 可见） -->
+    <el-card v-if="userStore.userInfo.username === 'admin'" class="login-history-card" shadow="never">
+      <template #header>
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <span>登录历史</span>
+          <el-button link size="small" @click="loadLoginHistory">刷新</el-button>
+        </div>
+      </template>
+      <el-empty v-if="!loginHistory.length" description="暂无登录记录" :image-size="40" />
+      <div v-else style="display:flex;flex-direction:column;gap:8px">
+        <div v-for="log in loginHistory" :key="log.id"
+          style="display:flex;align-items:center;gap:12px;padding:6px 12px;background:#fafafa;border-radius:4px">
+          <span style="font-size:13px;color:#262626;min-width:80px">{{ log.full_name }}</span>
+          <span style="font-size:12px;color:#8c8c8c">{{ log.login_at }}</span>
+          <span style="font-size:12px;color:#bfbfbf;margin-left:auto">{{ log.ip_address }}</span>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 系统信息 -->
     <el-card class="system-info">
       <template #header>
@@ -113,12 +132,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { getStats } from '@/api/route'
-import { getOnlineUsers } from '@/api/users'
+import { getOnlineUsers, getLoginHistory } from '@/api/users'
 
 const userStore = useUserStore()
 
 const stats = ref({ totalRoutes: 0, totalAgents: 0, thisMonthRoutes: 0 })
 const onlineUsers = ref([])
+const loginHistory = ref([])
 let onlineTimer = null
 
 const loadOnlineUsers = async () => {
@@ -126,6 +146,14 @@ const loadOnlineUsers = async () => {
     onlineUsers.value = await getOnlineUsers()
   } catch {
     // 非 admin 会收到 403，静默忽略
+  }
+}
+
+const loadLoginHistory = async () => {
+  try {
+    loginHistory.value = await getLoginHistory()
+  } catch (error) {
+    console.error('获取登录历史失败:', error)
   }
 }
 
@@ -145,6 +173,7 @@ onMounted(async () => {
 
   if (userStore.userInfo.username === 'admin') {
     loadOnlineUsers()
+    loadLoginHistory()
     onlineTimer = setInterval(loadOnlineUsers, 30000)
   }
 })
@@ -249,6 +278,10 @@ onUnmounted(() => {
   margin-top: 12px;
   font-size: 14px;
   color: #595959;
+}
+
+.login-history-card {
+  margin-bottom: 24px;
 }
 
 .system-info {

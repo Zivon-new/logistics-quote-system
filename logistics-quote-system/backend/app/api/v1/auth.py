@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from ...core.deps import get_db, get_current_user
 from ...core.security import create_access_token, verify_password
 from ...core.captcha import generate_captcha, verify_captcha
+from ...core.request_utils import get_client_ip
 from ...schemas.user import LoginRequest, LoginResponse, UserResponse
-from ...models.user import User
+from ...models.user import User, UserLoginLog
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 limiter = Limiter(key_func=get_remote_address)
@@ -61,6 +62,7 @@ async def login(
     db.query(User).filter(User.id == user.id).update(
         {User.session_version: User.session_version + 1}
     )
+    db.add(UserLoginLog(user_id=user.id, ip_address=get_client_ip(request)))
     db.commit()
     db.refresh(user)
 
