@@ -2,6 +2,9 @@
 """
 认证相关API
 """
+import logging
+from datetime import datetime
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,6 +18,19 @@ from ...models.user import User, UserLoginLog
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger(__name__)
+
+LOGIN_LOG_FILE = Path(__file__).resolve().parents[3] / "logs" / "login_history.log"
+
+
+def _append_login_log(username: str, ip_address: str | None):
+    """记录完整登录历史到日志文件（Dashboard 登录历史卡片只展示每人最近一次）"""
+    try:
+        LOGIN_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(LOGIN_LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | {username} | {ip_address or '-'}\n")
+    except OSError as e:
+        logger.warning(f"写入登录历史日志失败: {e}")
 
 
 @router.get("/captcha", summary="获取验证码")
@@ -65,6 +81,7 @@ async def login(
     db.add(UserLoginLog(user_id=user.id, ip_address=get_client_ip(request)))
     db.commit()
     db.refresh(user)
+    _append_login_log(user.username, get_client_ip(request))
 
     access_token = create_access_token(data={"sub": user.username, "ver": user.session_version})
 

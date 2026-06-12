@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 
-export function getUserActivity() {
-  return request({ url: '/v1/users/activity', method: 'get' })
+export function getOnlineUsers() {
+  return request({ url: '/v1/users/online', method: 'get' })
 }
 
 export function getLoginHistory() {

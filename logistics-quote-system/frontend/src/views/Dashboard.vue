@@ -66,20 +66,21 @@
       </div>
     </el-card>
 
-    <!-- 用户活跃状态（仅 admin 可见） -->
+    <!-- 在线用户（仅 admin 可见） -->
     <el-card v-if="userStore.userInfo.username === 'admin'" class="online-card" shadow="never">
       <template #header>
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
-          <span>用户活跃状态</span>
-          <el-button link size="small" @click="loadUserActivity">刷新</el-button>
+          <span>当前在线用户</span>
+          <el-button link size="small" @click="loadOnlineUsers">刷新</el-button>
         </div>
       </template>
-      <div style="display:flex;flex-wrap:wrap;gap:10px">
-        <div v-for="u in userActivity" :key="u.username"
-          :style="{display:'flex',alignItems:'center',gap:'8px',padding:'6px 12px',background:u.is_online?'#f6ffed':'#fafafa',border:`1px solid ${u.is_online?'#b7eb8f':'#e5e7eb'}`,borderRadius:'20px'}">
-          <span :style="{width:'8px',height:'8px',borderRadius:'50%',display:'inline-block',background:u.is_online?'#52c41a':'#d9d9d9'}"></span>
+      <el-empty v-if="!onlineUsers.length" description="暂无在线用户" :image-size="40" />
+      <div v-else style="display:flex;flex-wrap:wrap;gap:10px">
+        <div v-for="u in onlineUsers" :key="u.username"
+          style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:20px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#52c41a;display:inline-block"></span>
           <span style="font-size:13px;color:#262626">{{ u.full_name }}</span>
-          <span style="font-size:11px;color:#8c8c8c">{{ u.last_active || '从未活跃' }}</span>
+          <span style="font-size:11px;color:#8c8c8c">{{ u.last_active }}</span>
         </div>
       </div>
     </el-card>
@@ -131,18 +132,18 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { getStats } from '@/api/route'
-import { getUserActivity, getLoginHistory } from '@/api/users'
+import { getOnlineUsers, getLoginHistory } from '@/api/users'
 
 const userStore = useUserStore()
 
 const stats = ref({ totalRoutes: 0, totalAgents: 0, thisMonthRoutes: 0 })
-const userActivity = ref([])
+const onlineUsers = ref([])
 const loginHistory = ref([])
-let activityTimer = null
+let onlineTimer = null
 
-const loadUserActivity = async () => {
+const loadOnlineUsers = async () => {
   try {
-    userActivity.value = await getUserActivity()
+    onlineUsers.value = await getOnlineUsers()
   } catch {
     // 非 admin 会收到 403，静默忽略
   }
@@ -171,14 +172,14 @@ onMounted(async () => {
   }
 
   if (userStore.userInfo.username === 'admin') {
-    loadUserActivity()
+    loadOnlineUsers()
     loadLoginHistory()
-    activityTimer = setInterval(loadUserActivity, 30000)
+    onlineTimer = setInterval(loadOnlineUsers, 30000)
   }
 })
 
 onUnmounted(() => {
-  if (activityTimer) clearInterval(activityTimer)
+  if (onlineTimer) clearInterval(onlineTimer)
 })
 </script>
 
