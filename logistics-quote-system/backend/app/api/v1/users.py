@@ -12,8 +12,8 @@ ONLINE_THRESHOLD_MINUTES = 2
 LOGIN_HISTORY_LIMIT = 20
 
 
-@router.get("/online")
-async def get_online_users(
+@router.get("/activity")
+async def get_user_activity(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -21,16 +21,17 @@ async def get_online_users(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="权限不足")
 
     cutoff = datetime.now() - timedelta(minutes=ONLINE_THRESHOLD_MINUTES)
+    # MySQL 的 DESC 排序会把 NULL 排在最后，从未活跃过的用户自然落到列表底部
     users = db.query(User).filter(
-        User.is_active == True,
-        User.last_active >= cutoff
+        User.is_active == True
     ).order_by(User.last_active.desc()).all()
 
     return [
         {
             "username": u.username,
             "full_name": u.full_name or u.username,
-            "last_active": u.last_active.strftime("%H:%M:%S") if u.last_active else None,
+            "last_active": u.last_active.strftime("%m-%d %H:%M") if u.last_active else None,
+            "is_online": bool(u.last_active and u.last_active >= cutoff),
         }
         for u in users
     ]
