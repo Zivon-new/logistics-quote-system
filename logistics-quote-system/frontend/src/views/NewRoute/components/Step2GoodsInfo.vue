@@ -15,7 +15,8 @@
         <el-button type="primary" :icon="Plus" size="small" @click="addGoodsDetail">添加货物</el-button>
       </div>
 
-      <el-table :data="goodsDetails" border stripe class="goods-table" v-if="goodsDetails.length > 0">
+      <div v-if="goodsDetails.length > 0" @keydown="handleGoodsKeydown" @focusin="onCellFocusIn" @dblclick="onCellDblClick" @mousedown="onCellMouseDown">
+      <el-table :data="goodsDetails" border stripe class="goods-table">
         <el-table-column label="货物名称" min-width="140">
           <template #default="scope">
             <el-input v-model="scope.row.货物名称" placeholder="如：Nokia 7750" size="small" />
@@ -85,6 +86,7 @@
           </template>
         </el-table-column>
       </el-table>
+      </div>
 
       <div v-else class="empty-tip">
         <el-empty description="暂无货物，点击上方按钮添加" :image-size="80" />
@@ -177,8 +179,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
+import { useGridEditMode, isRadioInput } from '@/composables/useGridEditMode'
+import { focusCell } from '@/utils/gridCellFocus'
 
 const props = defineProps({
   goodsDetails: { type: Array, default: () => [] },
@@ -221,6 +225,58 @@ const calcDetailAuto = (row) => {
   }
   if (row.单价 && row.数量) {
     row.总价 = parseFloat((row.单价 * row.数量).toFixed(2))
+  }
+}
+
+// 货物明细表格的单元格选中态/编辑态导航（ADR-0001）
+const { onCellFocusIn, onCellDblClick, onCellMouseDown, handleEditTransition } = useGridEditMode()
+
+const handleGoodsKeydown = (e) => {
+  if (!handleEditTransition(e)) return
+  const target = e.target
+
+  const tr = target.closest('tr.el-table__row')
+  if (!tr) return
+  const td = target.closest('td')
+  if (!td) return
+  const tbody = tr.closest('tbody')
+  if (!tbody) return
+
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    // 单选框组（是否新品）需 preventDefault 覆盖原生方向键切换选中值的行为
+    if (isRadioInput(target)) e.preventDefault()
+    const allTds = [...tr.querySelectorAll('td')]
+    const curTdIdx = allTds.indexOf(td)
+    if (curTdIdx < 0) return
+    const step = e.key === 'ArrowRight' ? 1 : -1
+    for (let i = curTdIdx + step; i >= 0 && i < allTds.length; i += step) {
+      const inp = allTds[i].querySelector('input:checked') || allTds[i].querySelector('input')
+      if (inp) { e.preventDefault(); inp.focus(); return }
+    }
+    return
+  }
+
+  e.preventDefault()
+  const allRows = [...tbody.querySelectorAll('tr.el-table__row')]
+  const rowIdx = allRows.indexOf(tr)
+  const allTds = [...tr.querySelectorAll('td')]
+  const colIdx = allTds.indexOf(td)
+
+  if (e.key === 'ArrowUp') {
+    if (rowIdx <= 0) return
+    focusCell(allRows, rowIdx - 1, colIdx)
+    return
+  }
+
+  // Enter / ArrowDown → 下一行，最后一行自动新增
+  if (rowIdx + 1 >= allRows.length) {
+    addGoodsDetail()
+    nextTick(() => {
+      const newRows = [...tbody.querySelectorAll('tr.el-table__row')]
+      focusCell(newRows, newRows.length - 1, colIdx)
+    })
+  } else {
+    focusCell(allRows, rowIdx + 1, colIdx)
   }
 }
 

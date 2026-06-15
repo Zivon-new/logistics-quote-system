@@ -170,7 +170,7 @@
             </div>
           </div>
 
-          <div @keydown="handleFeeKeydown($event, agentIndex, 'fi')">
+          <div @keydown="handleFeeKeydown($event, agentIndex, 'fi')" @focusin="onCellFocusIn" @dblclick="onCellDblClick" @mousedown="onCellMouseDown">
           <el-table
             v-if="agent.fee_items && agent.fee_items.length > 0"
             :ref="el => onFeeItemTableRef(el, agentIndex)"
@@ -394,7 +394,7 @@
             </div>
           </div>
 
-          <div @keydown="handleFeeKeydown($event, agentIndex, 'ft')">
+          <div @keydown="handleFeeKeydown($event, agentIndex, 'ft')" @focusin="onCellFocusIn" @dblclick="onCellDblClick" @mousedown="onCellMouseDown">
           <el-table
             v-if="agent.fee_total && agent.fee_total.length > 0"
             :ref="el => onFeeTotalTableRef(el, agentIndex)"
@@ -655,7 +655,7 @@
                   </el-button>
                 </div>
               </div>
-              <div @keydown="handleTaxKeydown($event, agent)">
+              <div @keydown="handleTaxKeydown($event, agent)" @focusin="onCellFocusIn" @dblclick="onCellDblClick" @mousedown="onCellMouseDown">
               <el-table
                 :data="agent.summary.税率明细 || []"
                 border size="small"
@@ -878,6 +878,8 @@ import Sortable from 'sortablejs'
 import AttachmentPanel from '@/components/AttachmentPanel.vue'
 import CurrencySelect from '@/components/CurrencySelect.vue'
 import { useFeeCalculation } from '@/composables/useFeeCalculation'
+import { useGridEditMode } from '@/composables/useGridEditMode'
+import { focusCell } from '@/utils/gridCellFocus'
 
 const props = defineProps({
   modelValue: {
@@ -930,6 +932,9 @@ const {
 } = useFeeCalculation(props)
 
 loadExchangeRates()
+
+// ── 单元格选中态/编辑态（ADR-0001） ─────────────────────────
+const { onCellFocusIn, onCellDblClick, onCellMouseDown, handleEditTransition } = useGridEditMode()
 
 // ── 行唯一 key（row-key 必须，否则 Vue 用位置 diff 会和 Sortable 的 DOM 移动冲突）
 let _idCnt = 0
@@ -1226,9 +1231,9 @@ const syncTaxFrom = (targetAgent, sourceAgent) => {
 
 // 税率明细表格的键盘导航（Enter/方向键，与费用明细一致）
 const handleTaxKeydown = (e, agent) => {
-  if (!['Enter', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
+  if (!handleEditTransition(e)) return
   const target = e.target
-  if (!target || target.tagName !== 'INPUT') return
+
   const tr = target.closest('tr.el-table__row')
   if (!tr) return
   const td = target.closest('td')
@@ -1241,7 +1246,7 @@ const handleTaxKeydown = (e, agent) => {
     const curIdx = allInputs.indexOf(target)
     if (curIdx < 0) return
     const next = e.key === 'ArrowRight' ? allInputs[curIdx + 1] : allInputs[curIdx - 1]
-    if (next) { e.preventDefault(); next.focus(); next.select() }
+    if (next) { e.preventDefault(); next.focus() }
     return
   }
 
@@ -1269,9 +1274,9 @@ const handleTaxKeydown = (e, agent) => {
 }
 
 const handleFeeKeydown = (e, agentIndex, tableType) => {
-  if (!['Enter', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return
+  if (!handleEditTransition(e)) return
   const target = e.target
-  if (!target || target.tagName !== 'INPUT') return
+
   const tr = target.closest('tr.el-table__row')
   if (!tr) return
   const td = target.closest('td')
@@ -1285,7 +1290,7 @@ const handleFeeKeydown = (e, agentIndex, tableType) => {
     const curIdx = allInputs.indexOf(target)
     if (curIdx < 0) return
     const next = e.key === 'ArrowRight' ? allInputs[curIdx + 1] : allInputs[curIdx - 1]
-    if (next) { e.preventDefault(); next.focus(); next.select() }
+    if (next) { e.preventDefault(); next.focus() }
     return
   }
 
@@ -1313,15 +1318,6 @@ const handleFeeKeydown = (e, agentIndex, tableType) => {
   } else {
     focusCell(allRows, rowIdx + 1, colIdx)
   }
-}
-
-const focusCell = (rows, rowIdx, colIdx) => {
-  const tr = rows[rowIdx]
-  if (!tr) return
-  const tds = [...tr.querySelectorAll('td')]
-  const td = tds[Math.min(colIdx, tds.length - 1)]
-  const inp = td?.querySelector('input')
-  if (inp) { inp.focus(); inp.select() }
 }
 
 // taxRateToDisplay / taxRateFromDisplay — from useFeeCalculation composable

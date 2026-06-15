@@ -2,26 +2,31 @@
   <div class="step1-container">
     <h3>路线基本信息</h3>
     
-    <el-form :model="formData" :rules="rules" ref="formRef" label-width="120px">
+    <el-form :model="formData" :rules="rules" ref="formRef" label-width="120px"
+      @focusin="onCellFocusIn" @dblclick="onCellDblClick" @mousedown="onCellMouseDown">
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="起始地" prop="起始地">
-            <el-input 
-              v-model="formData.起始地" 
+            <el-input
+              ref="起始地Ref"
+              v-model="formData.起始地"
               placeholder="如：深圳"
               clearable
               @input="handleInput"
+              @keydown="handleStep1Keydown($event, '起始地')"
             />
           </el-form-item>
         </el-col>
-        
+
         <el-col :span="12">
           <el-form-item label="途径地" prop="途径地">
-            <el-input 
-              v-model="formData.途径地" 
+            <el-input
+              ref="途径地Ref"
+              v-model="formData.途径地"
               placeholder="可选，如：香港"
               clearable
               @input="handleInput"
+              @keydown="handleStep1Keydown($event, '途径地')"
             />
           </el-form-item>
         </el-col>
@@ -30,28 +35,33 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="目的地" prop="目的地">
-            <el-input 
-              v-model="formData.目的地" 
+            <el-input
+              ref="目的地Ref"
+              v-model="formData.目的地"
               placeholder="如：新加坡"
               clearable
               @input="handleInput"
+              @keydown="handleStep1Keydown($event, '目的地')"
             />
           </el-form-item>
         </el-col>
-        
+
         <el-col :span="12">
           <el-form-item label="交易日期" prop="dateRange">
-            <el-date-picker
-              v-model="formData.dateRange"
-              type="daterange"
-              range-separator="-"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              format="YYYY-MM-DD"
-              value-format="YYYY-MM-DD"
-              style="width: 100%"
-              @change="handleInput"
-            />
+            <div ref="交易日期Ref" style="width: 100%" @keydown="handleStep1Keydown($event, '交易日期')">
+              <el-date-picker
+                v-model="formData.dateRange"
+                type="daterange"
+                range-separator="-"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+                @change="handleInput"
+                @visible-change="onDateRangeVisibleChange"
+              />
+            </div>
           </el-form-item>
         </el-col>
       </el-row>
@@ -60,26 +70,30 @@
         <el-col :span="12">
           <el-form-item label="实际重量" prop="实际重量">
             <!-- ✅ 修复：使用 @input 手动处理数字转换 -->
-            <el-input 
+            <el-input
+              ref="实际重量Ref"
               v-model="formData.实际重量"
               type="number"
               placeholder="0.00"
               clearable
               @input="handleNumberInput('实际重量', $event)"
+              @keydown="handleStep1Keydown($event, '实际重量')"
             >
               <template #append>kg</template>
             </el-input>
           </el-form-item>
         </el-col>
-        
+
         <el-col :span="12">
           <el-form-item label="计费重量" prop="计费重量">
-            <el-input 
+            <el-input
+              ref="计费重量Ref"
               v-model="formData.计费重量"
               type="number"
               placeholder="0.00"
               clearable
               @input="handleNumberInput('计费重量', $event)"
+              @keydown="handleStep1Keydown($event, '计费重量')"
             >
               <template #append>kg</template>
             </el-input>
@@ -90,21 +104,24 @@
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="总体积" prop="总体积">
-            <el-input 
+            <el-input
+              ref="总体积Ref"
               v-model="formData.总体积"
               type="number"
               placeholder="0.00"
               clearable
               @input="handleNumberInput('总体积', $event)"
+              @keydown="handleStep1Keydown($event, '总体积')"
             >
               <template #append>cbm</template>
             </el-input>
           </el-form-item>
         </el-col>
-        
+
         <el-col :span="12">
           <el-form-item label="货值" prop="货值">
             <el-input
+              ref="货值Ref"
               :model-value="货值Raw"
               type="text"
               placeholder="如 500000 或 600000*0.8"
@@ -112,9 +129,16 @@
               @input="on货值Input"
               @blur="on货值Blur"
               @clear="() => { 货值Raw = ''; formData.货值 = 0; handleInput() }"
+              @keydown="handleStep1Keydown($event, '货值')"
               style="width: calc(100% - 90px);"
             />
-            <el-select v-model="formData.货值币种" style="width: 100px; margin-left: 2px;" @change="handleInput">
+            <el-select
+              ref="货值币种Ref"
+              v-model="formData.货值币种"
+              style="width: 100px; margin-left: 2px;"
+              @change="handleInput"
+              @keydown="handleStep1Keydown($event, '货值币种')"
+            >
               <el-option label="RMB" value="RMB" />
               <el-option label="USD 美元" value="USD" />
               <el-option label="EUR 欧元" value="EUR" />
@@ -154,6 +178,8 @@
 import { reactive, ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { InfoFilled } from '@element-plus/icons-vue'
+import { useGridEditMode } from '@/composables/useGridEditMode'
+import { getTargetCell, LAST_CELL } from './step1GridLayout'
 
 const props = defineProps({
   modelValue: {
@@ -340,6 +366,76 @@ const populate = (data) => {
   }
   
   console.log('✅ Step1 populate 完成，当前 formData:', formData)
+}
+
+// ========== 单元格选中态/编辑态导航（ADR-0001） ==========
+const { onCellFocusIn, onCellDblClick, onCellMouseDown, handleEditTransition } = useGridEditMode()
+
+const 起始地Ref = ref(null)
+const 途径地Ref = ref(null)
+const 目的地Ref = ref(null)
+const 实际重量Ref = ref(null)
+const 计费重量Ref = ref(null)
+const 总体积Ref = ref(null)
+const 货值Ref = ref(null)
+const 货值币种Ref = ref(null)
+const 交易日期Ref = ref(null)
+const dateRangePickerOpen = ref(false)
+
+const cellRefs = {
+  起始地: 起始地Ref,
+  途径地: 途径地Ref,
+  目的地: 目的地Ref,
+  实际重量: 实际重量Ref,
+  计费重量: 计费重量Ref,
+  总体积: 总体积Ref,
+  货值: 货值Ref,
+  货值币种: 货值币种Ref,
+}
+
+const onDateRangeVisibleChange = (visible) => {
+  dateRangePickerOpen.value = visible
+}
+
+const focusStep1Cell = (cellId) => {
+  if (cellId === '交易日期开始' || cellId === '交易日期结束') {
+    const inputs = 交易日期Ref.value?.querySelectorAll('input')
+    const input = cellId === '交易日期开始' ? inputs?.[0] : inputs?.[1]
+    input?.focus()
+    return
+  }
+  cellRefs[cellId]?.value?.focus?.()
+}
+
+const handleStep1Keydown = (e, rawCellId) => {
+  let cellId = rawCellId
+  if (cellId === '交易日期') {
+    const inputs = [...(交易日期Ref.value?.querySelectorAll('input') || [])]
+    cellId = inputs.indexOf(e.target) === 1 ? '交易日期结束' : '交易日期开始'
+  }
+
+  if (e.key === 'Tab') {
+    if (cellId === LAST_CELL) e.preventDefault()
+    return
+  }
+
+  // 日历面板展开时视为编辑态：方向键交给日历自身导航，仅Enter仍提交并跳格
+  const isDateCell = cellId === '交易日期开始' || cellId === '交易日期结束'
+  if (isDateCell && dateRangePickerOpen.value && e.key !== 'Enter') return
+
+  if (!handleEditTransition(e)) return
+
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const target = getTargetCell(cellId, e.key)
+    if (!target) return
+    e.preventDefault()
+    focusStep1Cell(target)
+    return
+  }
+
+  e.preventDefault()
+  const target = getTargetCell(cellId, e.key)
+  if (target) focusStep1Cell(target)
 }
 
 defineExpose({ validate, getValues, populate })
