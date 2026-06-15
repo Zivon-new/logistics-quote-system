@@ -237,16 +237,14 @@
 
             <el-table-column label="单位" width="130">
               <template #default="scope">
-                <el-autocomplete
+                <el-select
                   v-model="scope.row.单位"
-                  :fetch-suggestions="queryUnits"
                   size="small"
-                  placeholder="选择或手动输入"
-                  :trigger-on-focus="true"
                   style="width:100%"
-                  @select="() => handleUnitChange(scope.row)"
                   @change="() => handleUnitChange(scope.row)"
-                />
+                >
+                  <el-option v-for="u in UNIT_OPTIONS" :key="u" :label="u" :value="u" />
+                </el-select>
               </template>
             </el-table-column>
 
@@ -1182,18 +1180,11 @@ const removeFeeTotal = (agentIndex, feeIndex) => {
   props.modelValue[agentIndex].fee_total.splice(feeIndex, 1)
 }
 
-// 单位建议列表（el-autocomplete 数据源）
+// 单位下拉选项
 const UNIT_OPTIONS = [
   '/kg', '/cbm', '/票', '/件', '/个', '/箱', '/板', '/套', '/人', '/次', '/天',
   '/kg/天', '/cbm/天', '/票/天', '/kg/周', '/cbm/周'
 ]
-const queryUnits = (query, cb) => {
-  const q = (query || '').trim()
-  const results = q
-    ? UNIT_OPTIONS.filter(u => u.includes(q)).map(u => ({ value: u }))
-    : UNIT_OPTIONS.map(u => ({ value: u }))
-  cb(results)
-}
 
 // 处理单位变化
 const handleUnitChange = (feeItem) => {
